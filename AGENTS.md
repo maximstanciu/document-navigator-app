@@ -4,7 +4,7 @@ This is an Expo/React Native mobile application (Expo SDK 58, React Native 0.88,
 
 - `docs/SPEC.md` — requirements (IDs like CAP-2, ANL-8), data model, API contract, analysis schema. Source of truth for behavior.
 - `docs/IMPLEMENTATION_PLAN.md` — stages, tasks (e.g. 1.3), acceptance criteria, which skill to use.
-- Decisions D-1…D-5 in SPEC §11.1 are **not made yet**. Don't implement code that depends on an open decision; ask instead. When a decision is made, it is moved into the SPEC sections it affects.
+- Decisions D-1…D-3 in SPEC §11.1 are **not made yet** (D-4 and D-5 are accepted and already reflected in the SPEC). Don't implement code that depends on an open decision; ask instead. When a decision is made, it is moved into the SPEC sections it affects.
 - Reference requirement IDs and task numbers in commit messages and PR descriptions.
 
 ## Expo has changed — do not trust your training data

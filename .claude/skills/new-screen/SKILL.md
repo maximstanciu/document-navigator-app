@@ -88,6 +88,6 @@ Add `<name>-screen.test.tsx` next to the screen (never under `src/app/`). Cover 
 
 ## 6. Finish
 
-Run the `verify` skill, then look at the screen with the `run-app` skill (web preview at minimum). Deep link to check: `npx uri-scheme open "documentnavigatorapp://<path>" --ios|--android`.
+Run the `verify` skill, then look at the screen with the `run-app` skill (web preview at minimum). Deep link to check: `npx uri-scheme open "docnavigator://<path>" --ios|--android`.
 
 For platform-native UI (SwiftUI / Jetpack Compose via `@expo/ui`, native headers, liquid glass), the official `expo` plugin skills have current guidance.

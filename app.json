@@ -1,16 +1,19 @@
 {
   "expo": {
-    "name": "document-navigator-app",
+    "name": "DocNavigator",
     "slug": "document-navigator-app",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "documentnavigatorapp",
+    "scheme": "docnavigator",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.stanciu.docnavigator",
+      "deploymentTarget": "16.4",
       "icon": "./assets/expo.icon"
     },
     "android": {
+      "package": "com.stanciu.docnavigator",
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -31,6 +34,14 @@
           "backgroundColor": "#208AEF",
           "image": "./assets/images/splash-icon.png",
           "imageWidth": 76
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "minSdkVersion": 26
+          }
         }
       ]
     ],

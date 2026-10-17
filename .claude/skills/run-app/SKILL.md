@@ -27,7 +27,7 @@ Web is a proxy, not proof: native-only code (`NativeTabs`, `expo-symbols` SF Sym
 
 In the `expo start` terminal: `a` Android, `i` iOS, `w` web, `r` reload, `j` open the JS debugger, `m` dev menu, `s` switch Expo Go ↔ development build.
 
-Deep links: `npx uri-scheme open "documentnavigatorapp://documents/getting-started" --android` (scheme from `app.json`).
+Deep links: `npx uri-scheme open "docnavigator://documents/getting-started" --android` (scheme from `app.json`).
 
 ## Logs and debugging
 
