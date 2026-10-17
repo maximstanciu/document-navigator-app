@@ -43,6 +43,12 @@
             "minSdkVersion": 26
           }
         }
+      ],
+      [
+        "react-native-document-scanner-plugin",
+        {
+          "cameraPermission": "DocNavigator uses the camera to scan your documents."
+        }
       ]
     ],
     "experiments": {
