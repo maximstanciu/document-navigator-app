@@ -48,9 +48,9 @@ src/
   components/          # shared UI; ui/ for primitives (Button), screen-state.tsx for loading/error/empty
   constants/theme.ts   # colors (light/dark), Spacing, Fonts, layout constants
   hooks/               # shared hooks (useTheme, useColorScheme)
-  lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts
+  lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts, device-id.ts
     db/                # SQLite: migrations, repositories (getRepositories()), query keys (dbKeys)
-    files/             # (planned, 1.4) page files under Paths.document
+    files/             # page files under Paths.document/documents/<id>/ (relative paths in the DB)
     i18n/              # (planned, 1.1) localization setup, ru/en dictionaries
   shared/              # (planned, 1.2) pure TS shared by client and server: zod schemas, types, limits
   server/              # (planned, 3.1) server-only code for API routes: handlers, LLM providers, limits

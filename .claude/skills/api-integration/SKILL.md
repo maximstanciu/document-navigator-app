@@ -67,7 +67,7 @@ export function useMarkDeadlineDone() {
 
 - Invalidate **every** table the write touched (documents + deadlines + actions after an analysis).
 - Side effects that other features own go through their explicitly shared functions (`syncReminders()`), never through their internals, and never in a cycle (`documents → analysis → reminders`, `deadlines → reminders`, `settings → reminders`).
-- Deleting a document wipes its content immediately (STO-6): DB rows and page files (`src/lib/files/`, _planned, 1.4_).
+- Deleting a document wipes its content immediately (STO-6): `documents.remove()` returns the page paths and notification ids; delete the files with `deleteDocumentFiles()` from `src/lib/files/page-files.ts` and cancel the reminders. Store only relative page paths (STO-3).
 
 ## 2. Calling the app's API routes
 
