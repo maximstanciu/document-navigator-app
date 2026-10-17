@@ -1,31 +1,38 @@
-import { ApiError, apiClient } from '@/lib/api/client';
-import { env } from '@/lib/env';
+import { getRepositories } from '@/lib/db/repositories';
+import type { DocumentRecord } from '@/lib/db/types';
 
-import { documentFixtures } from './fixtures';
 import type { DocumentDetail, DocumentSummary } from './types';
 
 /**
- * Endpoint functions: one per backend call, typed, no React. Query hooks in `./queries.ts`
- * wrap them. Until `EXPO_PUBLIC_API_URL` is set they serve fixtures so the app runs offline.
+ * Data access for the documents feature: reads local documents through the repositories in
+ * `src/lib/db`, no React. Query hooks in `./queries.ts` wrap these functions.
  */
 
-export async function fetchDocuments(signal?: AbortSignal): Promise<DocumentSummary[]> {
-  if (!env.apiUrl) {
-    return documentFixtures.map(({ id, title, updatedAt, pageCount }) => ({
-      id,
-      title,
-      updatedAt,
-      pageCount,
-    }));
-  }
-  return apiClient.get<DocumentSummary[]>('/documents', { signal });
+function toSummary(document: DocumentRecord): DocumentSummary {
+  return {
+    id: document.id,
+    title: document.title,
+    status: document.status,
+    senderName: document.senderName,
+    pageCount: document.pageCount,
+    createdAt: document.createdAt,
+  };
 }
 
-export async function fetchDocument(id: string, signal?: AbortSignal): Promise<DocumentDetail> {
-  if (!env.apiUrl) {
-    const document = documentFixtures.find((item) => item.id === id);
-    if (!document) throw new ApiError(`Document "${id}" not found`, 404, undefined);
-    return document;
-  }
-  return apiClient.get<DocumentDetail>(`/documents/${encodeURIComponent(id)}`, { signal });
+/** Active documents, newest first (HOME-2). */
+export async function listDocuments(): Promise<DocumentSummary[]> {
+  const documents = await getRepositories().documents.list();
+  return documents.map(toSummary);
+}
+
+/** `null` when the document doesn't exist or was deleted. */
+export async function getDocument(id: string): Promise<DocumentDetail | null> {
+  const document = await getRepositories().documents.get(id);
+  if (!document) return null;
+  return {
+    ...toSummary(document),
+    documentDate: document.documentDate,
+    analyzedAt: document.analyzedAt,
+    mimeType: document.mimeType,
+  };
 }

@@ -1,12 +1,11 @@
-export type DocumentSummary = {
-  id: string;
-  title: string;
-  /** ISO 8601 timestamp. */
-  updatedAt: string;
-  pageCount: number;
-};
+import type { DocumentRecord } from '@/lib/db/types';
 
-export type DocumentDetail = DocumentSummary & {
-  body: string;
-  tags: string[];
-};
+/** A row in the documents list. HOME-2 adds type and nearest deadline in task 4.5. */
+export type DocumentSummary = Pick<
+  DocumentRecord,
+  'id' | 'title' | 'status' | 'senderName' | 'pageCount' | 'createdAt'
+>;
+
+/** What the document screen shows until the full analysis blocks arrive in task 4.2. */
+export type DocumentDetail = DocumentSummary &
+  Pick<DocumentRecord, 'documentDate' | 'analyzedAt' | 'mimeType'>;

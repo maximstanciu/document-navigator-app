@@ -1,22 +1,24 @@
 import { queryOptions } from '@tanstack/react-query';
 
-import { fetchDocument, fetchDocuments } from './api';
+import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
+
+import { getDocument, listDocuments } from './api';
 
 /**
- * Query keys and fetchers live together so screens, prefetching and cache invalidation all
- * agree. Use as `useQuery(documentQueries.list())`; invalidate the whole feature with
- * `queryClient.invalidateQueries({ queryKey: documentQueries.all() })`.
+ * Local queries: keys come from `dbKeys` so any feature that writes documents can invalidate
+ * them (`queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() })`).
  */
 export const documentQueries = {
-  all: () => ['documents'] as const,
   list: () =>
     queryOptions({
-      queryKey: [...documentQueries.all(), 'list'],
-      queryFn: ({ signal }) => fetchDocuments(signal),
+      queryKey: dbKeys.documents.list(),
+      queryFn: listDocuments,
+      ...localQueryDefaults,
     }),
   detail: (id: string) =>
     queryOptions({
-      queryKey: [...documentQueries.all(), 'detail', id],
-      queryFn: ({ signal }) => fetchDocument(id, signal),
+      queryKey: dbKeys.documents.detail(id),
+      queryFn: () => getDocument(id),
+      ...localQueryDefaults,
     }),
 };

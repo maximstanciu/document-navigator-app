@@ -17,7 +17,7 @@ Data has two sources, and components never touch either directly:
 
 Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `useMarkDeadlineDone()`. No `fetch`, no direct DB calls, no `useEffect` data loading.
 
-> Until task 1.6, `src/features/documents` is still the boilerplate (HTTP endpoints + fixtures fallback). Use it as a reference for file layout and `queryOptions` shape only — don't copy its data source or its fixtures.
+> Reference: `src/features/documents` is the reference local-data feature: `api.ts` reads through `getRepositories()`, `queries.ts` uses `dbKeys` + `localQueryDefaults`, screen tests seed an in-memory database.
 
 ## 1. Local data (most features)
 

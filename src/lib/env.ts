@@ -6,6 +6,6 @@
  * - never put secrets here — every value ships to every device.
  */
 export const env = {
-  /** Base URL of the backend API. Empty means "no backend": features fall back to fixtures. */
+  /** Origin of this app's API routes (/api/v1/*). Empty until a backend is configured. */
   apiUrl: process.env.EXPO_PUBLIC_API_URL ?? '',
 };

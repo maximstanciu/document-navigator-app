@@ -11,7 +11,7 @@ import { DocumentListItem } from '../components/document-list-item';
 import { documentQueries } from '../queries';
 
 export function DocumentListScreen() {
-  const { data, error, isPending, isRefetching, refetch } = useQuery(documentQueries.list());
+  const { data, error, isPending, refetch } = useQuery(documentQueries.list());
 
   if (isPending) return <LoadingState label="Loading documents" />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
@@ -29,11 +29,12 @@ export function DocumentListScreen() {
             </ThemedText>
           }
           ListEmptyComponent={
-            <EmptyState title="No documents yet" message="Documents you add will show up here." />
+            <EmptyState
+              title="No documents yet"
+              message="Documents you scan or add will show up here."
+            />
           }
           contentContainerStyle={styles.content}
-          onRefresh={refetch}
-          refreshing={isRefetching}
         />
       </SafeAreaView>
     </ThemedView>

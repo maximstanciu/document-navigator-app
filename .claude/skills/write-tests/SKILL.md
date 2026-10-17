@@ -72,14 +72,7 @@ await renderWithProviders(<DocumentListScreen />);
 expect(await screen.findByText('Счёт')).toBeOnTheScreen();
 ```
 
-Pass `createFakeClock().now` to `installTestRepositories` to control timestamps. Repository behavior itself (SQL, migrations, search) is tested in `src/lib/db/*.test.ts`. For the error state, make the feature's data function reject with `jest.spyOn`. Until a feature is on `src/lib/db` (documents before task 1.6), stub its data function, as `src/features/documents/screens/document-list-screen.test.tsx` does:
-
-```tsx
-import * as api from '../api';
-jest.spyOn(api, 'fetchDocuments').mockResolvedValue([]);
-await renderWithProviders(<DocumentListScreen />);
-expect(await screen.findByText('No documents yet')).toBeOnTheScreen();
-```
+Pass `createFakeClock().now` to `installTestRepositories` to control timestamps. Repository behavior itself (SQL, migrations, search) is tested in `src/lib/db/*.test.ts`. For the error state, make the feature's data function reject once — `jest.spyOn(api, 'listDocuments').mockRejectedValueOnce(new Error('…'))` — and check that retry recovers. Full example: `src/features/documents/screens/document-list-screen.test.tsx`. A screen that sets its header with `<Stack.Screen options>` needs a router: render it with `renderRouter` (see `document-detail-screen.test.tsx`).
 
 Cover: data, empty, error → retry. Restore spies in `afterEach(() => jest.restoreAllMocks())`. After a mutation, assert what the user sees change, not that `invalidateQueries` was called.
 
@@ -101,8 +94,8 @@ await renderRouter(
   { index: DocumentListScreen, 'documents/[id]': DocumentRoute },
   { initialUrl: '/', wrapper: createTestProviders() }
 );
-await user.press(await screen.findByRole('link', { name: /Getting started/ }));
-expect(screen).toHavePathname('/documents/getting-started');
+await user.press(await screen.findByRole('link', { name: /Счёт за газ/ }));
+expect(screen).toHavePathname('/documents/doc-1');
 ```
 
 **Hook** — `const { result } = await renderHook(() => useThing(), { wrapper: createTestProviders() });`

@@ -18,7 +18,7 @@ Start in the feature; promote to `src/components/` only when a second feature ne
 
 ## 2. Conventions
 
-Reference: `src/components/ui/button.tsx` (primitive) and `src/features/documents/components/document-list-item.tsx` (feature row; the `documents` data layer is boilerplate until task 1.6, the component pattern is fine).
+Reference: `src/components/ui/button.tsx` (primitive) and `src/features/documents/components/document-list-item.tsx` (feature row).
 
 - **Files** kebab-case (`document-card.tsx`); **exports** named PascalCase (`export function DocumentCard`). No default exports outside `src/app/`.
 - **Props**: export a `<Name>Props` type when other files need it. Extend RN props (`Omit<PressableProps, 'style'>`) instead of re-declaring them; spread `...rest` last on the root element.

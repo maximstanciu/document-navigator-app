@@ -22,7 +22,7 @@ src/app/...                  # thin route files that render the screens
 
 Rules: no barrels (`index.ts`); relative imports only inside the feature, `@/` everywhere else. A feature may import another feature's components and explicitly shared functions (`syncReminders()`), never its internals, never in a cycle. DB access always goes through `src/lib/db`. Nothing but route files in `src/app/`.
 
-> `src/features/documents` is the boilerplate until task 1.6 (HTTP endpoints + fixtures). Mirror its folder shape, not its data layer.
+> Reference: `src/features/documents` is the reference local-data feature: `api.ts` reads through `getRepositories()`, `queries.ts` uses `dbKeys` + `localQueryDefaults`, screen tests seed an in-memory database.
 
 ## Steps
 

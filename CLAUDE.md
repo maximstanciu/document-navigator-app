@@ -2,7 +2,7 @@
 
 ## Claude Code skills in this repo
 
-Project skills live in `.claude/skills/`. Use the matching skill instead of improvising a workflow; they encode this repo's conventions (local-first data, own API routes, adapters, tests at the adapter boundary). `src/features/documents` is still the boilerplate data layer until task 1.6 — the skills say what to copy from it and what not.
+Project skills live in `.claude/skills/`. Use the matching skill instead of improvising a workflow; they encode this repo's conventions (local-first data, own API routes, adapters, tests at the adapter boundary). `src/features/documents` is the reference local-data feature.
 
 | Skill                 | Use for                                                                 |
 | --------------------- | ----------------------------------------------------------------------- |

@@ -10,7 +10,7 @@ description: Start this Expo app and look at it running — web preview in the b
 `.claude/launch.json` has a `web` configuration (`npx expo start --web --port 8081`).
 
 1. Start it with the browser preview tool (`preview_start` with name `web`), or in a terminal: `npm run web`.
-2. First bundle takes ~10–20s. Then navigate to routes directly: `http://localhost:8081/`, `/settings`, `/documents/getting-started`.
+2. First bundle takes ~10–20s. Then navigate to routes directly: `http://localhost:8081/`, `/settings`, `/documents/<id>`.
 3. Read the page as text or take a screenshot; check the console for errors.
 4. Check both color schemes (the browser pane can emulate light/dark) and a phone-sized viewport.
 

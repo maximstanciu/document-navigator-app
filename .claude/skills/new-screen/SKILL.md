@@ -16,7 +16,7 @@ Reference for structure — read these before writing anything:
 - `src/app/(tabs)/index.tsx` → `src/features/documents/screens/document-list-screen.tsx` (tab with list)
 - `src/app/_layout.tsx` (root Stack), `src/app/(tabs)/_layout.tsx` + `src/components/app-tabs.tsx` / `app-tabs.web.tsx` (tabs)
 
-Until task 1.6 the `documents` screens load boilerplate data over HTTP with fixtures; copy their route/screen split and state handling, not their data source.
+Both `documents` screens read local data through `documentQueries` and handle loading, error with retry, and empty or not-found states; their tests show how to seed data with `installTestRepositories()`.
 
 ## 1. Pick the route file
 

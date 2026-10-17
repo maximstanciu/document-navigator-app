@@ -35,7 +35,7 @@ export function SettingsScreen() {
             value={Platform.OS === 'web' ? 'web' : `${Platform.OS} ${Platform.Version}`}
           />
           <InfoRow label="Appearance" value={colorScheme ?? 'unspecified'} />
-          <InfoRow label="API" value={env.apiUrl || 'Local fixtures'} />
+          <InfoRow label="API" value={env.apiUrl || 'Not configured'} />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
