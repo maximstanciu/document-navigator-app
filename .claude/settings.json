@@ -1,5 +1,24 @@
 {
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
   "enabledPlugins": {
     "expo@claude-plugins-official": true
+  },
+  "permissions": {
+    "allow": [
+      "Bash(npm run verify)",
+      "Bash(npm run typecheck)",
+      "Bash(npm run lint)",
+      "Bash(npm run format)",
+      "Bash(npm run format:check)",
+      "Bash(npm run doctor)",
+      "Bash(npm test)",
+      "Bash(npm test:*)",
+      "Bash(npx jest:*)",
+      "Bash(npx tsc --noEmit:*)",
+      "Bash(npx expo lint:*)",
+      "Bash(npx expo config:*)",
+      "Bash(npx expo-doctor:*)",
+      "Bash(npx prettier:*)"
+    ]
   }
 }

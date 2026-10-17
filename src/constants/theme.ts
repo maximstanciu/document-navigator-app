@@ -14,6 +14,10 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
+    tint: '#0A6FD8',
+    onTint: '#ffffff',
+    danger: '#D93036',
+    border: '#D9D9E0',
   },
   dark: {
     text: '#ffffff',
@@ -21,6 +25,10 @@ export const Colors = {
     backgroundElement: '#212225',
     backgroundSelected: '#2E3135',
     textSecondary: '#B0B4BA',
+    tint: '#3C9FFE',
+    onTint: '#000000',
+    danger: '#FF6369',
+    border: '#3A3F42',
   },
 } as const;
 
@@ -62,4 +70,8 @@ export const Spacing = {
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
+/** Web renders the tab bar as a floating header (see `app-tabs.web.tsx`). */
+export const TopTabInset = Platform.select({ web: Spacing.six + Spacing.three }) ?? 0;
+/** Minimum touch target size (Apple HIG 44pt, Material 48dp). */
+export const MinTouchTarget = 44;
 export const MaxContentWidth = 800;
