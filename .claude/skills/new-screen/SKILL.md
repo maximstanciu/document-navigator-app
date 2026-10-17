@@ -93,7 +93,7 @@ If `tsc` rejects a new href, run `npx expo start` once to regenerate `.expo/type
 
 ## 5. Test it
 
-Add `<name>-screen.test.tsx` next to the screen (never under `src/app/`). Cover loading → data, error → retry, empty, with data seeded through the in-memory repository (or a mocked feature adapter). If the screen navigates or sits behind a guard, add a `renderRouter` test. Patterns: `write-tests` skill.
+Add `<name>-screen.test.tsx` next to the screen (never under `src/app/`). Cover loading → data, error → retry, empty, with data seeded through `installTestRepositories()` (or a mocked feature adapter). If the screen navigates or sits behind a guard, add a `renderRouter` test. Patterns: `write-tests` skill.
 
 ## 6. Finish
 

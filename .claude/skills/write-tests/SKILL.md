@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: Write or fix Jest tests for pure logic, components, screens, hooks, navigation, API client calls and API route handlers using jest-expo and React Native Testing Library v14 (async APIs), with dependencies replaced at the adapter boundary (in-memory repository, mocked native adapter, MockLlmProvider). Use when the user asks for tests, coverage, a regression test for a bug, or when a test is failing or flaky.
+description: Write or fix Jest tests for pure logic, components, screens, hooks, navigation, API client calls and API route handlers using jest-expo and React Native Testing Library v14 (async APIs), with dependencies replaced at the adapter boundary (repositories on in-memory SQLite, mocked native adapter, MockLlmProvider). Use when the user asks for tests, coverage, a regression test for a bug, or when a test is failing or flaky.
 argument-hint: '[file or behavior to test]'
 ---
 
@@ -12,14 +12,14 @@ RNTL v14 differs from most training data. Before writing tests, skim `node_modul
 
 ## What to test where (AGENTS.md → Testing)
 
-| Code                                                                   | Test                                                                                 |
-| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
-| Pure logic: dates, `planReminders`, post-processing, re-analysis merge | plain unit tests — most edge cases live here                                         |
-| Screens and components with data                                       | `renderWithProviders` + in-memory repository from `src/lib/db` (or a mocked adapter) |
-| Navigation, guards (onboarding)                                        | `renderRouter` from `expo-router/testing-library`                                    |
-| API client functions                                                   | `jest.spyOn(globalThis, 'fetch')`                                                    |
-| API handlers in `src/server/`                                          | call the handler with a `Request`, assert on the `Response`, `MockLlmProvider`       |
-| Scanner, notifications, calendar                                       | mock our adapter module; the real flow goes to `docs/smoke-test.md` (task 4.7)       |
+| Code                                                                   | Test                                                                                       |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| Pure logic: dates, `planReminders`, post-processing, re-analysis merge | plain unit tests — most edge cases live here                                               |
+| Screens and components with data                                       | `renderWithProviders` + `installTestRepositories()` (SQLite in memory) or a mocked adapter |
+| Navigation, guards (onboarding)                                        | `renderRouter` from `expo-router/testing-library`                                          |
+| API client functions                                                   | `jest.spyOn(globalThis, 'fetch')`                                                          |
+| API handlers in `src/server/`                                          | call the handler with a `Request`, assert on the `Response`, `MockLlmProvider`             |
+| Scanner, notifications, calendar                                       | mock our adapter module; the real flow goes to `docs/smoke-test.md` (task 4.7)             |
 
 Replace dependencies at the adapter boundary (repository, our native adapter, `fetch`) — never deep inside SQLite, Expo modules or React Query.
 
@@ -49,7 +49,30 @@ await user.press(screen.getByRole('button', { name: 'Save' }));
 expect(onPress).toHaveBeenCalledTimes(1);
 ```
 
-**Screen with data** — render with `renderWithProviders` (fresh `QueryClient`, retries off) and control data at the repository boundary: seed the in-memory repository from `src/lib/db` (task 1.3 defines how it is injected). Until a feature is on `src/lib/db`, stub its data function, as `src/features/documents/screens/document-list-screen.test.tsx` does:
+**Screen with data** — render with `renderWithProviders` (fresh `QueryClient`, retries off) and seed real data through the repositories on an in-memory SQLite database:
+
+```tsx
+import { setRepositories, type Repositories } from '@/lib/db/repositories';
+import { installTestRepositories } from '@/test/sqlite';
+
+let repositories: Repositories;
+beforeEach(async () => {
+  ({ repositories } = await installTestRepositories());
+});
+afterEach(() => setRepositories(null));
+
+await repositories.documents.create({
+  id: 'doc-1',
+  title: 'Счёт',
+  source: 'scan',
+  mimeType: 'image/jpeg',
+  fileSize: 1,
+});
+await renderWithProviders(<DocumentListScreen />);
+expect(await screen.findByText('Счёт')).toBeOnTheScreen();
+```
+
+Pass `createFakeClock().now` to `installTestRepositories` to control timestamps. Repository behavior itself (SQL, migrations, search) is tested in `src/lib/db/*.test.ts`. For the error state, make the feature's data function reject with `jest.spyOn`. Until a feature is on `src/lib/db` (documents before task 1.6), stub its data function, as `src/features/documents/screens/document-list-screen.test.tsx` does:
 
 ```tsx
 import * as api from '../api';

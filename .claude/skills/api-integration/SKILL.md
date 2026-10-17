@@ -10,10 +10,10 @@ Read first: `AGENTS.md` (Conventions → Data is local-first, Server code, Share
 
 Data has two sources, and components never touch either directly:
 
-| Source                                                      | Lives in                                         | Reached through                                |
-| ----------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- |
-| Local data (documents, pages, deadlines, actions, settings) | SQLite on the device                             | repositories in `src/lib/db/` (_planned, 1.3_) |
-| Analysis and limits                                         | this app's API routes `/api/v1/*` on EAS Hosting | `apiClient` (`src/lib/api/client.ts`)          |
+| Source                                                      | Lives in                                         | Reached through                                       |
+| ----------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
+| Local data (documents, pages, deadlines, actions, settings) | SQLite on the device                             | `getRepositories()` from `src/lib/db/repositories.ts` |
+| Analysis and limits                                         | this app's API routes `/api/v1/*` on EAS Hosting | `apiClient` (`src/lib/api/client.ts`)                 |
 
 Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `useMarkDeadlineDone()`. No `fetch`, no direct DB calls, no `useEffect` data loading.
 
@@ -23,13 +23,15 @@ Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `use
 
 **Layers**
 
-| Layer        | File                           | Knows about                                                      |
-| ------------ | ------------------------------ | ---------------------------------------------------------------- |
-| Storage      | `src/lib/db/` (_planned, 1.3_) | opening SQLite, migrations, one repository per table, query keys |
-| Feature data | `src/features/<f>/api.ts`      | calls repositories, maps rows to feature types; no React         |
-| Cache        | `src/features/<f>/queries.ts`  | `queryOptions` for reads, mutation hooks, invalidation           |
+| Layer        | File                          | Knows about                                                      |
+| ------------ | ----------------------------- | ---------------------------------------------------------------- |
+| Storage      | `src/lib/db/`                 | opening SQLite, migrations, one repository per table, query keys |
+| Feature data | `src/features/<f>/api.ts`     | calls repositories, maps rows to feature types; no React         |
+| Cache        | `src/features/<f>/queries.ts` | `queryOptions` for reads, mutation hooks, invalidation           |
 
-- Repositories have async interfaces and an in-memory implementation of the same interface for Jest (or Drizzle — whichever task 1.3 chose; follow what's in `src/lib/db`).
+- Repositories are plain SQL over a small `SqlDatabase` interface (`database.ts`): expo-sqlite in the app, Node's `node:sqlite` in Jest. Every query goes through one serial queue; inside `db.transaction(async (tx) => ...)` use **only** `tx`, or the call deadlocks.
+- New table or column → a new entry in `migrations.ts` (never edit a shipped one), a repository function, a test on the in-memory database.
+- `search_text` is derived by the documents repository from title, sender, summary and key facts (HOME-3); features never write it.
 - **Query keys come from `src/lib/db`**, per table, not invented per feature. A mutation in one feature (analysis writes deadlines) must be able to invalidate what another feature reads (the Deadlines tab).
 - No other feature's internals: if you need a table, use its repository from `src/lib/db`.
 
@@ -39,15 +41,14 @@ Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `use
 export const deadlineQueries = {
   list: () =>
     queryOptions({
-      queryKey: dbKeys.deadlines.list(),
-      queryFn: () => listOpenDeadlines(),
-      staleTime: Infinity, // local data changes only through our own mutations
-      retry: false, // a failing local read won't fix itself
+      queryKey: dbKeys.deadlines.list({ statuses: ['open'] }),
+      queryFn: () => getRepositories().deadlines.list({ statuses: ['open'] }),
+      ...localQueryDefaults, // staleTime: Infinity, no retries, no refetch on focus
     }),
 };
 ```
 
-Local queries: `staleTime: Infinity`, `retry: false`, no refetch on app foreground. The network-oriented defaults in `createQueryClient()` are for API queries only.
+Local queries always spread `localQueryDefaults` from `src/lib/db/query-keys.ts`. The network-oriented defaults in `createQueryClient()` are for API queries only.
 
 **Writes**
 
@@ -55,7 +56,7 @@ Local queries: `staleTime: Infinity`, `retry: false`, no refetch on app foregrou
 export function useMarkDeadlineDone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => markDeadlineDone(id),
+    mutationFn: (id: string) => getRepositories().deadlines.update(id, { status: 'done' }),
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() });
       await syncReminders(); // explicit shared function from features/reminders
@@ -106,7 +107,7 @@ export function POST(request: Request) {
 
 ## 4. Tests
 
-- Feature data and screens: swap the repository at the boundary (in-memory implementation from `src/lib/db`), seed it, render with `renderWithProviders`. Don't mock React Query or SQLite internals.
+- Feature data and screens: `await installTestRepositories()` from `@/test/sqlite` (real SQLite in memory, installed as `getRepositories()`), seed through the repositories, render with `renderWithProviders`; `setRepositories(null)` in `afterEach`. Don't mock React Query or SQLite.
 - API client functions: `jest.spyOn(globalThis, 'fetch')` and assert URL, method, headers and body; cover every error code the UI distinguishes (`src/lib/api/client.test.ts` shows the pattern).
 - Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. If the Jest environment lacks a Fetch API global you need, add `/** @jest-environment node */` at the top of the server test file.
 - Pure post-processing (dates, `deadlineId` links, trimming) gets plain unit tests.

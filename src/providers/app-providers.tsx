@@ -5,6 +5,8 @@ import { useState, type PropsWithChildren } from 'react';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createQueryClient, useAppStateFocusManager } from '@/lib/query-client';
 
+import { DatabaseGate } from './database-gate';
+
 /** Every app-wide provider, in one place. Tests use a lighter wrapper: `@/test/render`. */
 export function AppProviders({ children }: PropsWithChildren) {
   const [queryClient] = useState(createQueryClient);
@@ -14,7 +16,7 @@ export function AppProviders({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-        {children}
+        <DatabaseGate>{children}</DatabaseGate>
       </ThemeProvider>
     </QueryClientProvider>
   );

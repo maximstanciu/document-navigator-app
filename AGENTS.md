@@ -49,7 +49,7 @@ src/
   constants/theme.ts   # colors (light/dark), Spacing, Fonts, layout constants
   hooks/               # shared hooks (useTheme, useColorScheme)
   lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts
-    db/                # (planned, 1.3) SQLite, migrations, repositories, query keys
+    db/                # SQLite: migrations, repositories (getRepositories()), query keys (dbKeys)
     files/             # (planned, 1.4) page files under Paths.document
     i18n/              # (planned, 1.1) localization setup, ru/en dictionaries
   shared/              # (planned, 1.2) pure TS shared by client and server: zod schemas, types, limits
@@ -64,7 +64,7 @@ scripts/eval/          # (planned, 0.3/3.7) analysis quality evaluation
 - **Routes are thin.** `src/app/**` files only read params and render a screen from `src/features/*/screens/`. API route files (`+api.ts`) only parse the request and delegate to a handler in `src/server/`. Never put components, hooks, utils, or tests in `src/app/`.
 - **Files** kebab-case; **exports** named (default exports only for route files). Import with the `@/` alias (`@/components/...`); relative imports only within a feature folder. No barrel `index.ts` files.
 - **Styling**: `StyleSheet.create`; colors from `useTheme()` / `ThemedText` / `ThemedView` only — no hex literals in components; spacing from `Spacing`. Support light and dark mode. New color tokens need AA contrast in both themes.
-- **Data is local-first.** Documents, pages, deadlines, actions and settings live on the device in SQLite; access them only through repositories in `src/lib/db/`, read and written through React Query (`queryOptions` for reads, mutations that invalidate the affected keys). Local queries use `staleTime: Infinity` and no retries. The only HTTP calls are to this app's own API routes (`/api/v1/*`) through `apiClient`. No `fetch`, direct DB calls, or `useEffect` data loading in components. Every data screen handles loading, error (with retry), and empty states.
+- **Data is local-first.** Documents, pages, deadlines, actions and settings live on the device in SQLite; access them only through repositories in `src/lib/db/` (`getRepositories()`), read and written through React Query (`queryOptions` for reads, mutations that invalidate the affected `dbKeys`). Local queries spread `localQueryDefaults` (`staleTime: Infinity`, no retries). The only HTTP calls are to this app's own API routes (`/api/v1/*`) through `apiClient`. No `fetch`, direct DB calls, or `useEffect` data loading in components. Every data screen handles loading, error (with retry), and empty states.
   - Until task 1.6, `features/documents` is still the boilerplate example (HTTP endpoints with a fixtures fallback). Don't copy that pattern into new features.
 - **Feature dependencies**: features may import another feature's components and explicitly shared functions (e.g. `syncReminders()`), never in a cycle. DB access always goes through `src/lib/db`, never another feature's internals.
 - **Server code** (`src/server/**`) is imported only from `src/app/api/**/*+api.ts` (enforced by lint after task 1.7). It runs on EAS Hosting (Cloudflare Workers): no native binaries, in-memory `fs`, about 250 MB of memory per isolate shared by all its concurrent requests (measured in spike 0.2, `docs/spikes/0.2-eas-hosting.md`). Secrets (LLM keys) are read from `process.env` only here, never with an `EXPO_PUBLIC_` prefix.
@@ -82,7 +82,7 @@ Tests live next to the code as `*.test.ts(x)` (never under `src/app/`). Render d
 
 - Pure logic (date handling, `planReminders`, response post-processing, re-analysis merge) gets plain unit tests — that's where most edge cases are covered.
 - API handlers are tested in `src/server/` by calling them with a `Request` and asserting on the `Response`, with `MockLlmProvider` instead of a real model.
-- Repositories and native modules are replaced at the adapter boundary (in-memory repository, mocked adapter), not deep inside library internals.
+- Repositories run on real SQLite in memory in Jest (`installTestRepositories()` from `@/test/sqlite`, Node's built-in `node:sqlite`); native modules are replaced at the adapter boundary (mocked adapter), not deep inside library internals.
 - Native flows that Jest can't reach (scanner, notifications, calendar) are covered by the manual checklist in `docs/smoke-test.md` (task 4.7).
 
 This project uses `@testing-library/react-native` v14. Its APIs and testing conventions can differ from your training data — `render`, `fireEvent`, `renderHook`, `act`, and `userEvent` calls are async and must be awaited.
