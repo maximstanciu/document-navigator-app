@@ -35,7 +35,8 @@ Scope: the files the user named, or every screen in `src/features/*/screens/` fo
 
 - Text scales with system font size: no fixed `height` on text containers; test with the largest accessibility size. Use `maxFontSizeMultiplier` only for space-critical UI (tab labels), never body text.
 - Contrast ≥ 4.5:1 for body text, 3:1 for large text and UI glyphs, in **both** themes. Use theme tokens; if you add colors to `src/constants/theme.ts`, check contrast for light and dark.
-- Never convey state by color alone — add text or an icon.
+- Never convey state by color alone — add text or an icon. This includes risk levels and fraud warnings (DET-10, §8.4): VoiceOver/TalkBack must read the level as text.
+- Labels are localized like visible text (ru/en dictionaries after task 1.1); check that Russian strings don't truncate at large font sizes.
 
 **Motion**
 

@@ -1,93 +1,114 @@
 ---
 name: api-integration
-description: Connect the app to a backend endpoint the project's way — typed endpoint functions on the shared apiClient, React Query queryOptions and mutations, cache invalidation, auth headers, env config, and tests. Use when the user asks to fetch, load, save, sync, call an API/endpoint, add a mutation, handle auth tokens, or replace fixtures with a real backend.
-argument-hint: '<METHOD /path> [feature]'
+description: Wire data into the app the project's way — local SQLite data through repositories in src/lib/db and React Query, calls to this app's own API routes (/api/v1/*) through apiClient, and the server side of those routes (thin +api.ts, handlers in src/server, MockLlmProvider tests). Use when the user asks to load, save, store, query, cache, invalidate, add a mutation, call or add an endpoint/API route, handle request errors, or change env config.
+argument-hint: '<what data or endpoint> [feature]'
 ---
 
-# API integration
+# Data and API integration
 
-Three layers, each in one place:
+Read first: `AGENTS.md` (Conventions → Data is local-first, Server code, Shared code), `docs/SPEC.md` §6 (data model) and §7 (API contract, error codes). This skill describes the target architecture; folders marked _planned_ in `AGENTS.md` are created by the plan task named there — create them exactly there.
 
-| Layer     | File                          | Knows about                             |
-| --------- | ----------------------------- | --------------------------------------- |
-| HTTP      | `src/lib/api/client.ts`       | base URL, JSON, auth header, `ApiError` |
-| Endpoints | `src/features/<f>/api.ts`     | paths, request/response types           |
-| Cache     | `src/features/<f>/queries.ts` | query keys, invalidation                |
+Data has two sources, and components never touch either directly:
 
-Screens only call hooks: `useQuery(documentQueries.list())`, `useCreateDocument()`. Never `fetch` or `useEffect`-load data in a component.
+| Source                                                      | Lives in                                         | Reached through                                |
+| ----------------------------------------------------------- | ------------------------------------------------ | ---------------------------------------------- |
+| Local data (documents, pages, deadlines, actions, settings) | SQLite on the device                             | repositories in `src/lib/db/` (_planned, 1.3_) |
+| Analysis and limits                                         | this app's API routes `/api/v1/*` on EAS Hosting | `apiClient` (`src/lib/api/client.ts`)          |
 
-Reference: `src/features/documents/{api,queries}.ts`, `src/lib/api/client.ts`, `src/lib/query-client.ts`.
+Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `useMarkDeadlineDone()`. No `fetch`, no direct DB calls, no `useEffect` data loading.
 
-## 1. Config
+> Until task 1.6, `src/features/documents` is still the boilerplate (HTTP endpoints + fixtures fallback). Use it as a reference for file layout and `queryOptions` shape only — don't copy its data source or its fixtures.
 
-- Base URL comes from `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). Developers put it in `.env.local` (see `.env.example`); EAS builds get it from EAS environment variables.
-- New config → add to `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access (Expo inlines only that form).
-- `EXPO_PUBLIC_*` ships inside the app. Secrets (API keys with write access, signing keys) never go in the client — they belong on the server.
+## 1. Local data (most features)
 
-## 2. Endpoint function (`api.ts`)
+**Layers**
 
-```ts
-export async function fetchDocuments(signal?: AbortSignal) {
-  return apiClient.get<DocumentSummary[]>('/documents', { signal, query: { page: 1 } });
-}
+| Layer        | File                           | Knows about                                                      |
+| ------------ | ------------------------------ | ---------------------------------------------------------------- |
+| Storage      | `src/lib/db/` (_planned, 1.3_) | opening SQLite, migrations, one repository per table, query keys |
+| Feature data | `src/features/<f>/api.ts`      | calls repositories, maps rows to feature types; no React         |
+| Cache        | `src/features/<f>/queries.ts`  | `queryOptions` for reads, mutation hooks, invalidation           |
 
-export async function createDocument(input: DocumentInput) {
-  return apiClient.post<DocumentDetail>('/documents', { body: input });
-}
-```
+- Repositories have async interfaces and an in-memory implementation of the same interface for Jest (or Drizzle — whichever task 1.3 chose; follow what's in `src/lib/db`).
+- **Query keys come from `src/lib/db`**, per table, not invented per feature. A mutation in one feature (analysis writes deadlines) must be able to invalidate what another feature reads (the Deadlines tab).
+- No other feature's internals: if you need a table, use its repository from `src/lib/db`.
 
-- One function per endpoint. Typed return. Accept `signal` on reads so React Query can cancel.
-- Encode path params: `` `/documents/${encodeURIComponent(id)}` ``.
-- Map server shapes to app types here if they differ (snake_case → camelCase, date strings, etc.) — screens see clean types only.
-- If the backend isn't trusted to match the types, validate at this boundary (e.g. add `zod` with `npx expo install zod` and `schema.parse(data)`).
-- Keep the fixtures fallback (`if (!env.apiUrl) ...`) only while the backend doesn't exist; remove it once it does.
-
-## 3. Queries (`queries.ts`)
+**Reads**
 
 ```ts
-export const documentQueries = {
-  all: () => ['documents'] as const,
-  list: (filters?: { q?: string }) =>
+export const deadlineQueries = {
+  list: () =>
     queryOptions({
-      queryKey: [...documentQueries.all(), 'list', filters ?? {}],
-      queryFn: ({ signal }) => fetchDocuments(signal),
-    }),
-  detail: (id: string) =>
-    queryOptions({
-      queryKey: [...documentQueries.all(), 'detail', id],
-      queryFn: ({ signal }) => fetchDocument(id, signal),
+      queryKey: dbKeys.deadlines.list(),
+      queryFn: () => listOpenDeadlines(),
+      staleTime: Infinity, // local data changes only through our own mutations
+      retry: false, // a failing local read won't fix itself
     }),
 };
 ```
 
-Keys are hierarchical so `invalidateQueries({ queryKey: documentQueries.all() })` refreshes the whole feature. Everything the fetch depends on goes in the key.
+Local queries: `staleTime: Infinity`, `retry: false`, no refetch on app foreground. The network-oriented defaults in `createQueryClient()` are for API queries only.
 
-## 4. Mutations
+**Writes**
 
 ```ts
-export function useCreateDocument() {
+export function useMarkDeadlineDone() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: createDocument,
-    onSuccess: (created) => {
-      queryClient.setQueryData(documentQueries.detail(created.id).queryKey, created);
-      return queryClient.invalidateQueries({ queryKey: documentQueries.all() });
+    mutationFn: (id: string) => markDeadlineDone(id),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() });
+      await syncReminders(); // explicit shared function from features/reminders
     },
   });
 }
 ```
 
-In the screen: disable the submit button while `isPending`, show `error` inline, navigate on success. Use optimistic updates (`onMutate` + rollback in `onError`) only where latency is visible and the operation rarely fails.
+- Invalidate **every** table the write touched (documents + deadlines + actions after an analysis).
+- Side effects that other features own go through their explicitly shared functions (`syncReminders()`), never through their internals, and never in a cycle (`documents → analysis → reminders`, `deadlines → reminders`, `settings → reminders`).
+- Deleting a document wipes its content immediately (STO-6): DB rows and page files (`src/lib/files/`, _planned, 1.4_).
 
-## 5. Errors, retries, auth
+## 2. Calling the app's API routes
 
-- Non-2xx → `ApiError` with `status` and parsed `body`. `createQueryClient()` already skips retries for 4xx; check `error instanceof ApiError && error.status === 404` for specific UI.
-- Auth: call `setAccessTokenGetter(() => token)` once at sign-in (and `undefined` at sign-out). Store tokens with `expo-secure-store`, not AsyncStorage. On 401, clear the session and redirect to sign-in in one central place (e.g. a `QueryCache({ onError })` in `createQueryClient`), not per screen.
-- App foreground refetch is already wired (`useAppStateFocusManager`). For connectivity-aware behavior, connect React Query's `onlineManager` to `expo-network` (check its current API in the versioned docs).
+Only two endpoints exist: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC §7.2). Their client functions live in `features/analysis/api.ts` (and settings for limits).
 
-## 6. Tests
+- Base URL: `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). New public config → `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access. Never secrets in `EXPO_PUBLIC_*`.
+- Request types and the response schema come from `src/shared/` (_planned, 1.2_): the zod schema is the single source of truth. Validate the response at the boundary (`schema.parse`).
+- Headers on every call: `X-Device-Id`, `X-App-Version`, `X-Platform` (SPEC §7.2). There are no accounts in MVP; `setAccessTokenGetter` stays unused.
+- `analyzeDocument` is a mutation **without retries**, `multipart/form-data`, 90 s client timeout (task 4.1 extends `apiClient` for `FormData` and timeouts). Background behavior follows D-1 = A (ANL-3).
+- Errors: server errors are `{ error: { code, message } }` → `ApiError`. Network `TypeError`, timeout, offline (check `expo-network` first, ANL-10) and app restart mid-analysis map to `ClientErrorCode`. Do the mapping **once**, in `features/analysis`, not per screen. A `5xx` without a JSON body (isolate crash, spike 0.2) is `unavailable`.
+- Never log or send to crash reporting the document or its analysis — metadata only.
 
-- `api.ts`: mock `fetch` with `jest.spyOn(globalThis, 'fetch')` and assert URL/method/body, or test the fixture path. Example: `src/lib/api/client.test.ts`.
-- Screens: stub the endpoint function, not React Query — `jest.spyOn(api, 'fetchDocuments').mockResolvedValue([...])` — and render with `renderWithProviders` (fresh `QueryClient`, retries off). Example: `document-list-screen.test.tsx`.
+## 3. Writing an API route (server side)
+
+```
+src/app/api/v1/analyze+api.ts            thin: parse request, call the handler, return its Response
+src/server/analysis/handle-analyze.ts     validation, limits, provider call, post-processing
+src/server/analysis/providers/*.ts        LlmProvider implementations (mock + the chosen one)
+src/shared/analysis/*.ts                  zod schema, types, limits (no react/react-native/expo imports)
+```
+
+```ts
+// src/app/api/v1/analyze+api.ts
+import { handleAnalyze } from '@/server/analysis/handle-analyze';
+
+export function POST(request: Request) {
+  return handleAnalyze(request, createAnalyzeDeps());
+}
+```
+
+- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes. `MockLlmProvider` is used when `LLM_PROVIDER` is unset.
+- Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
+- Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**. Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
+- Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.
+- Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**` (lint after task 1.7).
+- Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1).
+
+## 4. Tests
+
+- Feature data and screens: swap the repository at the boundary (in-memory implementation from `src/lib/db`), seed it, render with `renderWithProviders`. Don't mock React Query or SQLite internals.
+- API client functions: `jest.spyOn(globalThis, 'fetch')` and assert URL, method, headers and body; cover every error code the UI distinguishes (`src/lib/api/client.test.ts` shows the pattern).
+- Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. If the Jest environment lacks a Fetch API global you need, add `/** @jest-environment node */` at the top of the server test file.
+- Pure post-processing (dates, `deadlineId` links, trimming) gets plain unit tests.
 
 Then run the `verify` skill.

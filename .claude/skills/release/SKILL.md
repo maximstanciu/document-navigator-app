@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Release
 
-Builds cost EAS minutes; submissions and updates reach real users. **Confirm with the user before every `eas build`, `eas submit`, and `eas update` command**, showing the exact command, profile, platform, and version.
+Builds cost EAS minutes; submissions, updates and deployments reach real users. **Confirm with the user before every `eas build`, `eas submit`, `eas update`, and `eas deploy` command**, showing the exact command, profile, platform, and version.
 
 Run EAS CLI as `npx eas-cli@latest <command>`. For store-submission details, credentials, and CI (EAS Workflows), the official `expo` plugin skills have current guidance.
 
@@ -23,15 +23,9 @@ Run EAS CLI as `npx eas-cli@latest <command>`. For store-submission details, cre
 
 ## One-time setup (if not done yet)
 
-Check `app.json` for `extra.eas.projectId`. If missing:
+Already done (tasks 0.1, 0.2, 0.5): project `@maximst/docnavigator` is linked (`extra.eas.projectId`), `expo-dev-client` and `expo-updates` are installed, `runtimeVersion` uses the `fingerprint` policy, identifiers are `com.stanciu.docnavigator`. If `npx eas-cli@latest whoami` says "Not logged in", ask the user to run `npx eas-cli@latest login --device` in a terminal tab they can see — never enter their credentials.
 
-```bash
-npx eas-cli@latest login
-npx eas-cli@latest init               # links the project, writes projectId
-npx eas-cli@latest update:configure   # only if OTA updates are wanted: installs expo-updates, sets runtimeVersion
-```
-
-`development` builds need `npx expo install expo-dev-client`. Set real `ios.bundleIdentifier` and `android.package` in `app.json` before the first store build — they can't change after publishing.
+iOS builds need a paid Apple Developer account; the first one signs in to Apple interactively.
 
 ## Store release
 
@@ -58,13 +52,25 @@ npx eas-cli@latest update:configure   # only if OTA updates are wanted: installs
 
 ## OTA update (JS/asset-only fixes)
 
-Only when nothing native changed since the build users have: no new native module, no `app.json` plugin/permission/icon/splash change, no Expo SDK bump. Otherwise ship a new build.
+Only when nothing native changed since the build users have: no new native module, no `app.json` plugin/permission/icon/splash change, no Expo SDK bump. With the `fingerprint` runtime policy a native change produces a new runtime version, so the update simply won't reach older builds — ship a new build instead.
 
 ```bash
 npx eas-cli@latest update --channel production --message "<what changed>"
 ```
 
 Prefer `--channel preview` first and verify on a preview build. Roll back with `npx eas-cli@latest update:republish` to a previous update group if needed.
+
+## API routes (EAS Hosting)
+
+API routes deploy separately from app builds (task 3.6). After confirmation:
+
+```bash
+npx expo export --platform web
+npx eas-cli@latest deploy                 # preview deployment
+npx eas-cli@latest deploy --prod          # production, only when the user says so
+```
+
+Secrets (LLM keys) live in EAS environment variables, never in `EXPO_PUBLIC_*`. Production URL changes need a matching `EXPO_PUBLIC_API_URL` in the app build.
 
 ## Never
 

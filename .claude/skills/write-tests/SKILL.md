@@ -1,6 +1,6 @@
 ---
 name: write-tests
-description: Write or fix Jest tests for components, screens, hooks, navigation, and API code using jest-expo and React Native Testing Library v14 (async APIs). Use when the user asks for tests, coverage, a regression test for a bug, or when a test is failing or flaky.
+description: Write or fix Jest tests for pure logic, components, screens, hooks, navigation, API client calls and API route handlers using jest-expo and React Native Testing Library v14 (async APIs), with dependencies replaced at the adapter boundary (in-memory repository, mocked native adapter, MockLlmProvider). Use when the user asks for tests, coverage, a regression test for a bug, or when a test is failing or flaky.
 argument-hint: '[file or behavior to test]'
 ---
 
@@ -9,6 +9,19 @@ argument-hint: '[file or behavior to test]'
 Stack: `jest-expo` preset, `@testing-library/react-native` **v14**, `expo-router/testing-library`, config in `jest.config.js`.
 
 RNTL v14 differs from most training data. Before writing tests, skim `node_modules/@testing-library/react-native/docs/guides/llm-guidelines.md` (and other files in that folder as needed) — it matches the installed version.
+
+## What to test where (AGENTS.md → Testing)
+
+| Code                                                                   | Test                                                                                 |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
+| Pure logic: dates, `planReminders`, post-processing, re-analysis merge | plain unit tests — most edge cases live here                                         |
+| Screens and components with data                                       | `renderWithProviders` + in-memory repository from `src/lib/db` (or a mocked adapter) |
+| Navigation, guards (onboarding)                                        | `renderRouter` from `expo-router/testing-library`                                    |
+| API client functions                                                   | `jest.spyOn(globalThis, 'fetch')`                                                    |
+| API handlers in `src/server/`                                          | call the handler with a `Request`, assert on the `Response`, `MockLlmProvider`       |
+| Scanner, notifications, calendar                                       | mock our adapter module; the real flow goes to `docs/smoke-test.md` (task 4.7)       |
+
+Replace dependencies at the adapter boundary (repository, our native adapter, `fetch`) — never deep inside SQLite, Expo modules or React Query.
 
 ## Where tests go
 
@@ -36,7 +49,7 @@ await user.press(screen.getByRole('button', { name: 'Save' }));
 expect(onPress).toHaveBeenCalledTimes(1);
 ```
 
-**Screen with data** — `src/features/documents/screens/document-list-screen.test.tsx`. Render with `renderWithProviders` (fresh `QueryClient`, retries off) and control data by stubbing the feature's endpoint function:
+**Screen with data** — render with `renderWithProviders` (fresh `QueryClient`, retries off) and control data at the repository boundary: seed the in-memory repository from `src/lib/db` (task 1.3 defines how it is injected). Until a feature is on `src/lib/db`, stub its data function, as `src/features/documents/screens/document-list-screen.test.tsx` does:
 
 ```tsx
 import * as api from '../api';
@@ -45,7 +58,16 @@ await renderWithProviders(<DocumentListScreen />);
 expect(await screen.findByText('No documents yet')).toBeOnTheScreen();
 ```
 
-Cover: data, empty, error → retry. Restore spies in `afterEach(() => jest.restoreAllMocks())`.
+Cover: data, empty, error → retry. Restore spies in `afterEach(() => jest.restoreAllMocks())`. After a mutation, assert what the user sees change, not that `invalidateQueries` was called.
+
+**Pure logic** — pass time in explicitly; never read `Date.now()` inside the function under test:
+
+```ts
+const plan = planReminders(deadlines, settings, new Date('2026-10-30T09:00:00+01:00'));
+expect(plan).toEqual([...]);
+```
+
+Cover the cases the plan task lists (past dates, due today, time zone change, limits, repeated calls change nothing). Write calendar dates as `YYYY-MM-DD` strings, as in the data model.
 
 **Navigation** — mount real screens in an in-memory router:
 
@@ -62,11 +84,34 @@ expect(screen).toHavePathname('/documents/getting-started');
 
 **Hook** — `const { result } = await renderHook(() => useThing(), { wrapper: createTestProviders() });`
 
-**HTTP layer** — `jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }))`. See `src/lib/api/client.test.ts`. Mock modules (e.g. `@/lib/env`) with `jest.mock(path, factory)` at the top of the file.
+**HTTP layer** — `jest.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(JSON.stringify(body), { status }))`. See `src/lib/api/client.test.ts`. Cover each error code the UI distinguishes (SPEC §7.2) plus network failure, timeout and offline. Mock modules (e.g. `@/lib/env`) with `jest.mock(path, factory)` at the top of the file.
 
-**Native modules** — `jest-expo` mocks most Expo modules. For a library without mocks, add `jest.mock('lib-name', () => ({ ... }))` in the test, or in a shared setup file registered via `setupFilesAfterEnv` in `jest.config.js` if many tests need it.
+**API handler** — no HTTP server, no real model:
+
+```ts
+const response = await handleAnalyze(
+  new Request('http://test/api/v1/analyze', { method: 'POST', body: formData }),
+  { provider: new MockLlmProvider(), limits: fakeLimits, now: () => fixedNow }
+);
+expect(response.status).toBe(413);
+expect(await response.json()).toEqual({
+  error: { code: 'too_large', message: expect.any(String) },
+});
+```
+
+One test per error code. If a Fetch API global is missing in the default Jest environment, add `/** @jest-environment node */` to the server test file.
+
+**Native modules** — mock **our adapter** (`jest.mock('../scanner', ...)`), not the library: the adapter is the contract the feature relies on. `jest-expo` mocks most Expo modules for code that imports them indirectly. For a library without mocks, add `jest.mock('lib-name', () => ({ ... }))` in the test, or in a shared setup file registered via `setupFilesAfterEnv` in `jest.config.js` if many tests need it.
+
+**Strings** — once task 1.1 lands, query by the translated text from the dictionary (or by role and name), not by hard-coded English.
+
+**Intl caveat** — Jest runs on Node with full ICU; Hermes on Android has no `Intl.PluralRules` or `Intl.RelativeTimeFormat` (spike 0.7). A green test does not prove the device has the API: keep the polyfill imported in the app entry and check plurals on a device.
 
 **Time** — `jest.useFakeTimers()` with `userEvent.setup({ advanceTimers: jest.advanceTimersByTime })`.
+
+## Test data
+
+Synthetic only. Never put real documents, names, IBANs or addresses in fixtures or snapshots (eval sets included).
 
 ## Bug fixes
 

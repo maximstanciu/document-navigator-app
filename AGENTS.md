@@ -109,6 +109,6 @@ Docs: https://docs.expo.dev/eas/index.md
 - If `ios/` and `android/` directories do not exist, they are generated (Continuous Native Generation). Never create or edit them by hand — configure native behavior in `app.json` and config plugins.
 - Expo Go only includes its bundled native modules. After adding a library with native code, the app needs a development build: `npx expo run:ios|android` locally, or `eas build --profile development`.
 - Prefer recommended Expo modules over third-party libraries, and check your available skills before adding dependencies. The approved candidate list is SPEC §10; anything outside it needs the user's OK. Docs: https://docs.expo.dev/versions/latest/index.md
-- The skills in `.claude/skills/` were written for the boilerplate (HTTP endpoints + fixtures) and are updated in plan task 1.0. Until then, where a skill conflicts with this file or `docs/SPEC.md`, this file and the SPEC win.
+- The skills in `.claude/skills/` follow this file and `docs/SPEC.md` (updated in plan task 1.0). If a skill and this file or the SPEC ever disagree, this file and the SPEC win — and fix the skill.
 - Never commit real documents containing personal data (eval sets included); use synthetic or anonymized samples.
 - Run `npm run verify` before declaring any task done.

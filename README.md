@@ -1,84 +1,98 @@
-# Document Navigator
+# DocNavigator — навигатор по документам
 
-React Native boilerplate built on [Expo](https://expo.dev) (SDK 58) with Expo Router, TypeScript, React Query, Jest + React Native Testing Library, and a set of [Claude Code](https://claude.com/claude-code) skills that encode the project's workflows.
+Мобильное приложение, которое простым языком объясняет письма, счета и договоры: что это за документ, что нужно сделать, до какого числа и чем рискуешь. Пользователь сканирует документ или загружает PDF, приложение выделяет сроки, действия, риски и признаки мошенничества и напоминает о сроках.
 
-## Quick start
+Для кого: люди, которые получают документы на неродном языке (эмигранты, экспаты, студенты), и все, кому тяжело разбираться в бюрократии.
 
-```bash
-npm install
-cp .env.example .env.local   # optional: set EXPO_PUBLIC_API_URL
-npm start                    # then press a (Android), i (iOS), or w (web)
-```
+**Статус:** MVP в разработке. Этап 0 плана (решения и спайки) пройден на Android; iOS-сборка ещё впереди.
 
-Without `EXPO_PUBLIC_API_URL` the app runs on local fixtures, so it works with no backend.
+## Документы проекта
 
-## Scripts
+| Документ                                                   | Что внутри                                                                    |
+| ---------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| [docs/SPEC.md](docs/SPEC.md)                               | Требования (ID вида CAP-2, ANL-8), модель данных, контракт API, схема анализа |
+| [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Этапы, задачи, критерии приёмки, риски                                        |
+| [docs/spikes/](docs/spikes/)                               | Отчёты спайков: EAS Hosting (0.2), сканер (0.4), календарь и `Intl` (0.7)     |
+| [AGENTS.md](AGENTS.md)                                     | Архитектурные соглашения и правила для разработчиков и агентов                |
 
-| Script                    | What it does                                                     |
-| ------------------------- | ---------------------------------------------------------------- |
-| `npm start`               | Expo dev server                                                  |
-| `npm run android/ios/web` | Dev server + open the platform                                   |
-| `npm run verify`          | Typecheck, lint, format check, tests (CI gate)                   |
-| `npm run typecheck`       | `tsc --noEmit`                                                   |
-| `npm run lint`            | ESLint (`eslint-config-expo` + Prettier + Testing Library rules) |
-| `npm run format`          | Prettier write                                                   |
-| `npm test`                | Jest (`jest-expo` preset)                                        |
-| `npm run doctor`          | `expo-doctor` dependency/config checks                           |
+## Как устроено
 
-### CI
-
-GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master` and on pull requests: `npm ci`, then `npm run verify`, with `expo-doctor` in a parallel job. Node 22. If `npm run verify` passes locally, the verify job should pass too.
-
-## What's inside
-
-- **Routing** — Expo Router with typed routes: a root Stack, a tab group (native tabs on iOS/Android, custom tab bar on web), a dynamic detail route, and a not-found screen.
-- **Feature modules** — `src/features/<feature>/` holds types, API calls, React Query `queryOptions`, components, and screens. `documents` is the reference feature (list → detail); `settings` shows app info.
-- **Data layer** — `src/lib/api/client.ts` (typed fetch wrapper, `ApiError`, bearer token hook), `src/lib/query-client.ts` (retry policy, refetch on app foreground).
-- **UI kit** — themed text/view, light/dark color tokens, `Button`, loading/error/empty states, accessibility built in (ARIA props, 44pt targets, AA contrast).
-- **Testing** — Jest with RNTL v14 (async APIs), `renderWithProviders`, and router tests with `expo-router/testing-library`.
-- **Tooling** — ESLint flat config, Prettier, React Compiler, `eas.json` with development/preview/production profiles.
+- **iOS и Android** на Expo SDK 58 (React Native 0.88, New Architecture, Expo Router, TypeScript). Web — только превью для разработки: без сканера, уведомлений и календаря.
+- **Данные только на устройстве.** Документы, страницы, сроки, действия и настройки хранятся в SQLite и файловой системе телефона. Аккаунтов нет.
+- **Анализ** делает свой бэкенд: Expo API routes (`/api/v1/analyze`, `/api/v1/limits`) на EAS Hosting, LLM-провайдер за интерфейсом `LlmProvider`. Сервер не хранит ни документы, ни результаты; логирует только метаданные.
+- **Напоминания** — локальные уведомления и кнопка «В календарь».
+- **Сканер** — системный: ML Kit на Android, VisionKit на iOS (`react-native-document-scanner-plugin`).
 
 ```
 src/
-  app/          routes only (thin)
-  features/     domain modules (documents, settings)
-  components/   shared UI (ui/ primitives)
-  constants/    theme tokens
-  hooks/        shared hooks
-  lib/          env, API client, query client
-  providers/    app-wide providers
-  test/         test helpers
-.claude/
-  skills/       project skills for Claude Code
-  settings.json shared Claude Code settings (Expo plugin, safe command allowlist)
-  launch.json   dev server config for the browser preview
+  app/          маршруты Expo Router (тонкие) и API routes (+api.ts)
+  features/     доменные модули: capture, documents, analysis, deadlines, reminders, onboarding, settings
+  components/   общий UI (ui/ — примитивы)
+  lib/          инфраструктура клиента: env, api-клиент, query-клиент; db/, files/, i18n/ появятся на этапе 1
+  shared/       чистый TS для клиента и сервера: zod-схема анализа, лимиты (этап 1)
+  server/       код API routes: обработчики, провайдеры LLM, лимиты (этап 3)
+  constants/ hooks/ providers/ test/
+docs/           спецификация, план, отчёты спайков
+.claude/        скиллы и настройки Claude Code
 ```
 
-## Claude Code skills
+Подробная целевая структура и правила зависимостей — в [AGENTS.md](AGENTS.md) и в плане. Пока не сделана задача 1.6, фича `documents` — пример из шаблона (HTTP и фикстуры), в новых фичах этот подход не повторяем.
 
-`CLAUDE.md` loads the project conventions from `AGENTS.md` (shared with other coding agents) and indexes the skills in `.claude/skills/`. Claude picks them up automatically; you can also invoke one directly, e.g. `/new-screen settings/profile`.
+## Разработка
 
-| Skill                 | Purpose                                                               |
-| --------------------- | --------------------------------------------------------------------- |
-| `verify`              | Quality gate before anything is "done"                                |
-| `new-screen`          | Add a route/screen/tab/modal with all UI states and a test            |
-| `new-component`       | Themed, accessible component + test in the right folder               |
-| `new-feature`         | Scaffold a full feature module                                        |
-| `api-integration`     | Endpoints, queries, mutations, auth, env config                       |
-| `write-tests`         | Jest + RNTL v14 patterns, router tests, mocks                         |
-| `add-dependency`      | Expo-compatible installs, native modules, config plugins, permissions |
-| `run-app`             | Run on web/emulator/simulator/device, read logs                       |
-| `troubleshoot`        | Common Metro / Jest / native / build failures                         |
-| `performance-audit`   | Lists, re-renders, images, startup, bundle size                       |
-| `accessibility-audit` | Screen readers, targets, contrast, font scaling, motion               |
-| `release`             | Version bump + EAS build/submit/update (manual `/release` only)       |
+### Что нужно
 
-The project also enables the official [`expo` plugin](https://github.com/expo/skills) for Expo-maintained skills (native UI, deployment, CI/CD, SDK upgrades). Claude Code offers to install it when you trust the folder.
+- Node.js 22.13+ (как в CI).
+- Для Android-сборок: Android SDK (`~/Android/Sdk`), JDK 17, эмулятор с Google Play или телефон с отладкой по USB.
+- Для iOS: сборки только через EAS, нужен платный Apple Developer Program и iPhone.
+- Аккаунт Expo — для EAS (сборки iOS, деплой API routes, обновления по воздуху).
 
-## Making it yours
+### Запуск
 
-1. Rename the app: `name`, `slug`, `scheme` in `app.json`; `name` in `package.json`.
-2. Set `ios.bundleIdentifier` and `android.package` in `app.json` before your first store build.
-3. Replace icons and splash in `assets/`.
-4. Point `EXPO_PUBLIC_API_URL` at your backend and drop the fixture fallback in `src/features/documents/api.ts` (or delete the feature).
-5. Link EAS: `npx eas-cli@latest init`.
+Приложение использует нативные модули, которых нет в Expo Go, поэтому нужен development build.
+
+```bash
+npm install
+cp .env.example .env.local     # при необходимости задать EXPO_PUBLIC_API_URL
+ANDROID_HOME=~/Android/Sdk npx expo run:android --device <эмулятор или serial телефона>
+npx expo start --dev-client    # Metro; приложение подключится к нему
+```
+
+Пересобирать нативную часть нужно только после установки нативного пакета или изменения плагинов в `app.json` (`npx expo prebuild --platform android --clean`, затем снова `expo run:android`). Изменения JS подхватываются без пересборки.
+
+Быстрая проверка вёрстки без устройства — web-превью: `npm run web`.
+
+Папки `android/` и `ios/` генерируются (Continuous Native Generation) и не коммитятся: нативные настройки — только через `app.json` и config plugins.
+
+### Скрипты
+
+| Скрипт              | Что делает                                                             |
+| ------------------- | ---------------------------------------------------------------------- |
+| `npm start`         | Metro dev server                                                       |
+| `npm run android`   | `expo run:android` — локальная сборка и установка на Android           |
+| `npm run web`       | Metro + web-превью                                                     |
+| `npm run verify`    | typecheck, lint, проверка Prettier, тесты — обязательно перед «готово» |
+| `npm run typecheck` | `tsc --noEmit`                                                         |
+| `npm run lint`      | ESLint (`eslint-config-expo`, правила React Compiler)                  |
+| `npm run format`    | Prettier                                                               |
+| `npm test`          | Jest (`jest-expo`, React Native Testing Library v14)                   |
+| `npm run doctor`    | `expo-doctor`                                                          |
+
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) на каждый push в `master` и на pull request: `npm ci` → `npm run verify`, параллельно `expo-doctor`.
+
+### EAS
+
+Проект `@maximst/docnavigator`. Сборки, деплой API routes и обновления по воздуху стоят денег или публикуют результат, поэтому запускаются только осознанно: см. скилл `release`. `runtimeVersion` считается по политике `fingerprint`: обновление по воздуху доходит только до сборок с тем же нативным кодом.
+
+## Правила, которые легко нарушить
+
+- **Конфиденциальность.** Содержимое документов и анализа (названия, отправители, суммы, цитаты) не попадает в логи, отчёты о падениях и текст уведомлений.
+- **Тестовые документы** — только синтетические или обезличенные. Реальные документы с персональными данными в репозиторий не коммитим.
+- **Секреты** (ключи LLM) — только в переменных окружения сервера EAS Hosting, никогда в `EXPO_PUBLIC_*`.
+- **Зависимости** — из одобренного списка SPEC §10; остальное после согласования.
+
+## Claude Code
+
+`CLAUDE.md` подключает соглашения из `AGENTS.md` и перечисляет скиллы проекта в `.claude/skills/`: `verify`, `new-screen`, `new-component`, `new-feature`, `api-integration`, `write-tests`, `add-dependency`, `run-app`, `troubleshoot`, `performance-audit`, `accessibility-audit`, `release`. Claude выбирает их сам; можно вызвать и явно, например `/new-screen deadlines`. Дополнительно включён официальный плагин [`expo`](https://github.com/expo/skills) со скиллами Expo.
