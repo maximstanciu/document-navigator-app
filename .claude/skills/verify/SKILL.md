@@ -37,6 +37,10 @@ The single gate for "done" in this repo. Run it after every change to source, co
 
 4. If you changed UI, also see it render: use the `run-app` skill (web preview is the fastest check available on any machine).
 
+## CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs this same gate on pushes to `master` and on pull requests: `npm ci` → `npm run verify`, plus `npx --yes expo-doctor` in a separate job. A local pass means the CI verify job should pass. The workflow only calls `npm run verify`, so changing the gate means changing that script in `package.json`, not the workflow.
+
 ## Reporting
 
 State exactly what ran and what passed. If something could not be checked (e.g. iOS-only code on a Linux machine), say so instead of implying it was verified.

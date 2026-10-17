@@ -25,6 +25,10 @@ Without `EXPO_PUBLIC_API_URL` the app runs on local fixtures, so it works with n
 | `npm test`                | Jest (`jest-expo` preset)                                        |
 | `npm run doctor`          | `expo-doctor` dependency/config checks                           |
 
+### CI
+
+GitHub Actions (`.github/workflows/ci.yml`) runs on every push to `master` and on pull requests: `npm ci`, then `npm run verify`, with `expo-doctor` in a parallel job. Node 22. If `npm run verify` passes locally, the verify job should pass too.
+
 ## What's inside
 
 - **Routing** — Expo Router with typed routes: a root Stack, a tab group (native tabs on iOS/Android, custom tab bar on web), a dynamic detail route, and a not-found screen.
