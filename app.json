@@ -54,6 +54,12 @@
         "projectId": "2308c906-b62b-4697-99e5-99f4363eecc0"
       }
     },
-    "owner": "maximst"
+    "owner": "maximst",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/2308c906-b62b-4697-99e5-99f4363eecc0"
+    }
   }
 }
