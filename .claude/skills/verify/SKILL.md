@@ -39,7 +39,7 @@ The single gate for "done" in this repo. Run it after every change to source, co
 
 ## CI
 
-GitHub Actions (`.github/workflows/ci.yml`) runs this same gate on pushes to `master` and on pull requests: `npm ci` → `npm run verify`, plus `npx --yes expo-doctor` in a separate job. A local pass means the CI verify job should pass. The workflow only calls `npm run verify`, so changing the gate means changing that script in `package.json`, not the workflow.
+GitHub Actions (`.github/workflows/ci.yml`) runs this same gate on pushes to `master`/`main` and on pull requests, plus a `bundle` job (`npm run check:bundle`: export web with API routes and Android, fail on `LLM_*` names in client bundles). Run `npm run check:bundle` locally after touching Metro config, env handling or anything server-side. The verify job is: `npm ci` → `npm run verify`, plus `npx --yes expo-doctor` in a separate job. A local pass means the CI verify job should pass. The workflow only calls `npm run verify`, so changing the gate means changing that script in `package.json`, not the workflow.
 
 ## Reporting
 

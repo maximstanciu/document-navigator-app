@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [master]
+    branches: [master, main]
   pull_request:
 
 permissions:
@@ -42,3 +42,20 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx --yes expo-doctor
+
+  bundle:
+    name: Export bundles and check for leaked secrets
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      # Catches bundling errors tsc and Jest can't see (web incl. API routes, Android), then
+      # fails if a server-only variable name (LLM_*) ended up in a client bundle (SPEC §8.2).
+      - run: npm run check:bundle

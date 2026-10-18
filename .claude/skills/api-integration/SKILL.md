@@ -102,7 +102,7 @@ export function POST(request: Request) {
 - Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
 - Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**. Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
 - Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.
-- Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**` (lint after task 1.7).
+- Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**`; server code may import only `src/server`, `src/shared` and `expo-server` (ESLint enforces both). `npm run check:bundle` fails if an `LLM_*` name reaches a client bundle.
 - Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1).
 
 ## 4. Tests

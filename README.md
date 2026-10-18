@@ -66,21 +66,22 @@ npx expo start --dev-client    # Metro; приложение подключит�
 
 ### Скрипты
 
-| Скрипт              | Что делает                                                             |
-| ------------------- | ---------------------------------------------------------------------- |
-| `npm start`         | Metro dev server                                                       |
-| `npm run android`   | `expo run:android` — локальная сборка и установка на Android           |
-| `npm run web`       | Metro + web-превью                                                     |
-| `npm run verify`    | typecheck, lint, проверка Prettier, тесты — обязательно перед «готово» |
-| `npm run typecheck` | `tsc --noEmit`                                                         |
-| `npm run lint`      | ESLint (`eslint-config-expo`, правила React Compiler)                  |
-| `npm run format`    | Prettier                                                               |
-| `npm test`          | Jest (`jest-expo`, React Native Testing Library v14)                   |
-| `npm run doctor`    | `expo-doctor`                                                          |
+| Скрипт                 | Что делает                                                                                                    |
+| ---------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `npm start`            | Metro dev server                                                                                              |
+| `npm run android`      | `expo run:android` — локальная сборка и установка на Android                                                  |
+| `npm run web`          | Metro + web-превью                                                                                            |
+| `npm run verify`       | typecheck, lint, проверка Prettier, тесты — обязательно перед «готово»                                        |
+| `npm run typecheck`    | `tsc --noEmit`                                                                                                |
+| `npm run lint`         | ESLint (`eslint-config-expo`, правила React Compiler)                                                         |
+| `npm run format`       | Prettier                                                                                                      |
+| `npm test`             | Jest (`jest-expo`, React Native Testing Library v14)                                                          |
+| `npm run doctor`       | `expo-doctor`                                                                                                 |
+| `npm run check:bundle` | Экспорт web (с API routes) и Android; ошибка, если имя серверной переменной `LLM_*` попало в клиентский бандл |
 
 ### CI
 
-GitHub Actions (`.github/workflows/ci.yml`) на каждый push в `master` и на pull request: `npm ci` → `npm run verify`, параллельно `expo-doctor`.
+GitHub Actions (`.github/workflows/ci.yml`) на каждый push в `master` или `main` и на pull request: `npm ci` → `npm run verify`, параллельно `expo-doctor` и `npm run check:bundle` (сборка бандлов и проверка утечки секретов).
 
 ### EAS
 

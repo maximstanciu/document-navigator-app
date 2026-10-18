@@ -14,10 +14,20 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
-    tint: '#0A6FD8',
+    tint: '#0966CA',
     onTint: '#ffffff',
     danger: '#D93036',
     border: '#D9D9E0',
+    // Risk levels and the fraud warning (DET-5, DET-10). Always paired with text and an icon:
+    // color alone never carries the meaning (§8.4). Contrast is checked in theme.test.ts.
+    riskHigh: '#B42318',
+    riskHighBackground: '#FEE4E2',
+    riskMedium: '#93370D',
+    riskMediumBackground: '#FEF0C7',
+    riskLow: '#1849A9',
+    riskLowBackground: '#E0EAFF',
+    fraudWarning: '#9F1239',
+    fraudWarningBackground: '#FFE4E6',
   },
   dark: {
     text: '#ffffff',
@@ -29,6 +39,14 @@ export const Colors = {
     onTint: '#000000',
     danger: '#FF6369',
     border: '#3A3F42',
+    riskHigh: '#FDA29B',
+    riskHighBackground: '#55160C',
+    riskMedium: '#FEC84B',
+    riskMediumBackground: '#4E1D09',
+    riskLow: '#84ADFF',
+    riskLowBackground: '#102A56',
+    fraudWarning: '#FDA4AF',
+    fraudWarningBackground: '#4C0519',
   },
 } as const;
 

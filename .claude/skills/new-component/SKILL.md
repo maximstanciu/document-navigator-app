@@ -26,7 +26,7 @@ Reference: `src/components/ui/button.tsx` (primitive) and `src/features/document
 - **Text**: always `ThemedText` with a `type` (`default`, `small`, `smallBold`, `subtitle`, `title`, `link`, `code`). Raw `<Text>` skips theming.
 - **Strings**: once task 1.1 lands, visible text and `aria-label`s come from the ru/en dictionaries — components take translated strings or call the translation hook, never hard-code user-facing English. Dates, amounts and plurals via `Intl`.
 - **Data**: components get data through props or the feature's query hooks; native capabilities through the feature's adapter. No `fetch`, DB or native module calls in components.
-- **Risk and warnings**: risk levels and fraud warnings use the dedicated color tokens (task 1.8) **plus** text and an icon — never color alone (DET-10).
+- **Risk and warnings**: risk levels and fraud warnings use the dedicated color tokens (`riskHigh`, `riskMedium`, `riskLow`, `fraudWarning`, each with a `…Background`) **plus** text and an icon — never color alone (DET-10).
 - **Privacy**: never `console.log` document content (titles, senders, amounts, quotes).
 - **Images**: `expo-image` (`import { Image } from 'expo-image'`), not RN `Image`.
 - **Icons**: `expo-symbols` `SymbolView` with `{ ios, android, web }` names.
