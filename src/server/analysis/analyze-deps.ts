@@ -1,4 +1,5 @@
 import { parseAppVersion } from '../http/app-version';
+import { consoleServerLog } from '../logs/server-log';
 import type { AnalyzeDeps } from './handle-analyze';
 import type { LlmProvider } from './llm-provider';
 import { isMockFixtureName, MockLlmProvider } from './providers/mock-llm-provider';
@@ -13,13 +14,20 @@ type ServerEnv = Record<string, string | undefined>;
  * - `LLM_PROVIDER`: unset — `MockLlmProvider` (SPEC §7.5).
  * - `LLM_MOCK_FIXTURE`, `LLM_MOCK_DELAY_MS`: what the mock returns and how long it takes.
  * - `MIN_APP_VERSION`: `major.minor.patch`; older apps get `426`. Unset — every version.
+ * - `DEVICE_ID_HASH_KEY`: the HMAC key for device ids in logs, a sensitive EAS variable on every
+ *   deployment. Unset — a development key that anyone could reproduce.
  */
 export function createAnalyzeDeps(env: ServerEnv = process.env): AnalyzeDeps {
   return {
     provider: createLlmProvider(env),
     minAppVersion: readMinAppVersion(env),
+    deviceHashKey: env.DEVICE_ID_HASH_KEY || DEVELOPMENT_HASH_KEY,
+    log: consoleServerLog,
+    now: Date.now,
   };
 }
+
+const DEVELOPMENT_HASH_KEY = 'docnavigator-development';
 
 function createLlmProvider(env: ServerEnv): LlmProvider {
   const id = env.LLM_PROVIDER || 'mock';

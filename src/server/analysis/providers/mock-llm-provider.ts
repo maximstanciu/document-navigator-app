@@ -35,7 +35,11 @@ export class MockLlmProvider implements LlmProvider {
     if (this.delayMs > 0) await delay(this.delayMs, input.signal);
     input.signal?.throwIfAborted();
     const { schemaVersion: _schemaVersion, ...result } = ANALYSIS_FIXTURES[this.fixture];
-    return { result: structuredClone(result), usage: { inputTokens: 0, outputTokens: 0 } };
+    return {
+      result: structuredClone(result),
+      usage: { inputTokens: 0, outputTokens: 0 },
+      costUsd: 0,
+    };
   }
 }
 

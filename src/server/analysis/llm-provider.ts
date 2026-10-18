@@ -25,6 +25,8 @@ export type LlmAnalyzeOutput = {
   /** The model's JSON, not validated yet: the handler checks it against `llmAnalysisSchema`. */
   result: unknown;
   usage: { inputTokens: number; outputTokens: number };
+  /** What the call cost by the provider's prices, for logs and the daily budget (SPEC §8.3). */
+  costUsd: number;
 };
 
 export interface LlmProvider {

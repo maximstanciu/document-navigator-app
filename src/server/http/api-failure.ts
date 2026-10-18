@@ -29,6 +29,10 @@ export class ApiFailure extends Error {
     this.name = 'ApiFailure';
   }
 
+  get status() {
+    return STATUS[this.code];
+  }
+
   toResponse() {
     return errorResponse(this.code, this.message, this.headers);
   }

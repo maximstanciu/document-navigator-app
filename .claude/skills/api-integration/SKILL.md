@@ -106,7 +106,7 @@ export function POST(request: Request) {
 - Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**, and on the Free plan 10 ms CPU per request, enforced after a burst of heavy requests (`504 CPU time limit exceeded`, re-measured in task 3.1). Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
 - Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.
 - Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**`; server code may import only `src/server`, `src/shared` and `expo-server` (ESLint enforces both). `npm run check:bundle` fails if an `LLM_*` name reaches a client bundle.
-- Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1).
+- Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1). Log through the handler's `deps.log` (`ServerLog` from `src/server/logs/server-log.ts`, one JSON line per event) with numbers, flags and closed sets of words only; no titles, file names, model output or error messages. Hash device ids with `hashDeviceId()` from `src/server/privacy/`. Rethrow unexpected errors through `redactError()` so crash reports carry no message. Test that a request's content never reaches the log (`handle-analyze.test.ts` shows the check).
 
 ## 4. Tests
 

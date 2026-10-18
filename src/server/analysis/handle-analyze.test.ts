@@ -12,12 +12,23 @@ import {
   pdf,
   TEST_URL,
 } from '../testing/analyze-request';
+import type { LogEvent } from '../logs/server-log';
 import { handleAnalyze, type AnalyzeDeps } from './handle-analyze';
+import * as inspectPdfModule from './inspect-pdf';
 import type { LlmAnalyzeInput, LlmProvider } from './llm-provider';
 import { MockLlmProvider } from './providers/mock-llm-provider';
 
+let events: LogEvent[] = [];
+
 function deps(overrides: Partial<AnalyzeDeps> = {}): AnalyzeDeps {
-  return { provider: new MockLlmProvider(), minAppVersion: null, ...overrides };
+  return {
+    provider: new MockLlmProvider(),
+    minAppVersion: null,
+    deviceHashKey: 'test-key',
+    log: (event) => events.push(event),
+    now: Date.now,
+    ...overrides,
+  };
 }
 
 /** A provider that records what it got and answers with `result`. */
@@ -27,7 +38,7 @@ function recordingProvider(answer: () => Promise<unknown> = async () => validRes
     id: 'recording',
     analyze: async (input) => {
       calls.push({ ...input, files: [...input.files] });
-      return { result: await answer(), usage: { inputTokens: 1, outputTokens: 1 } };
+      return { result: await answer(), usage: { inputTokens: 1, outputTokens: 1 }, costUsd: 0 };
     },
   };
   return { provider, calls };
@@ -46,6 +57,7 @@ async function expectError(response: Response, status: number, code: string) {
 
 describe('handleAnalyze', () => {
   beforeEach(() => {
+    events = [];
     // pdf-lib reports skipped objects of damaged files on the console.
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -313,7 +325,7 @@ describe('handleAnalyze', () => {
         handed = input.files;
         // A real provider encodes the files and empties the array it was given.
         input.files.splice(0);
-        return { result: validResult(), usage: { inputTokens: 0, outputTokens: 0 } };
+        return { result: validResult(), usage: { inputTokens: 0, outputTokens: 0 }, costUsd: 0 };
       },
     };
 
@@ -327,3 +339,160 @@ describe('handleAnalyze', () => {
     expect((await response.json()).pageCount).toBe(2);
   });
 });
+
+describe('handleAnalyze logs', () => {
+  const ofType = (event: string) => events.filter((logged) => logged.event === event);
+
+  beforeEach(() => {
+    events = [];
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  it('logs a start and an end with metadata of the request', async () => {
+    await handleAnalyze(analyzeRequest({ files: [jpeg(1000), jpeg(2000)] }), deps());
+
+    expect(events.map((event) => event.event)).toEqual(['analyze.start', 'analyze.end']);
+    const [start, end] = events;
+    expect(start).toEqual({
+      event: 'analyze.start',
+      requestId: expect.any(String),
+      device: expect.stringMatching(/^[0-9a-f]{16}$/),
+      platform: 'android',
+      appVersion: '1.0.0',
+      bodyBytes: null,
+    });
+    expect(end).toEqual({
+      event: 'analyze.end',
+      requestId: start.requestId,
+      status: 200,
+      code: 'ok',
+      error: null,
+      ms: expect.any(Number),
+      platform: 'android',
+      appVersion: '1.0.0',
+      kind: 'images',
+      pages: 2,
+      bytes: 3000,
+      locale: 'ru',
+      provider: 'mock',
+      modelMs: expect.any(Number),
+      inputTokens: 0,
+      outputTokens: 0,
+      costUsd: 0,
+      deadlines: 1,
+      fraudSignals: 0,
+      readable: true,
+    });
+  });
+
+  it('uses the Cf-Ray id, which the EAS dashboard looks requests up by', async () => {
+    await handleAnalyze(analyzeRequest({ headers: { 'Cf-Ray': '8f1d2c3b4a5e6f70-FRA' } }), deps());
+
+    expect(events.map((event) => event.requestId)).toEqual([
+      '8f1d2c3b4a5e6f70-FRA',
+      '8f1d2c3b4a5e6f70-FRA',
+    ]);
+  });
+
+  it('logs only the end when the client headers are wrong', async () => {
+    await handleAnalyze(analyzeRequest({ headers: { [API_HEADERS.deviceId]: 'x' } }), deps());
+
+    expect(events).toEqual([
+      expect.objectContaining({ event: 'analyze.end', status: 400, code: 'invalid_request' }),
+    ]);
+    expect(events[0]).toMatchObject({ platform: null, kind: null });
+  });
+
+  it('logs how far a rejected upload got', async () => {
+    await handleAnalyze(analyzeRequest({ files: [pdf(minimalPdf({ encrypted: true }))] }), deps());
+
+    expect(ofType('analyze.end')[0]).toMatchObject({
+      status: 422,
+      code: 'encrypted_pdf',
+      kind: 'pdf',
+      pages: null,
+      modelMs: null,
+    });
+  });
+
+  it('logs an invalid model answer without what the model said', async () => {
+    const { provider } = recordingProvider(async () => ({ ...validResult(), summary: 42 }));
+
+    await handleAnalyze(analyzeRequest(), deps({ provider }));
+
+    expect(ofType('analyze.end')[0]).toMatchObject({
+      status: 502,
+      code: 'analysis_failed',
+      modelMs: expect.any(Number),
+      deadlines: null,
+    });
+  });
+
+  it('leaves an interrupted analysis without an end (SPEC §8.7)', async () => {
+    const controller = new AbortController();
+    const request = new Request(analyzeRequest(), { signal: controller.signal });
+    const provider: LlmProvider = {
+      id: 'aborted',
+      analyze: async () => {
+        controller.abort();
+        throw new DOMException('Aborted', 'AbortError');
+      },
+    };
+
+    await expect(handleAnalyze(request, deps({ provider }))).rejects.toThrow();
+    expect(events.map((event) => event.event)).toEqual(['analyze.start']);
+  });
+
+  it('rethrows an unexpected error without its message, which can quote content', async () => {
+    jest
+      .spyOn(inspectPdfModule, 'inspectPdf')
+      .mockRejectedValue(new SyntaxError('Unexpected token in "Счёт за электричество"'));
+
+    const failure = handleAnalyze(analyzeRequest({ files: [pdf(minimalPdf())] }), deps());
+
+    await expect(failure).rejects.toMatchObject({
+      name: 'SyntaxError',
+      message: '[message redacted]',
+      stack: expect.not.stringContaining('Счёт'),
+    });
+    expect(ofType('analyze.end')[0]).toMatchObject({
+      status: 500,
+      code: 'internal',
+      error: 'SyntaxError',
+    });
+  });
+
+  it('never logs the document or its analysis (SPEC §7.1)', async () => {
+    const { fraudulentInvoice } = ANALYSIS_FIXTURES;
+    const content = stringsIn(fraudulentInvoice).filter((text) => text.length >= 4);
+    const fileName = 'Паспорт Иванова.jpg';
+
+    await handleAnalyze(
+      analyzeRequest({ files: [{ ...jpeg(), name: fileName }] }),
+      deps({ provider: new MockLlmProvider({ fixture: 'fraudulentInvoice' }) })
+    );
+    await handleAnalyze(
+      analyzeRequest({ files: [{ ...jpeg(), name: fileName }] }),
+      deps({
+        provider: recordingProvider(async () => ({ ...validResult(), summary: 42 })).provider,
+      })
+    );
+
+    const logged = JSON.stringify(events);
+    expect(ofType('analyze.end')).toHaveLength(2);
+    expect(content.length).toBeGreaterThan(10);
+    for (const text of [...content, fileName, CLIENT_HEADERS[API_HEADERS.deviceId]]) {
+      expect(logged).not.toContain(text);
+    }
+  });
+});
+
+function stringsIn(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(stringsIn);
+  if (value && typeof value === 'object') return Object.values(value).flatMap(stringsIn);
+  return [];
+}
