@@ -9,6 +9,10 @@ type CaptureState = { source: DocumentSource | null; pages: CapturedPage[] };
 export type CaptureSession = CaptureState & {
   /** Starts over with the pages from one source. */
   start: (source: DocumentSource, pages: CapturedPage[]) => void;
+  /** Appends pages after the existing ones («Scan more», CAP-5). */
+  add: (pages: CapturedPage[]) => void;
+  /** Removes the page at `index` (CAP-5). */
+  remove: (index: number) => void;
 };
 
 const CaptureSessionContext = createContext<CaptureSession | null>(null);
@@ -22,6 +26,9 @@ export function CaptureSessionProvider({ children }: PropsWithChildren) {
   const session: CaptureSession = {
     ...state,
     start: (source, pages) => setState({ source, pages }),
+    add: (pages) => setState((current) => ({ ...current, pages: [...current.pages, ...pages] })),
+    remove: (index) =>
+      setState((current) => ({ ...current, pages: current.pages.filter((_, i) => i !== index) })),
   };
   return <CaptureSessionContext value={session}>{children}</CaptureSessionContext>;
 }

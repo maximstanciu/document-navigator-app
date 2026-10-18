@@ -111,6 +111,16 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
     });
   });
 
+  it('counts against the room left when adding to a document', () => {
+    const photos = [file({ uri: 'file:///p1.jpg' }), file({ uri: 'file:///p2.jpg' })];
+
+    expect(checkPickedFiles('gallery', photos, 2).status).toBe('ok');
+    expect(checkPickedFiles('gallery', photos, 1)).toEqual({
+      status: 'too_many_pages',
+      pageCount: 2,
+    });
+  });
+
   it('leaves the size to the check after normalization (CAP-4, CAP-7)', () => {
     const photos = [file({ size: 15 * MB }), file({ uri: 'file:///p2.jpg', size: 15 * MB })];
 

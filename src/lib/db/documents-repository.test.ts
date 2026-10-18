@@ -38,6 +38,31 @@ describe('documents repository', () => {
     expect(await repos.documents.get('doc-1')).toEqual(created);
   });
 
+  it('creates a document together with its pages in order (CAP-5)', async () => {
+    const page = (id: string) => ({
+      id,
+      relativePath: `documents/doc-1/${id}.jpg`,
+      width: 1448,
+      height: 2048,
+    });
+
+    await repos.documents.create(newDocument('doc-1'), [page('p-a'), page('p-b')]);
+
+    expect(await repos.pages.listByDocument('doc-1')).toEqual([
+      { ...page('p-a'), documentId: 'doc-1', index: 0 },
+      { ...page('p-b'), documentId: 'doc-1', index: 1 },
+    ]);
+  });
+
+  it('creates nothing when a page can not be saved', async () => {
+    const page = { id: 'same', relativePath: 'documents/doc-1/a.jpg', width: null, height: null };
+
+    await expect(repos.documents.create(newDocument('doc-1'), [page, page])).rejects.toThrow();
+
+    expect(await repos.documents.get('doc-1')).toBeNull();
+    expect(await repos.pages.listByDocument('doc-1')).toEqual([]);
+  });
+
   it('lists active documents newest first', async () => {
     await repos.documents.create(newDocument('older', 'Old'));
     clock.advance(1000);

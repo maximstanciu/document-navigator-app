@@ -70,7 +70,9 @@ export type PickedFilesCheck =
  */
 export function checkPickedFiles(
   source: 'gallery' | 'file',
-  files: readonly PickedFile[]
+  files: readonly PickedFile[],
+  /** Pages the document still has room for: fewer when adding to a document (CAP-5). */
+  maxPages = MAX_DOCUMENT_PAGES
 ): PickedFilesCheck {
   const pdfAllowed = source === 'file' && files.length === 1;
   const pages: CapturedPage[] = [];
@@ -89,7 +91,7 @@ export function checkPickedFiles(
     });
   }
   // The pickers stop at the limit on Android and iOS, but not on web.
-  if (pages.length > MAX_DOCUMENT_PAGES) {
+  if (pages.length > maxPages) {
     return { status: 'too_many_pages', pageCount: pages.length };
   }
   return { status: 'ok', pages };

@@ -1,7 +1,7 @@
 import { MAX_DOCUMENT_BYTES } from '@/shared/limits';
 
 import { normalizeImage } from './normalize-image';
-import { preparePages } from './prepare-pages';
+import { checkDocumentSize, preparePages } from './prepare-pages';
 import type { CapturedPage } from './types';
 
 jest.mock('./normalize-image', () => ({ normalizeImage: jest.fn() }));
@@ -36,7 +36,7 @@ function normalizesTo(size: number | null) {
 
 afterEach(() => normalize.mockReset());
 
-describe('preparePages (CAP-4, CAP-7)', () => {
+describe('preparePages (CAP-4)', () => {
   it('normalizes every image to a JPEG, keeping the page order', async () => {
     normalizesTo(400_000);
     const pages = [
@@ -65,32 +65,6 @@ describe('preparePages (CAP-4, CAP-7)', () => {
   it('keeps a PDF as it is (D-4)', async () => {
     expect(await preparePages([pdf(3 * MB)])).toEqual({ status: 'ok', pages: [pdf(3 * MB)] });
     expect(normalize).not.toHaveBeenCalled();
-  });
-
-  it('checks the total size after normalization, up to the limit inclusive', async () => {
-    normalizesTo(MAX_DOCUMENT_BYTES / 2);
-    const pages = [page('file:///1.jpg'), page('file:///2.jpg')];
-
-    expect((await preparePages(pages)).status).toBe('ok');
-
-    normalizesTo(MAX_DOCUMENT_BYTES / 2 + 1);
-    expect(await preparePages(pages)).toEqual({
-      status: 'too_large',
-      size: MAX_DOCUMENT_BYTES + 2,
-    });
-  });
-
-  it('refuses a PDF over the limit, which is uploaded as is', async () => {
-    expect(await preparePages([pdf(MAX_DOCUMENT_BYTES + 1)])).toEqual({
-      status: 'too_large',
-      size: MAX_DOCUMENT_BYTES + 1,
-    });
-  });
-
-  it('counts a page of unknown size as zero and leaves it to the server', async () => {
-    normalizesTo(null);
-
-    expect((await preparePages([page('file:///1.jpg'), pdf(null)])).status).toBe('ok');
   });
 
   it('reports an image that can not be decoded', async () => {
@@ -124,5 +98,28 @@ describe('preparePages (CAP-4, CAP-7)', () => {
       })
     ).toEqual({ status: 'aborted' });
     expect(normalize).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('checkDocumentSize (CAP-7)', () => {
+  it('allows a document up to the limit inclusive', () => {
+    const half = page('file:///1.jpg', { size: MAX_DOCUMENT_BYTES / 2 });
+
+    expect(checkDocumentSize([half, half])).toEqual({ status: 'ok' });
+    expect(checkDocumentSize([half, half, page('file:///3.jpg', { size: 1 })])).toEqual({
+      status: 'too_large',
+      size: MAX_DOCUMENT_BYTES + 1,
+    });
+  });
+
+  it('refuses a PDF over the limit, which is uploaded as is', () => {
+    expect(checkDocumentSize([pdf(MAX_DOCUMENT_BYTES + 1)])).toEqual({
+      status: 'too_large',
+      size: MAX_DOCUMENT_BYTES + 1,
+    });
+  });
+
+  it('counts a page of unknown size as zero and leaves it to the server', () => {
+    expect(checkDocumentSize([pdf(null), page('file:///1.jpg')])).toEqual({ status: 'ok' });
   });
 });

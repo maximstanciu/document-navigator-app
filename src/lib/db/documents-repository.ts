@@ -1,4 +1,5 @@
 import type { SqlDatabase } from './database';
+import type { NewPage } from './pages-repository';
 import { buildSearchText, normalizeForSearch, searchablePartsOfAnalysis } from './search-text';
 import {
   buildAssignments,
@@ -125,28 +126,43 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
   return {
     get,
 
-    async create(input: NewDocument): Promise<DocumentRecord> {
+    /**
+     * Creates a document together with its pages in order, in one transaction: a draft never exists
+     * without its pages (CAP-5). The page files must already be saved.
+     */
+    async create(input: NewDocument, pages: readonly NewPage[] = []): Promise<DocumentRecord> {
       const timestamp = now().toISOString();
-      await db.runAsync(
-        `INSERT INTO documents (id, title, status, source, mime_type, page_count, file_size,
-          search_text, created_at, updated_at)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-        [
+      const row = await db.transaction(async (tx) => {
+        await tx.runAsync(
+          `INSERT INTO documents (id, title, status, source, mime_type, page_count, file_size,
+            search_text, created_at, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          [
+            input.id,
+            input.title,
+            input.status ?? 'draft',
+            input.source,
+            input.mimeType,
+            input.pageCount ?? null,
+            input.fileSize,
+            searchTextOf({ title: input.title, senderName: null, analysis: null }),
+            timestamp,
+            timestamp,
+          ]
+        );
+        for (const [index, page] of pages.entries()) {
+          await tx.runAsync(
+            `INSERT INTO pages (id, document_id, page_index, relative_path, width, height)
+             VALUES (?, ?, ?, ?, ?, ?)`,
+            [page.id, input.id, index, page.relativePath, page.width, page.height]
+          );
+        }
+        return tx.getFirstAsync<DocumentRow>(`SELECT ${COLUMNS} FROM documents WHERE id = ?`, [
           input.id,
-          input.title,
-          input.status ?? 'draft',
-          input.source,
-          input.mimeType,
-          input.pageCount ?? null,
-          input.fileSize,
-          searchTextOf({ title: input.title, senderName: null, analysis: null }),
-          timestamp,
-          timestamp,
-        ]
-      );
-      const created = await get(input.id);
-      if (!created) throw new Error(`Document ${input.id} was not saved`);
-      return created;
+        ]);
+      });
+      if (!row) throw new Error(`Document ${input.id} was not saved`);
+      return toRecord(row);
     },
 
     /** Active documents, newest first (HOME-2). */

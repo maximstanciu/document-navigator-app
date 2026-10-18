@@ -96,7 +96,11 @@ export const ru = {
     reviewTitle: 'Проверьте страницы',
     noPages: 'Страниц пока нет',
     pageLabel: 'Страница {{number}}',
-    pdfLabel: 'PDF, {{name}}, {{size}}',
+    removePage: 'Удалить страницу {{number}}',
+    scanMore: 'Доснять ещё',
+    addMorePhotos: 'Добавить ещё фото',
+    analyze: 'Разобрать документ',
+    saveFailed: 'Не удалось сохранить документ. Попробуйте ещё раз.',
   },
   settings: {
     title: 'Настройки',

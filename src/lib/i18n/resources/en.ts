@@ -87,7 +87,11 @@ export const en = {
     reviewTitle: 'Check the pages',
     noPages: 'No pages yet',
     pageLabel: 'Page {{number}}',
-    pdfLabel: 'PDF, {{name}}, {{size}}',
+    removePage: 'Remove page {{number}}',
+    scanMore: 'Scan more',
+    addMorePhotos: 'Add more photos',
+    analyze: 'Analyze the document',
+    saveFailed: "Couldn't save the document. Try again.",
   },
   settings: {
     title: 'Settings',
