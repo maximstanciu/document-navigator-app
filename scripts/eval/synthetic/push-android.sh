@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Copies a kit made by tenancy_kit.py to Android devices: Download/DocNavigatorTest for «Файл»,
+# Copies a kit made by one of the *_kit.py generators to Android devices: Download/DocNavigatorTest for «Файл»,
 # Pictures/DocNavigatorTest for «Фото из галереи». Replaces what an earlier run put there.
 #
 # Usage: scripts/eval/synthetic/push-android.sh [kit_dir] [serial...]
