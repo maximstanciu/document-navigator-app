@@ -119,9 +119,9 @@ One test per error code. If a Fetch API global is missing in the default Jest en
 
 **Native modules** — mock **our adapter** (`jest.mock('../scanner', ...)`), not the library: the adapter is the contract the feature relies on. `jest-expo` mocks most Expo modules for code that imports them indirectly. For a library without mocks, add `jest.mock('lib-name', () => ({ ... }))` in the test, or in a shared setup file registered via `setupFilesAfterEnv` in `jest.config.js` if many tests need it.
 
-**Strings** — once task 1.1 lands, query by the translated text from the dictionary (or by role and name), not by hard-coded English.
+**Strings** — tests start in English (`src/test/setup-i18n.ts` resets the language before each test), so query by the English dictionary text or by role and name. To check Russian, `await i18n.changeLanguage('ru')` (from `@/lib/i18n/i18n`) before rendering; cover Russian plurals with counts 1, 2, 5, 11 and 21.
 
-**Intl caveat** — Jest runs on Node with full ICU; Hermes on Android has no `Intl.PluralRules` or `Intl.RelativeTimeFormat` (spike 0.7). A green test does not prove the device has the API: keep the polyfill imported in the app entry and check plurals on a device.
+**Intl caveat** — Jest runs on Node with full ICU; Hermes on Android has no `Intl.PluralRules`, `Intl.Locale` or `Intl.RelativeTimeFormat` (spike 0.7). Plural tests do exercise the formatjs polyfill (it is force-installed, also in Jest), but for any other `Intl` API a green test does not prove the device has it: check on a device.
 
 **Time** — `jest.useFakeTimers()` with `userEvent.setup({ advanceTimers: jest.advanceTimersByTime })`.
 

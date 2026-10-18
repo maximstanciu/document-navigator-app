@@ -1,3 +1,4 @@
+import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -8,17 +9,18 @@ import { useTheme } from '@/hooks/use-theme';
 
 /** Full-screen placeholders for the three non-success states every data screen has. */
 
-export function LoadingState({ label = 'Loading' }: { label?: string }) {
+export function LoadingState({ label }: { label?: string }) {
   const theme = useTheme();
+  const { t } = useTranslation();
   return (
     <ThemedView style={styles.container} aria-busy>
-      <ActivityIndicator color={theme.textSecondary} aria-label={label} />
+      <ActivityIndicator color={theme.textSecondary} aria-label={label ?? t('common.loading')} />
     </ThemedView>
   );
 }
 
 export function ErrorState({
-  title = 'Something went wrong',
+  title,
   error,
   onRetry,
 }: {
@@ -26,17 +28,18 @@ export function ErrorState({
   error?: unknown;
   onRetry?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <ThemedView style={styles.container}>
       <ThemedText type="smallBold" role="alert">
-        {title}
+        {title ?? t('common.errorTitle')}
       </ThemedText>
       {error instanceof Error && (
         <ThemedText type="small" themeColor="textSecondary" style={styles.center}>
           {error.message}
         </ThemedText>
       )}
-      {onRetry && <Button label="Try again" variant="secondary" onPress={onRetry} />}
+      {onRetry && <Button label={t('common.retry')} variant="secondary" onPress={onRetry} />}
     </ThemedView>
   );
 }

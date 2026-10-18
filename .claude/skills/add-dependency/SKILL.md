@@ -73,6 +73,7 @@ Then mention in your summary: the package added, any `app.json` change, and whet
 | Notifications           | `expo-notifications` (local only)                                                           |
 | "Add to calendar"       | Android: `expo-intent-launcher` `ACTION_INSERT`; iOS: `expo-calendar` (spike 0.7)           |
 | Validation / schema     | `zod` v4 in `src/shared`                                                                    |
-| Plurals in Hermes       | `@formatjs/intl-pluralrules` polyfill (task 1.1)                                            |
+| Localization            | `expo-localization`, `i18next` + `react-i18next` (installed, task 1.1)                      |
+| Plurals in Hermes       | `@formatjs/intl-pluralrules` + `@formatjs/intl-locale` polyfills (installed, task 1.1)      |
 
 Not on SPEC §10 (ask first): form libraries, global state managers, UI kits, analytics, crash reporting (open question 6). Confirm each API against the versioned docs before relying on it — names and APIs change between SDKs.

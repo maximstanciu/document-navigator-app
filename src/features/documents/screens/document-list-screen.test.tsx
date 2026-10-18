@@ -3,6 +3,7 @@ import { renderRouter } from 'expo-router/testing-library';
 
 import DocumentRoute from '@/app/documents/[id]';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
+import { i18n } from '@/lib/i18n/i18n';
 import { createTestProviders, renderWithProviders } from '@/test/render';
 import { createFakeClock, installTestRepositories } from '@/test/sqlite';
 
@@ -46,6 +47,32 @@ describe('DocumentListScreen', () => {
     expect(links).toHaveLength(2);
     expect(links[0]).toHaveAccessibleName(/^Письмо из налоговой, .*2 pages · Not analyzed$/);
     expect(links[1]).toHaveAccessibleName(/^Счёт за газ, Stadtwerke, .*2 pages · Analyzed$/);
+  });
+
+  it('shows Russian text and plural forms in Russian', async () => {
+    await i18n.changeLanguage('ru');
+    for (const [id, pages] of [
+      ['one', 1],
+      ['few', 2],
+      ['many', 5],
+      ['twenty-one', 21],
+    ] as const) {
+      await repositories.documents.create({
+        id,
+        title: `Документ ${pages}`,
+        source: 'scan',
+        mimeType: 'image/jpeg',
+        pageCount: pages,
+        fileSize: 1,
+      });
+    }
+
+    await renderWithProviders(<DocumentListScreen />);
+
+    expect(await screen.findByRole('heading', { name: 'Документы' })).toBeOnTheScreen();
+    for (const text of ['1 страница', '2 страницы', '5 страниц', '21 страница']) {
+      expect(screen.getByText(new RegExp(`· ${text} · Не разобран$`))).toBeOnTheScreen();
+    }
   });
 
   it('does not show deleted documents', async () => {

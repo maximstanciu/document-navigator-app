@@ -10,7 +10,10 @@
     "ios": {
       "bundleIdentifier": "com.stanciu.docnavigator",
       "deploymentTarget": "16.4",
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/expo.icon",
+      "infoPlist": {
+        "CFBundleAllowMixedLocalizations": true
+      }
     },
     "android": {
       "package": "com.stanciu.docnavigator",
@@ -25,6 +28,10 @@
     "web": {
       "output": "server",
       "favicon": "./assets/images/favicon.png"
+    },
+    "locales": {
+      "ru": "./src/lib/i18n/native/ru.json",
+      "en": "./src/lib/i18n/native/en.json"
     },
     "plugins": [
       [
@@ -59,7 +66,14 @@
         }
       ],
       "expo-sqlite",
-      "expo-secure-store"
+      "expo-secure-store",
+      [
+        "expo-localization",
+        {
+          "supportedLocales": ["ru", "en"],
+          "supportsRTL": false
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,

@@ -28,7 +28,7 @@ src/
   app/          маршруты Expo Router (тонкие) и API routes (+api.ts)
   features/     доменные модули: capture, documents, analysis, deadlines, reminders, onboarding, settings
   components/   общий UI (ui/ — примитивы)
-  lib/          инфраструктура клиента: env, api-клиент, query-клиент; db/, files/, i18n/ появятся на этапе 1
+  lib/          инфраструктура клиента: env, api-клиент, query-клиент, db/ (SQLite), files/ (страницы), i18n/ (ru/en)
   shared/       чистый TS для клиента и сервера: zod-схема анализа, лимиты (этап 1)
   server/       код API routes: обработчики, провайдеры LLM, лимиты (этап 3)
   constants/ hooks/ providers/ test/

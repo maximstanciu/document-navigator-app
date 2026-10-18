@@ -7,6 +7,7 @@ import {
   TabListProps,
 } from 'expo-router/ui';
 import type { ComponentRef, Ref } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Pressable, View, StyleSheet } from 'react-native';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -15,16 +16,17 @@ import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
 
 export default function AppTabs() {
+  const { t } = useTranslation();
   return (
     <Tabs>
       <TabSlot style={{ height: '100%' }} />
       <TabList asChild>
         <CustomTabList>
           <TabTrigger name="index" href="/" asChild>
-            <TabButton>Documents</TabButton>
+            <TabButton>{t('tabs.documents')}</TabButton>
           </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
-            <TabButton>Settings</TabButton>
+            <TabButton>{t('tabs.settings')}</TabButton>
           </TabTrigger>
         </CustomTabList>
       </TabList>

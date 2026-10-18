@@ -1,4 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
+import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -11,9 +12,10 @@ import { DocumentListItem } from '../components/document-list-item';
 import { documentQueries } from '../queries';
 
 export function DocumentListScreen() {
+  const { t } = useTranslation();
   const { data, error, isPending, refetch } = useQuery(documentQueries.list());
 
-  if (isPending) return <LoadingState label="Loading documents" />;
+  if (isPending) return <LoadingState label={t('documents.loadingList')} />;
   if (error) return <ErrorState error={error} onRetry={() => refetch()} />;
 
   return (
@@ -25,14 +27,11 @@ export function DocumentListScreen() {
           renderItem={({ item }) => <DocumentListItem document={item} />}
           ListHeaderComponent={
             <ThemedText type="subtitle" role="heading" style={styles.heading}>
-              Documents
+              {t('documents.title')}
             </ThemedText>
           }
           ListEmptyComponent={
-            <EmptyState
-              title="No documents yet"
-              message="Documents you scan or add will show up here."
-            />
+            <EmptyState title={t('documents.emptyTitle')} message={t('documents.emptyMessage')} />
           }
           contentContainerStyle={styles.content}
         />

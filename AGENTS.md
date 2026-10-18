@@ -52,7 +52,8 @@ src/
   lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts, device-id.ts
     db/                # SQLite: migrations, repositories (getRepositories()), query keys (dbKeys)
     files/             # page files under Paths.document/documents/<id>/ (relative paths in the DB)
-    i18n/              # (planned, 1.1) localization setup, ru/en dictionaries
+    i18n/              # i18next instance, Intl polyfills, ru/en dictionaries (resources/),
+                       #   OS-level strings such as permission texts (native/, wired in app.json)
   shared/              # (planned, 1.2) pure TS shared by client and server: zod schemas, types, limits
   server/              # (planned, 3.1) server-only code for API routes: handlers, LLM providers, limits
   providers/           # AppProviders (React Query, navigation theme)
@@ -71,7 +72,7 @@ scripts/eval/          # (planned, 0.3/3.7) analysis quality evaluation
 - **Server code** (`src/server/**`) is imported only from `src/app/api/**/*+api.ts`, and itself imports only `src/server`, `src/shared` and `expo-server` among app and Expo code (all enforced by ESLint, `eslint.config.js`). It runs on EAS Hosting (Cloudflare Workers): no native binaries, in-memory `fs`, about 250 MB of memory per isolate shared by all its concurrent requests (measured in spike 0.2, `docs/spikes/0.2-eas-hosting.md`). Secrets (LLM keys) are read from `process.env` only here, never with an `EXPO_PUBLIC_` prefix.
 - **Shared code** (`src/shared/**`) is plain TypeScript: no `react`, `react-native`, or `expo*` imports, and only `src/shared` among app code (enforced by ESLint). The zod schema there is the single source of truth for the analysis type, runtime validation, and the JSON Schema sent to the LLM.
 - **Config**: public runtime config via `EXPO_PUBLIC_*` env vars, read only through `src/lib/env.ts`. Never put secrets in the client.
-- **Strings**: once task 1.1 lands, every user-facing string goes through the i18n dictionaries (ru and en), including accessibility labels. Format dates, amounts, and plurals with `Intl` in the user's locale.
+- **Strings**: every user-facing string goes through the i18n dictionaries in `src/lib/i18n/resources/` (`ru.ts` is the source, `en.ts` must match its keys), including accessibility labels: `const { t } = useTranslation()`. Plurals use i18next `_one`/`_few`/`_many`/`_other` keys (Russian needs all four). Format dates and amounts with `Intl` in the current language (`src/lib/i18n/format.ts`). Permission texts and other strings the OS shows go into `src/lib/i18n/native/*.json`.
 - **Privacy**: never log, send to crash reporting, or put in notification text the contents of a document or its analysis (titles, senders, amounts, quotes). Server logs carry metadata only (SPEC §7.1). Deleting a document wipes its content immediately (SPEC STO-6).
 - **React Compiler is on**: don't add `useMemo`/`useCallback`/`memo` by default; obey the `react-hooks` lint rules.
 - **Accessibility**: interactive elements get `role` + an accessible name (`aria-label` when needed); touch targets ≥ 44pt (`MinTouchTarget`); headings get `role="heading"`. Never convey risk level or warnings by color alone.

@@ -47,7 +47,7 @@ export function DocumentEditScreen({ id }: { id: string }) {
 Rules:
 
 - Data comes from React Query (`queries.ts` in the feature, backed by `src/lib/db` repositories or the API routes) — see the `api-integration` skill. No `fetch`, direct DB calls, or `useEffect` data loading in screens.
-- Strings: once task 1.1 lands, every visible string and `aria-label` comes from the ru/en dictionaries; dates, amounts and plurals via `Intl` in the user's locale. Russian strings run longer — leave room.
+- Strings: every visible string, header title and `aria-label` comes from the ru/en dictionaries (`useTranslation()`, keys in `src/lib/i18n/resources/`); dates and amounts via `src/lib/i18n/format.ts`, plurals via `_one`/`_few`/`_many`/`_other` keys. Russian strings run longer — leave room.
 - Native capabilities (scanner, notifications, calendar) are called through the feature's adapter; on web the screen must still render (the adapter's `.web.ts` stub, CAP-10).
 - Risk levels and fraud warnings are never conveyed by color alone — text plus icon (DET-10, §8.4).
 - Always handle all states: `LoadingState`, `ErrorState`, `EmptyState` from `@/components/screen-state`.

@@ -24,7 +24,7 @@ Reference: `src/components/ui/button.tsx` (primitive) and `src/features/document
 - **Props**: export a `<Name>Props` type when other files need it. Extend RN props (`Omit<PressableProps, 'style'>`) instead of re-declaring them; spread `...rest` last on the root element.
 - **Styling**: `StyleSheet.create` at the bottom of the file. Colors only from `useTheme()` or `ThemedText`/`ThemedView` (`themeColor`/`type` props) — never hex literals in components. Spacing from `Spacing`. New colors go into both `light` and `dark` in `src/constants/theme.ts`.
 - **Text**: always `ThemedText` with a `type` (`default`, `small`, `smallBold`, `subtitle`, `title`, `link`, `code`). Raw `<Text>` skips theming.
-- **Strings**: once task 1.1 lands, visible text and `aria-label`s come from the ru/en dictionaries — components take translated strings or call the translation hook, never hard-code user-facing English. Dates, amounts and plurals via `Intl`.
+- **Strings**: visible text and `aria-label`s come from the ru/en dictionaries — components take translated strings or call `useTranslation()`, never hard-code user-facing English. Dates and amounts via `src/lib/i18n/format.ts`, plurals via `_one`/`_few`/`_many`/`_other` keys.
 - **Data**: components get data through props or the feature's query hooks; native capabilities through the feature's adapter. No `fetch`, DB or native module calls in components.
 - **Risk and warnings**: risk levels and fraud warnings use the dedicated color tokens (`riskHigh`, `riskMedium`, `riskLow`, `fraudWarning`, each with a `…Background`) **plus** text and an icon — never color alone (DET-10).
 - **Privacy**: never `console.log` document content (titles, senders, amounts, quotes).

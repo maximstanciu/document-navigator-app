@@ -1,4 +1,5 @@
 import { Link } from 'expo-router';
+import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
@@ -9,8 +10,9 @@ import { displayTitle, formatMeta } from '../format';
 import type { DocumentSummary } from '../types';
 
 export function DocumentListItem({ document }: { document: DocumentSummary }) {
-  const title = displayTitle(document.title);
-  const meta = formatMeta(document);
+  const { t, i18n } = useTranslation();
+  const title = displayTitle(document.title, t);
+  const meta = formatMeta(document, t, i18n.language);
 
   return (
     <Link href={{ pathname: '/documents/[id]', params: { id: document.id } }} asChild>

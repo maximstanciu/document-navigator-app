@@ -1,0 +1,5 @@
+{
+  "ios": {
+    "NSCameraUsageDescription": "DocNavigator uses the camera to scan your documents."
+  }
+}

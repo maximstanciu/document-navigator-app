@@ -11,6 +11,14 @@ module.exports = {
     // Keep the preset's mappers, including the `@/` aliases it derives from tsconfig paths.
     ...expoPreset.moduleNameMapper,
   },
+  // The formatjs Intl polyfills ship as ES modules; let babel transform them like the preset's list.
+  transformIgnorePatterns: expoPreset.transformIgnorePatterns.map((pattern) =>
+    pattern.startsWith('/node_modules/(?!(')
+      ? pattern.replace('/node_modules/(?!(', '/node_modules/(?!(@formatjs|')
+      : pattern
+  ),
+  // Every test runs with the app's i18n setup (polyfills included) in English.
+  setupFilesAfterEnv: ['<rootDir>/src/test/setup-i18n.ts'],
   testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/dist/'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/test/**', '!src/app/**'],
 };

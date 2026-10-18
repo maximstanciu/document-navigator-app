@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { useTranslation } from 'react-i18next';
 import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -7,6 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { env } from '@/lib/env';
+
+import { LanguagePicker } from '../components/language-picker';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -20,6 +23,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 export function SettingsScreen() {
+  const { t } = useTranslation();
   const colorScheme = useColorScheme();
 
   return (
@@ -27,15 +31,24 @@ export function SettingsScreen() {
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         <ScrollView contentContainerStyle={styles.content}>
           <ThemedText type="subtitle" role="heading" style={styles.heading}>
-            Settings
+            {t('settings.title')}
           </ThemedText>
-          <InfoRow label="Version" value={Constants.expoConfig?.version ?? 'unknown'} />
+          <LanguagePicker />
           <InfoRow
-            label="Platform"
+            label={t('settings.version')}
+            value={Constants.expoConfig?.version ?? t('settings.unknown')}
+          />
+          <InfoRow
+            label={t('settings.platform')}
             value={Platform.OS === 'web' ? 'web' : `${Platform.OS} ${Platform.Version}`}
           />
-          <InfoRow label="Appearance" value={colorScheme ?? 'unspecified'} />
-          <InfoRow label="API" value={env.apiUrl || 'Not configured'} />
+          <InfoRow
+            label={t('settings.appearance')}
+            value={t(
+              `settings.appearanceValue.${colorScheme === 'light' || colorScheme === 'dark' ? colorScheme : 'unspecified'}`
+            )}
+          />
+          <InfoRow label={t('settings.api')} value={env.apiUrl || t('settings.apiNotConfigured')} />
         </ScrollView>
       </SafeAreaView>
     </ThemedView>
