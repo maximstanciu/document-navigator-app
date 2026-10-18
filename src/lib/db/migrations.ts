@@ -83,6 +83,16 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // Task 4.2: a deadline keeps the quote and the computation it came with (ANL-6), so they
+    // survive a re-analysis that replaces the analysis but keeps this deadline (ANL-8).
+    version: 2,
+    statements: [
+      `ALTER TABLE deadlines ADD COLUMN source_quote TEXT`,
+      `ALTER TABLE deadlines ADD COLUMN source_page INTEGER`,
+      `ALTER TABLE deadlines ADD COLUMN computation TEXT`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

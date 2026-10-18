@@ -1,13 +1,16 @@
 import { createFakeClock, createTestDatabase } from '@/test/sqlite';
 
+import type { SqlDatabase } from './database';
 import { createRepositories, type Repositories } from './repositories';
 
+let db: SqlDatabase;
 let repos: Repositories;
 let clock: ReturnType<typeof createFakeClock>;
 
 beforeEach(async () => {
   clock = createFakeClock();
-  repos = createRepositories(await createTestDatabase(), clock.now);
+  db = await createTestDatabase();
+  repos = createRepositories(db, clock.now);
   await repos.documents.create({
     id: 'doc-1',
     title: 'Письмо',
@@ -128,6 +131,50 @@ describe('deadlines repository', () => {
     expect(await repos.scheduledNotifications.list()).toEqual([]);
     expect((await repos.actions.get('a1'))?.deadlineId).toBeNull();
   });
+
+  it('keeps the quote, its page and the computation of a deadline (ANL-6)', async () => {
+    await repos.deadlines.insertMany([
+      {
+        ...deadline('computed', 'doc-1', '2026-10-23'),
+        dateSource: 'computed',
+        sourceQuote: 'Bitte antworten Sie innerhalb von 14 Tagen.',
+        sourcePage: 2,
+        computation: '14 дней с даты письма 09.10.2026',
+      },
+    ]);
+
+    expect(await repos.deadlines.get('computed')).toMatchObject({
+      sourceQuote: 'Bitte antworten Sie innerhalb von 14 Tagen.',
+      sourcePage: 2,
+      computation: '14 дней с даты письма 09.10.2026',
+    });
+    expect(await repos.deadlines.get('late')).toMatchObject({
+      sourceQuote: null,
+      sourcePage: null,
+      computation: null,
+    });
+  });
+
+  it('wipes the quote and the computation when the document is deleted (STO-6)', async () => {
+    await repos.deadlines.insertMany([
+      { ...deadline('quoted', 'doc-1', '2026-10-23'), sourceQuote: 'Zitat', computation: 'Расчёт' },
+    ]);
+
+    await repos.documents.remove('doc-1');
+
+    const rows = await db.getAllAsync<{ source_quote: string | null; computation: string | null }>(
+      "SELECT source_quote, computation FROM deadlines WHERE id = 'quoted'"
+    );
+    expect(rows).toEqual([{ source_quote: null, computation: null }]);
+  });
+
+  it('brings a deadline marked «Not relevant» back as open (DET-4)', async () => {
+    await repos.deadlines.update('late', { status: 'dismissed' });
+
+    await repos.deadlines.restore('late');
+
+    expect(await repos.deadlines.get('late')).toMatchObject({ status: 'open' });
+  });
 });
 
 describe('actions repository', () => {
@@ -154,6 +201,46 @@ describe('actions repository', () => {
     expect(await repos.actions.listByDeadline('d1')).toEqual([
       expect.objectContaining({ id: 'a1', done: true }),
     ]);
+  });
+
+  it('closes a deadline once all its actions are done and reopens it when one is not (REM-9)', async () => {
+    await repos.actions.insertMany([
+      { id: 'a3', documentId: 'doc-1', deadlineId: 'd1', description: 'Третье', priority: 'high' },
+    ]);
+
+    await repos.actions.setDone('a1', true);
+    expect(await repos.deadlines.get('d1')).toMatchObject({ status: 'open' });
+
+    await repos.actions.setDone('a3', true);
+    expect(await repos.deadlines.get('d1')).toMatchObject({ status: 'done' });
+    expect((await repos.actions.get('a3'))?.done).toBe(true);
+
+    await repos.actions.setDone('a1', false);
+    expect(await repos.deadlines.get('d1')).toMatchObject({ status: 'open' });
+  });
+
+  it('leaves a deadline marked «Not relevant» as it is when its actions change (REM-9)', async () => {
+    await repos.deadlines.update('d1', { status: 'dismissed' });
+
+    await repos.actions.setDone('a1', true);
+
+    expect(await repos.deadlines.get('d1')).toMatchObject({ status: 'dismissed' });
+  });
+
+  it('brings a deadline back as done when all its actions are done (DET-4, REM-9)', async () => {
+    await repos.actions.setDone('a1', true);
+    await repos.deadlines.update('d1', { status: 'dismissed' });
+
+    await repos.deadlines.restore('d1');
+
+    expect(await repos.deadlines.get('d1')).toMatchObject({ status: 'done' });
+  });
+
+  it('marks an action without a deadline done, and fails for a missing one', async () => {
+    await repos.actions.setDone('a2', true);
+
+    expect((await repos.actions.get('a2'))?.done).toBe(true);
+    await expect(repos.actions.setDone('missing', true)).rejects.toThrow(/not found/);
   });
 
   it('soft-deletes and wipes an action', async () => {

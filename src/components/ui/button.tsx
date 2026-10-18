@@ -6,12 +6,18 @@ import { useTheme } from '@/hooks/use-theme';
 
 export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
-  variant?: 'primary' | 'secondary';
+  /** `plain`: tinted text without a fill, as wide as its label, for actions inside a card. */
+  variant?: 'primary' | 'secondary' | 'plain';
 };
 
 export function Button({ label, variant = 'primary', disabled, ...rest }: ButtonProps) {
   const theme = useTheme();
-  const isPrimary = variant === 'primary';
+  const background = {
+    primary: theme.tint,
+    secondary: theme.backgroundElement,
+    plain: 'transparent',
+  }[variant];
+  const color = { primary: theme.onTint, secondary: theme.text, plain: theme.tint }[variant];
 
   return (
     <Pressable
@@ -22,12 +28,13 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
       hitSlop={Spacing.two}
       style={({ pressed }) => [
         styles.base,
-        { backgroundColor: isPrimary ? theme.tint : theme.backgroundElement },
+        variant === 'plain' && styles.plain,
+        { backgroundColor: background },
         pressed && styles.pressed,
         disabled && styles.disabled,
       ]}
       {...rest}>
-      <ThemedText type="smallBold" style={{ color: isPrimary ? theme.onTint : theme.text }}>
+      <ThemedText type="smallBold" style={{ color }}>
         {label}
       </ThemedText>
     </Pressable>
@@ -41,6 +48,10 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  plain: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.one,
   },
   pressed: {
     opacity: 0.7,

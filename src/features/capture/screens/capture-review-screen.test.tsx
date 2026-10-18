@@ -166,7 +166,7 @@ describe('CaptureReviewScreen (CAP-5)', () => {
 
     await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
 
-    expect(await screen.findByText('Not analyzed')).toBeOnTheScreen();
+    expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
     expect(screen).toHavePathname('/documents/uuid-1');
     expect(analyze).toHaveBeenCalledTimes(1);
     expect(analyze).toHaveBeenCalledWith('uuid-1', expect.any(Function));
@@ -194,7 +194,7 @@ describe('CaptureReviewScreen (CAP-5)', () => {
     expect(screen.queryByRole('button', { name: 'Add more photos' })).not.toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Analyze the document' }));
 
-    expect(await screen.findByText('Not analyzed')).toBeOnTheScreen();
+    expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
     expect(await repositories.documents.get('uuid-1')).toMatchObject({
       mimeType: 'application/pdf',
       pageCount: null,
@@ -215,7 +215,7 @@ describe('CaptureReviewScreen (CAP-5)', () => {
     expect(screen).toHavePathname('/capture/review');
     expect(analyzeDocument).not.toHaveBeenCalled();
     await user.press(analyze);
-    expect(await screen.findByText('Not analyzed')).toBeOnTheScreen();
+    expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
   });
 
   it('can not analyze once every page is removed', async () => {

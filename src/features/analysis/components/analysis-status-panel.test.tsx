@@ -82,14 +82,13 @@ describe('AnalysisStatusPanel on the document screen', () => {
 
     expect(await screen.findByText('Reading the document…')).toBeOnTheScreen();
     expect(screen.getByText(/Keep the app open until the analysis is done/)).toBeOnTheScreen();
-    expect(screen.getByText('Analyzing…')).toBeOnTheScreen();
 
     answer(analyzed());
 
     expect(
       await screen.findByRole('heading', { name: 'Счёт за электричество, сентябрь 2026' })
     ).toBeOnTheScreen();
-    expect(screen.getByText('Analyzed')).toBeOnTheScreen();
+    expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
     expect(screen.queryByText('Reading the document…')).not.toBeOnTheScreen();
   });
 

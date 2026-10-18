@@ -2,7 +2,13 @@ import { queryOptions } from '@tanstack/react-query';
 
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 
-import { getDocument, listDocuments } from './api';
+import {
+  getDocument,
+  getDocumentPages,
+  listDocumentActions,
+  listDocumentDeadlines,
+  listDocuments,
+} from './api';
 
 /**
  * Local queries: keys come from `dbKeys` so any feature that writes documents can invalidate
@@ -19,6 +25,24 @@ export const documentQueries = {
     queryOptions({
       queryKey: dbKeys.documents.detail(id),
       queryFn: () => getDocument(id),
+      ...localQueryDefaults,
+    }),
+  pages: (id: string) =>
+    queryOptions({
+      queryKey: dbKeys.pages.byDocument(id),
+      queryFn: () => getDocumentPages(id),
+      ...localQueryDefaults,
+    }),
+  deadlines: (id: string) =>
+    queryOptions({
+      queryKey: dbKeys.deadlines.list({ documentId: id }),
+      queryFn: () => listDocumentDeadlines(id),
+      ...localQueryDefaults,
+    }),
+  actions: (id: string) =>
+    queryOptions({
+      queryKey: dbKeys.actions.byDocument(id),
+      queryFn: () => listDocumentActions(id),
       ...localQueryDefaults,
     }),
 };

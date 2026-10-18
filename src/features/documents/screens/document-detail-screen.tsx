@@ -1,33 +1,40 @@
 import { useQuery } from '@tanstack/react-query';
+import type { TFunction } from 'i18next';
 import { Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet } from 'react-native';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { AnalysisStatusPanel } from '@/features/analysis/components/analysis-status-panel';
 import { useTheme } from '@/hooks/use-theme';
 import { formatCalendarDate, formatTimestampDate } from '@/lib/i18n/format';
 
-import { displayTitle, formatPageCount, formatStatus } from '../format';
+import { DocumentResult } from '../components/document-result';
+import { OriginalBlock } from '../components/original-block';
+import { displayTitle } from '../format';
 import { documentQueries } from '../queries';
+import type { DocumentDetail } from '../types';
 
-function InfoRow({ label, value }: { label: string; value: string }) {
-  return (
-    <ThemedView type="backgroundElement" style={styles.row}>
-      <ThemedText type="small">{label}</ThemedText>
-      <ThemedText type="small" themeColor="textSecondary" style={styles.value}>
-        {value}
-      </ThemedText>
-    </ThemedView>
-  );
+/** «Invoice · Stadtwerke · 3 Oct 2026» (DET-1); before the analysis, when it was added. */
+function documentMeta(document: DocumentDetail, t: TFunction, language: string) {
+  if (!document.analysis) {
+    return t('documents.addedOn', { date: formatTimestampDate(document.createdAt, language) });
+  }
+  const type = document.documentType;
+  return [
+    type && type !== 'other' && type !== 'unknown' ? t(`documents.documentType.${type}`) : null,
+    document.senderName,
+    document.documentDate ? formatCalendarDate(document.documentDate, language) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
 }
 
 /**
- * Basic document facts from SQLite and where its analysis stands; the analysis blocks
- * (DET-1…DET-10) arrive in task 4.2.
+ * A document (SPEC §4.4): the title, where its analysis stands, the analysis itself in the order of
+ * the four questions (DET-1…DET-10), the original and the disclaimer.
  */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -46,7 +53,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
   }
 
   const title = displayTitle(data.title, t);
-  const pageCount = formatPageCount(data.pageCount, t);
+  const meta = documentMeta(data, t, i18n.language);
 
   return (
     <ScrollView
@@ -57,52 +64,29 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       <ThemedText type="subtitle" role="heading">
         {title}
       </ThemedText>
+      {meta !== '' && (
+        <ThemedText type="small" themeColor="textSecondary">
+          {meta}
+        </ThemedText>
+      )}
       <AnalysisStatusPanel document={data} />
-      <ThemedView style={styles.rows}>
-        <InfoRow label={t('documents.field.status')} value={formatStatus(data.status, t)} />
-        {data.senderName && <InfoRow label={t('documents.field.from')} value={data.senderName} />}
-        {data.documentDate && (
-          <InfoRow
-            label={t('documents.field.documentDate')}
-            value={formatCalendarDate(data.documentDate, i18n.language)}
-          />
-        )}
-        <InfoRow
-          label={t('documents.field.added')}
-          value={formatTimestampDate(data.createdAt, i18n.language)}
-        />
-        <InfoRow
-          label={t('documents.field.type')}
-          value={t(
-            data.mimeType === 'application/pdf' ? 'documents.kind.pdf' : 'documents.kind.image'
-          )}
-        />
-        {pageCount && <InfoRow label={t('documents.field.pages')} value={pageCount} />}
-      </ThemedView>
+      {data.analysis && <DocumentResult documentId={data.id} analysis={data.analysis} />}
+      <OriginalBlock document={data} />
+      {data.analysis && (
+        <ThemedText type="small" themeColor="textSecondary">
+          {t('documents.disclaimer')}
+        </ThemedText>
+      )}
     </ScrollView>
   );
 }
 
 const styles = StyleSheet.create({
   content: {
-    gap: Spacing.three,
+    gap: Spacing.four,
     padding: Spacing.four,
     width: '100%',
     maxWidth: MaxContentWidth,
     alignSelf: 'center',
-  },
-  rows: {
-    gap: Spacing.two,
-  },
-  row: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.three,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
-  },
-  value: {
-    flexShrink: 1,
-    textAlign: 'right',
   },
 });

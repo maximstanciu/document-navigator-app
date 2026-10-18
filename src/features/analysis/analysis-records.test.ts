@@ -9,7 +9,7 @@ function sequentialIds() {
 }
 
 describe('analysisRecords', () => {
-  it('makes a record of each deadline and action, linking actions to their deadline', () => {
+  it('makes records of the deadlines, with their quotes, and of the actions linked to them', () => {
     const { deadlines, actions } = analysisRecords(
       'doc-1',
       ANALYSIS_FIXTURES.invoice,
@@ -25,6 +25,9 @@ describe('analysisRecords', () => {
         dueDate: '2026-10-31',
         dueTime: null,
         dateSource: 'explicit',
+        sourceQuote: 'Bitte überweisen Sie den Rechnungsbetrag von 84,20 € bis zum 31.10.2026.',
+        sourcePage: 1,
+        computation: null,
         confidence: 'high',
       },
     ]);

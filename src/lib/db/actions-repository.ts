@@ -1,4 +1,5 @@
 import type { SqlDatabase, SqlExecutor } from './database';
+import { settleDeadlineStatus } from './deadlines-repository';
 import { buildAssignments, toFlag, type Clock } from './sql';
 import type { ActionRecord } from './types';
 
@@ -106,6 +107,27 @@ export function createActionsRepository(db: SqlDatabase, now: Clock) {
       );
       if (result.changes === 0) throw new Error(`Action ${id} not found`);
       return (await get(id)) as ActionRecord;
+    },
+
+    /**
+     * Marks an action done or not (DET-3) and, in the same transaction, closes or reopens the
+     * deadline it belongs to (REM-9).
+     */
+    async setDone(id: string, done: boolean): Promise<void> {
+      const timestamp = now().toISOString();
+      await db.transaction(async (tx) => {
+        const row = await tx.getFirstAsync<{ deadline_id: string | null }>(
+          'SELECT deadline_id FROM actions WHERE id = ? AND deleted_at IS NULL',
+          [id]
+        );
+        if (!row) throw new Error(`Action ${id} not found`);
+        await tx.runAsync('UPDATE actions SET done = ?, updated_at = ? WHERE id = ?', [
+          toFlag(done),
+          timestamp,
+          id,
+        ]);
+        if (row.deadline_id) await settleDeadlineStatus(tx, row.deadline_id, timestamp);
+      });
     },
 
     async remove(id: string): Promise<void> {

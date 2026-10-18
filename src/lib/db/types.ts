@@ -54,6 +54,11 @@ export type DeadlineRecord = {
   dueTime: string | null;
   dateSource: 'explicit' | 'computed' | 'user';
   originalDate: string | null;
+  /** Verbatim quote from the original and its 1-based page (ANL-6), from the analysis. */
+  sourceQuote: string | null;
+  sourcePage: number | null;
+  /** How a computed date was derived, e.g. «14 days from the letter of 03.10.2026» (ANL-6). */
+  computation: string | null;
   confidence: Level;
   status: DeadlineStatus;
   /** `null` — defaults from settings, `[]` — reminders off. */

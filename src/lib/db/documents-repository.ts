@@ -340,8 +340,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         }
 
         await tx.runAsync(
-          `UPDATE deadlines SET description = '', original_date = NULL, updated_at = ?,
-             deleted_at = COALESCE(deleted_at, ?)
+          `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
+             computation = NULL, updated_at = ?, deleted_at = COALESCE(deleted_at, ?)
            WHERE document_id = ?`,
           [timestamp, timestamp, id]
         );

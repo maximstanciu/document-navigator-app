@@ -24,4 +24,22 @@ describe('Button', () => {
     expect(button).toBeDisabled();
     expect(onPress).not.toHaveBeenCalled();
   });
+
+  it('takes an accessible name that says more than the visible label', async () => {
+    const user = userEvent.setup();
+    const onPress = jest.fn();
+    await render(
+      <Button
+        label="Restore"
+        aria-label="Restore the deadline of Oct 31"
+        variant="plain"
+        onPress={onPress}
+      />
+    );
+
+    await user.press(screen.getByRole('button', { name: 'Restore the deadline of Oct 31' }));
+
+    expect(screen.getByText('Restore')).toBeOnTheScreen();
+    expect(onPress).toHaveBeenCalledTimes(1);
+  });
 });

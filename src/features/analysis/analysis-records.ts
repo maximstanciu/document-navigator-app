@@ -4,8 +4,8 @@ import type { AnalysisResult } from '@/shared/analysis/schema';
 
 /**
  * The deadlines and actions of an analysis as records to store (SPEC §6.1): each gets its own id,
- * and an action's `deadlineId` points to the record made from the deadline it named. Everything
- * else about them (quotes, how a date was computed) stays in the analysis.
+ * and an action's `deadlineId` points to the record made from the deadline it named. A deadline
+ * takes its quote and computation along (ANL-6): they must outlive a re-analysis that keeps it.
  */
 export function analysisRecords(
   documentId: string,
@@ -25,6 +25,9 @@ export function analysisRecords(
       dueDate: deadline.date,
       dueTime: deadline.time,
       dateSource: deadline.dateSource,
+      sourceQuote: deadline.sourceQuote,
+      sourcePage: deadline.page,
+      computation: deadline.computation,
       confidence: deadline.confidence,
     };
   });

@@ -76,6 +76,26 @@ describe('migrate', () => {
     expect(await tableNames(db)).not.toContain('extra');
   });
 
+  it('adds the quote columns to deadlines stored by version 1, keeping them (task 4.2)', async () => {
+    const db = createNodeDatabase();
+    await migrate(db, MIGRATIONS.slice(0, 1));
+    await db.runAsync(
+      `INSERT INTO documents (id, title, status, source, mime_type, file_size, created_at, updated_at)
+       VALUES ('doc-1', 'Счёт', 'ready', 'scan', 'image/jpeg', 10, 't', 't')`
+    );
+    await db.runAsync(
+      `INSERT INTO deadlines (id, document_id, kind, description, due_date, date_source, confidence,
+         status, created_at, updated_at)
+       VALUES ('d1', 'doc-1', 'payment', 'Оплатить', '2026-10-31', 'explicit', 'high', 'open', 't', 't')`
+    );
+
+    await expect(migrate(db)).resolves.toEqual({ from: 1, to: LATEST_SCHEMA_VERSION });
+
+    expect(
+      await db.getAllAsync('SELECT id, source_quote, source_page, computation FROM deadlines')
+    ).toEqual([{ id: 'd1', source_quote: null, source_page: null, computation: null }]);
+  });
+
   it('refuses a database created by a newer app version', async () => {
     const db = createNodeDatabase();
     await db.execAsync(`PRAGMA user_version = ${LATEST_SCHEMA_VERSION + 5}`);

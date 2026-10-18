@@ -11,6 +11,9 @@ type DeadlineRow = {
   due_time: string | null;
   date_source: DeadlineRecord['dateSource'];
   original_date: string | null;
+  source_quote: string | null;
+  source_page: number | null;
+  computation: string | null;
   confidence: DeadlineRecord['confidence'];
   status: DeadlineStatus;
   reminder_offsets_days: string | null;
@@ -20,7 +23,8 @@ type DeadlineRow = {
 };
 
 const COLUMNS = `id, document_id, kind, description, due_date, due_time, date_source, original_date,
-  confidence, status, reminder_offsets_days, created_at, updated_at, deleted_at`;
+  source_quote, source_page, computation, confidence, status, reminder_offsets_days, created_at,
+  updated_at, deleted_at`;
 
 function toOffsets(value: string | null): number[] | null {
   const parsed = fromJson(value);
@@ -37,6 +41,9 @@ function toRecord(row: DeadlineRow): DeadlineRecord {
     dueTime: row.due_time,
     dateSource: row.date_source,
     originalDate: row.original_date,
+    sourceQuote: row.source_quote,
+    sourcePage: row.source_page,
+    computation: row.computation,
     confidence: row.confidence,
     status: row.status,
     reminderOffsetsDays: toOffsets(row.reminder_offsets_days),
@@ -50,7 +57,18 @@ export type NewDeadline = Pick<
   DeadlineRecord,
   'id' | 'documentId' | 'kind' | 'description' | 'dueDate' | 'dateSource' | 'confidence'
 > &
-  Partial<Pick<DeadlineRecord, 'dueTime' | 'originalDate' | 'status' | 'reminderOffsetsDays'>>;
+  Partial<
+    Pick<
+      DeadlineRecord,
+      | 'dueTime'
+      | 'originalDate'
+      | 'sourceQuote'
+      | 'sourcePage'
+      | 'computation'
+      | 'status'
+      | 'reminderOffsetsDays'
+    >
+  >;
 
 export type DeadlinePatch = Partial<
   Pick<
@@ -85,10 +103,25 @@ const PATCH_COLUMNS = {
 
 export type DeadlineFilter = { documentId?: string; statuses?: readonly DeadlineStatus[] };
 
+/**
+ * REM-9 for a deadline with actions, through `tx`: it is `done` when every one of its actions is,
+ * `open` otherwise. A deadline marked «Not relevant» (`dismissed`) keeps that status.
+ */
+export async function settleDeadlineStatus(tx: SqlExecutor, deadlineId: string, timestamp: string) {
+  await tx.runAsync(
+    `UPDATE deadlines SET updated_at = ?, status = CASE WHEN EXISTS (
+       SELECT 1 FROM actions WHERE deadline_id = deadlines.id AND deleted_at IS NULL AND done = 0
+     ) THEN 'open' ELSE 'done' END
+     WHERE id = ? AND deleted_at IS NULL AND status != 'dismissed'`,
+    [timestamp, deadlineId]
+  );
+}
+
 /** Inserts one deadline through `tx`, so other repositories can add deadlines inside their transaction. */
 export async function insertDeadline(tx: SqlExecutor, deadline: NewDeadline, timestamp: string) {
   await tx.runAsync(
-    `INSERT INTO deadlines (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    `INSERT INTO deadlines (${COLUMNS})
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
     [
       deadline.id,
       deadline.documentId,
@@ -98,6 +131,9 @@ export async function insertDeadline(tx: SqlExecutor, deadline: NewDeadline, tim
       deadline.dueTime ?? null,
       deadline.dateSource,
       deadline.originalDate ?? null,
+      deadline.sourceQuote ?? null,
+      deadline.sourcePage ?? null,
+      deadline.computation ?? null,
       deadline.confidence,
       deadline.status ?? 'open',
       toJson(deadline.reminderOffsetsDays ?? null),
@@ -158,6 +194,27 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
       return (await get(id)) as DeadlineRecord;
     },
 
+    /**
+     * Brings a deadline marked «Not relevant» back (DET-4): `open`, or `done` if it has actions and
+     * all of them are done (REM-9). Nothing happens to a deadline in another status.
+     */
+    async restore(id: string): Promise<void> {
+      const timestamp = now().toISOString();
+      await db.transaction(async (tx) => {
+        const result = await tx.runAsync(
+          `UPDATE deadlines SET status = 'open', updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL AND status = 'dismissed'`,
+          [timestamp, id]
+        );
+        if (result.changes === 0) return;
+        const action = await tx.getFirstAsync<{ id: string }>(
+          'SELECT id FROM actions WHERE deadline_id = ? AND deleted_at IS NULL LIMIT 1',
+          [id]
+        );
+        if (action) await settleDeadlineStatus(tx, id, timestamp);
+      });
+    },
+
     /** Soft-deletes a deadline, wipes its description and drops its scheduled reminders, returning their ids. */
     async remove(id: string): Promise<string[]> {
       return db.transaction(async (tx) => {
@@ -170,7 +227,8 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
         await tx.runAsync('DELETE FROM scheduled_notifications WHERE deadline_id = ?', [id]);
         const timestamp = now().toISOString();
         await tx.runAsync(
-          `UPDATE deadlines SET description = '', original_date = NULL, updated_at = ?, deleted_at = ?
+          `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
+             computation = NULL, updated_at = ?, deleted_at = ?
            WHERE id = ? AND deleted_at IS NULL`,
           [timestamp, timestamp, id]
         );
