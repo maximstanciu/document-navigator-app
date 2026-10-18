@@ -89,7 +89,9 @@ function deviceTimeZone(): string {
 }
 
 /**
- * Analyzes a draft or a failed document (ANL-1…ANL-3, SPEC §6.3). The document becomes `analyzing`
+ * Analyzes a draft or a failed document, or a ready one again (ANL-1…ANL-3, ANL-8, SPEC §6.3); a
+ * new analysis merges with what the person did to the old one (`documents.saveAnalysis()`), and a
+ * failed one leaves the old one in place. The document becomes `analyzing`
  * (then `onStarted` runs, so screens can show it), and ends up either `ready` with the analysis,
  * its deadlines and actions, or `failed` with the reason; the reason is also thrown as an
  * `AnalysisError`. The screen stays on meanwhile (D-1). Without a network the request isn't sent

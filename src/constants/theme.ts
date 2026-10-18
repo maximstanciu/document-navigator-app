@@ -18,6 +18,8 @@ export const Colors = {
     onTint: '#ffffff',
     danger: '#D93036',
     border: '#D9D9E0',
+    // Dims the screen behind a sheet; never a text color.
+    scrim: '#00000066',
     // Risk levels and the fraud warning (DET-5, DET-10). Always paired with text and an icon:
     // color alone never carries the meaning (§8.4). Contrast is checked in theme.test.ts.
     riskHigh: '#B42318',
@@ -39,6 +41,7 @@ export const Colors = {
     onTint: '#000000',
     danger: '#FF6369',
     border: '#3A3F42',
+    scrim: '#000000A6',
     riskHigh: '#FDA29B',
     riskHighBackground: '#55160C',
     riskMedium: '#FEC84B',

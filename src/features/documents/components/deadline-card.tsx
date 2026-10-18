@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
 
@@ -5,8 +6,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Spacing } from '@/constants/theme';
 import {
+  useChangeDeadlineDate,
   useDismissDeadline,
   useRestoreDeadline,
   useSetActionDone,
@@ -27,7 +30,7 @@ function useDueDate(deadline: DeadlineRecord) {
 /** When it's due, whether that has passed, and how far to trust the date (ANL-6). */
 function DeadlineFacts({ deadline }: { deadline: DeadlineRecord }) {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const date = useDueDate(deadline);
   const overdue = deadline.status === 'open' && deadline.dueDate < localCalendarDate(new Date());
   const computed = deadline.dateSource === 'computed';
@@ -53,7 +56,11 @@ function DeadlineFacts({ deadline }: { deadline: DeadlineRecord }) {
       )}
       {deadline.dateSource === 'user' ? (
         <ThemedText type="small" themeColor="textSecondary">
-          {t('documents.deadline.changedByYou')}
+          {deadline.originalDate
+            ? t('documents.deadline.changedByYouFrom', {
+                date: formatCalendarDate(deadline.originalDate, i18n.language),
+              })
+            : t('documents.deadline.changedByYou')}
         </ThemedText>
       ) : (
         (computed || deadline.confidence !== 'high') && (
@@ -77,13 +84,15 @@ type DeadlineCardProps = {
 
 /**
  * A deadline with the actions due by it, or on its own (DET-3, DET-4): «Done» on each action or on
- * the deadline, and «Not relevant».
+ * the deadline, «Change date» (US-8) and «Not relevant».
  */
 export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
   const { t } = useTranslation();
   const date = useDueDate(deadline);
+  const [changingDate, setChangingDate] = useState(false);
   const setActionDone = useSetActionDone();
   const setDeadlineDone = useSetDeadlineDone();
+  const changeDate = useChangeDeadlineDate();
   const dismiss = useDismissDeadline();
 
   return (
@@ -104,13 +113,39 @@ export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
           onChange={(done) => setActionDone.mutate({ id: action.id, done })}
         />
       ))}
-      <Button
-        label={t('documents.deadline.notRelevant')}
-        aria-label={t('documents.deadline.notRelevantLabel', { date })}
-        variant="plain"
-        disabled={dismiss.isPending}
-        onPress={() => dismiss.mutate(deadline.id)}
-      />
+      {changingDate ? (
+        <DatePicker
+          value={deadline.dueDate}
+          label={t('documents.deadline.newDate', { description: deadline.description })}
+          onConfirm={(dueDate) => {
+            setChangingDate(false);
+            if (dueDate !== deadline.dueDate) changeDate.mutate({ id: deadline.id, dueDate });
+          }}
+          onCancel={() => setChangingDate(false)}
+        />
+      ) : (
+        <View style={styles.buttons}>
+          <Button
+            label={t('documents.deadline.changeDate')}
+            aria-label={t('documents.deadline.changeDateLabel', { date })}
+            variant="plain"
+            disabled={changeDate.isPending}
+            onPress={() => setChangingDate(true)}
+          />
+          <Button
+            label={t('documents.deadline.notRelevant')}
+            aria-label={t('documents.deadline.notRelevantLabel', { date })}
+            variant="plain"
+            disabled={dismiss.isPending}
+            onPress={() => dismiss.mutate(deadline.id)}
+          />
+        </View>
+      )}
+      {changeDate.isError && (
+        <ThemedText type="small" role="alert">
+          {t('documents.deadline.changeDateFailed')}
+        </ThemedText>
+      )}
     </ThemedView>
   );
 }
@@ -172,6 +207,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     columnGap: Spacing.two,
+  },
+  buttons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    columnGap: Spacing.three,
   },
   dismissed: {
     flexDirection: 'row',

@@ -94,6 +94,30 @@ describe('deadlines repository', () => {
     });
   });
 
+  it('changes the date to the person’s, remembering the analysis’s date once (US-8)', async () => {
+    clock.advance(5000);
+
+    await repos.deadlines.changeDate('late', '2026-11-25');
+    expect(await repos.deadlines.get('late')).toMatchObject({
+      dueDate: '2026-11-25',
+      dateSource: 'user',
+      originalDate: '2026-11-20',
+      updatedAt: '2026-10-17T09:00:05.000Z',
+    });
+
+    await repos.deadlines.changeDate('late', '2026-11-27');
+    expect(await repos.deadlines.get('late')).toMatchObject({
+      dueDate: '2026-11-27',
+      originalDate: '2026-11-20',
+    });
+  });
+
+  it('refuses a date that is not in the calendar, and a missing deadline', async () => {
+    await expect(repos.deadlines.changeDate('late', '2026-02-30')).rejects.toThrow(/calendar/);
+    await expect(repos.deadlines.changeDate('missing', '2026-11-25')).rejects.toThrow(/not found/);
+    expect(await repos.deadlines.get('late')).toMatchObject({ dueDate: '2026-11-20' });
+  });
+
   it('distinguishes default reminders (null) from reminders turned off ([])', async () => {
     await repos.deadlines.update('late', { reminderOffsetsDays: [] });
     await repos.deadlines.update('soon-morning', { reminderOffsetsDays: [3, 0] });

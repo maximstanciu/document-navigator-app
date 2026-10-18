@@ -1,3 +1,5 @@
+import { isCalendarDate } from '@/shared/calendar-date';
+
 import type { SqlDatabase, SqlExecutor, SqlValue } from './database';
 import { buildAssignments, fromJson, placeholders, toJson, type Clock } from './sql';
 import type { DeadlineRecord, DeadlineStatus } from './types';
@@ -192,6 +194,23 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
       );
       if (result.changes === 0) throw new Error(`Deadline ${id} not found`);
       return (await get(id)) as DeadlineRecord;
+    },
+
+    /**
+     * «Change date» (US-8, DET-4): the person's date wins. The deadline becomes `dateSource: 'user'`
+     * and remembers the analysis's date in `originalDate` the first time, so a re-analysis keeps it
+     * and doesn't bring the old date back as a new deadline (ANL-8).
+     */
+    async changeDate(id: string, dueDate: string): Promise<void> {
+      if (!isCalendarDate(dueDate)) throw new Error(`Not a calendar date: ${dueDate}`);
+      // SET reads the row as it was, so original_date takes the date before this change.
+      const result = await db.runAsync(
+        `UPDATE deadlines SET due_date = ?, date_source = 'user', updated_at = ?,
+           original_date = CASE WHEN date_source = 'user' THEN original_date ELSE due_date END
+         WHERE id = ? AND deleted_at IS NULL`,
+        [dueDate, now().toISOString(), id]
+      );
+      if (result.changes === 0) throw new Error(`Deadline ${id} not found`);
     },
 
     /**

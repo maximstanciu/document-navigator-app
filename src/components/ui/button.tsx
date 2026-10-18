@@ -6,8 +6,11 @@ import { useTheme } from '@/hooks/use-theme';
 
 export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
-  /** `plain`: tinted text without a fill, as wide as its label, for actions inside a card. */
-  variant?: 'primary' | 'secondary' | 'plain';
+  /**
+   * `plain`: tinted text without a fill, as wide as its label, for actions inside a card.
+   * `destructive`: a deleting action, in the high-risk color on the card background.
+   */
+  variant?: 'primary' | 'secondary' | 'plain' | 'destructive';
 };
 
 export function Button({ label, variant = 'primary', disabled, ...rest }: ButtonProps) {
@@ -16,8 +19,14 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
     primary: theme.tint,
     secondary: theme.backgroundElement,
     plain: 'transparent',
+    destructive: theme.backgroundElement,
   }[variant];
-  const color = { primary: theme.onTint, secondary: theme.text, plain: theme.tint }[variant];
+  const color = {
+    primary: theme.onTint,
+    secondary: theme.text,
+    plain: theme.tint,
+    destructive: theme.riskHigh,
+  }[variant];
 
   return (
     <Pressable

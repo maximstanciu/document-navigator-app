@@ -11,6 +11,7 @@ import {
   toJson,
   type Clock,
 } from './sql';
+import { mergeReanalysis, type ExistingAction, type ExistingDeadline } from './merge-reanalysis';
 import type { DocumentRecord } from './types';
 
 type DocumentRow = {
@@ -126,8 +127,22 @@ export type AnalysisOutcome = {
   actions: readonly NewAction[];
 };
 
-/** Statuses an analysis can start from (SPEC §6.3). Re-analysis of `ready` arrives with ANL-8. */
-const ANALYZABLE = `('draft', 'failed')`;
+/** Statuses an analysis can start from (SPEC §6.3): a `ready` document is analyzed again (ANL-8). */
+const ANALYZABLE = `('draft', 'failed', 'ready')`;
+
+/**
+ * The title a finished analysis leaves the document with: the analysis names it, unless the person
+ * did — a title other than the previous analysis's, or any title before the first analysis.
+ */
+function titleAfterAnalysis(
+  current: { title: string; analysis: DocumentRecord['analysis'] },
+  analysis: NonNullable<DocumentRecord['analysis']>
+): string {
+  const named = current.analysis
+    ? current.title !== current.analysis.title
+    : current.title.trim() !== '';
+  return named ? current.title : analysis.title;
+}
 
 export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
   async function get(id: string): Promise<DocumentRecord | null> {
@@ -237,7 +252,9 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
-     * Moves a draft or a failed document to `analyzing` and clears the previous error (SPEC §6.3).
+     * Moves a document to `analyzing` and clears the previous error (SPEC §6.3): a draft, a failed
+     * one, or a ready one to analyze again (ANL-8), which keeps its analysis until the new one is
+     * stored, and keeps it if the new one fails.
      * `false` when the document is gone or in another status, e.g. already being analyzed: the
      * check and the change are one statement, so two taps can't start two analyses.
      */
@@ -251,20 +268,34 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
-     * Stores a finished analysis (ANL-2): the document takes its title, type, sender and date from
-     * it and becomes `ready`, and its deadlines and actions are inserted, in one transaction.
-     * Only a document that is still `analyzing` is written: `false` when it was deleted meanwhile.
+     * Stores a finished analysis (ANL-2): the document takes its type, sender and date from it,
+     * and its title unless the person named it, and becomes `ready`. A re-analysis merges by ANL-8
+     * (`mergeReanalysis()`): what the person did to deadlines stays, the rest is replaced; replaced
+     * deadlines and actions are wiped like deleted ones, and their scheduled reminders are left for
+     * `syncReminders()` to cancel. One transaction, read and write, so «Done» pressed while the
+     * analysis ran is not lost. Only a document that is still `analyzing` is written: `false` when
+     * it was deleted meanwhile.
      */
     async saveAnalysis(id: string, outcome: AnalysisOutcome): Promise<boolean> {
       const timestamp = now().toISOString();
       return db.transaction(async (tx) => {
-        const exists = await tx.getFirstAsync<{ id: string }>(
-          `SELECT id FROM documents WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
+        const current = await tx.getFirstAsync<Pick<DocumentRow, 'title' | 'analysis'>>(
+          `SELECT title, analysis FROM documents
+           WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
           [id]
         );
-        if (!exists) return false;
+        if (!current) return false;
         const { analysis } = outcome;
-        const named = { title: analysis.title, senderName: analysis.sender?.name ?? null };
+        const named = {
+          title: titleAfterAnalysis(
+            {
+              title: current.title,
+              analysis: fromJson(current.analysis) as DocumentRecord['analysis'],
+            },
+            analysis
+          ),
+          senderName: analysis.sender?.name ?? null,
+        };
         await tx.runAsync(
           `UPDATE documents SET title = ?, document_type = ?, sender_name = ?, document_date = ?,
              status = 'ready', error_code = NULL, page_count = ?, analysis = ?, analysis_locale = ?,
@@ -284,8 +315,57 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             id,
           ]
         );
-        for (const deadline of outcome.deadlines) await insertDeadline(tx, deadline, timestamp);
-        for (const action of outcome.actions) await insertAction(tx, action, timestamp);
+
+        const deadlines = await tx.getAllAsync<{
+          id: string;
+          kind: ExistingDeadline['kind'];
+          due_date: string;
+          original_date: string | null;
+          date_source: ExistingDeadline['dateSource'];
+          status: ExistingDeadline['status'];
+        }>(
+          `SELECT id, kind, due_date, original_date, date_source, status FROM deadlines
+           WHERE document_id = ? AND deleted_at IS NULL`,
+          [id]
+        );
+        const actions = await tx.getAllAsync<{ id: string; deadline_id: string | null }>(
+          'SELECT id, deadline_id FROM actions WHERE document_id = ? AND deleted_at IS NULL',
+          [id]
+        );
+        const merge = mergeReanalysis(
+          {
+            deadlines: deadlines.map((row): ExistingDeadline => ({
+              id: row.id,
+              kind: row.kind,
+              dueDate: row.due_date,
+              originalDate: row.original_date,
+              dateSource: row.date_source,
+              status: row.status,
+            })),
+            actions: actions.map((row): ExistingAction => ({
+              id: row.id,
+              deadlineId: row.deadline_id,
+            })),
+          },
+          outcome
+        );
+        if (merge.removeDeadlineIds.length > 0) {
+          await tx.runAsync(
+            `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
+               computation = NULL, updated_at = ?, deleted_at = ?
+             WHERE id IN (${placeholders(merge.removeDeadlineIds.length)})`,
+            [timestamp, timestamp, ...merge.removeDeadlineIds]
+          );
+        }
+        if (merge.removeActionIds.length > 0) {
+          await tx.runAsync(
+            `UPDATE actions SET description = '', updated_at = ?, deleted_at = ?
+             WHERE id IN (${placeholders(merge.removeActionIds.length)})`,
+            [timestamp, timestamp, ...merge.removeActionIds]
+          );
+        }
+        for (const deadline of merge.insertDeadlines) await insertDeadline(tx, deadline, timestamp);
+        for (const action of merge.insertActions) await insertAction(tx, action, timestamp);
         return true;
       });
     },

@@ -192,11 +192,12 @@ describe('documents repository', () => {
       });
     });
 
-    it('does not start an analysis of a ready, deleted or missing document', async () => {
+    it('starts a new analysis of a ready document (ANL-8), not of a deleted or missing one', async () => {
       await repos.documents.create({ ...newDocument('ready'), status: 'ready' });
       await repos.documents.create(newDocument('deleted'));
       await repos.documents.remove('deleted');
 
+      expect(await repos.documents.startAnalysis('ready')).toBe(true);
       expect(await repos.documents.startAnalysis('ready')).toBe(false);
       expect(await repos.documents.startAnalysis('deleted')).toBe(false);
       expect(await repos.documents.startAnalysis('missing')).toBe(false);
@@ -228,6 +229,176 @@ describe('documents repository', () => {
       expect(await repos.actions.listByDocument('doc-1')).toMatchObject([
         { id: 'ac-1', deadlineId: 'dl-1', done: false },
       ]);
+    });
+
+    describe('re-analysis (ANL-8)', () => {
+      /** doc-1 analyzed once: a payment deadline with its action, and an undated action. */
+      async function analyzedOnce() {
+        await repos.documents.create(newDocument('doc-1', ''));
+        await repos.documents.startAnalysis('doc-1');
+        const first = outcome('doc-1');
+        await repos.documents.saveAnalysis('doc-1', {
+          ...first,
+          actions: [
+            ...first.actions,
+            {
+              id: 'ac-undated',
+              documentId: 'doc-1',
+              description: 'Сохранить счёт',
+              priority: 'low' as const,
+            },
+          ],
+        });
+      }
+
+      /** The same document analyzed again: the payment found again, and a new deadline. */
+      const second = () => ({
+        ...outcome('doc-1'),
+        analysis: { ...invoice, title: 'Счёт Stadtwerke за сентябрь' },
+        deadlines: [
+          {
+            id: 'dl-2',
+            documentId: 'doc-1',
+            kind: 'payment' as const,
+            description: 'Оплатить счёт до конца месяца',
+            dueDate: '2026-10-31',
+            dateSource: 'explicit' as const,
+            confidence: 'high' as const,
+          },
+          {
+            id: 'dl-3',
+            documentId: 'doc-1',
+            kind: 'response' as const,
+            description: 'Оспорить счёт',
+            dueDate: '2026-11-03',
+            dateSource: 'computed' as const,
+            confidence: 'medium' as const,
+          },
+        ],
+        actions: [
+          {
+            id: 'ac-2',
+            documentId: 'doc-1',
+            description: 'Оплатить 84,20 €',
+            priority: 'high' as const,
+            deadlineId: 'dl-2',
+          },
+        ],
+      });
+
+      async function analyzeAgain() {
+        clock.advance(60_000);
+        expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
+        expect(await repos.documents.saveAnalysis('doc-1', second())).toBe(true);
+      }
+
+      const liveDeadlines = async () =>
+        (await repos.deadlines.list({ documentId: 'doc-1' })).map((d) => d.id);
+      const liveActions = async () =>
+        (await repos.actions.listByDocument('doc-1')).map((a) => a.id);
+
+      it('replaces deadlines and actions the person did nothing to', async () => {
+        await analyzedOnce();
+
+        await analyzeAgain();
+
+        expect(await liveDeadlines()).toEqual(['dl-2', 'dl-3']);
+        expect(await liveActions()).toEqual(['ac-2']);
+        expect(await repos.documents.get('doc-1')).toMatchObject({
+          title: 'Счёт Stadtwerke за сентябрь',
+          analyzedAt: '2026-10-17T09:01:00.000Z',
+          status: 'ready',
+        });
+      });
+
+      it('wipes what it replaces, like a deletion (STO-6)', async () => {
+        await analyzedOnce();
+
+        await analyzeAgain();
+
+        const wiped = await db.getAllAsync<{ description: string; deleted_at: string | null }>(
+          `SELECT description, deleted_at FROM deadlines WHERE id = 'dl-1'
+           UNION ALL SELECT description, deleted_at FROM actions WHERE id IN ('ac-1', 'ac-undated')`
+        );
+        expect(wiped).toEqual(
+          Array(3).fill({ description: '', deleted_at: '2026-10-17T09:01:00.000Z' })
+        );
+      });
+
+      it('keeps a deadline done meanwhile with its action, and drops the new duplicate', async () => {
+        await analyzedOnce();
+        await repos.documents.startAnalysis('doc-1');
+        // «Done» while the new analysis is on its way.
+        await repos.actions.setDone('ac-1', true);
+        await repos.documents.saveAnalysis('doc-1', second());
+
+        expect(await liveDeadlines()).toEqual(['dl-1', 'dl-3']);
+        expect(await liveActions()).toEqual(['ac-1']);
+        expect(await repos.deadlines.get('dl-1')).toMatchObject({ status: 'done' });
+      });
+
+      it('keeps a deadline marked «Not relevant»', async () => {
+        await analyzedOnce();
+        await repos.deadlines.update('dl-1', { status: 'dismissed' });
+
+        await analyzeAgain();
+
+        expect(await liveDeadlines()).toEqual(['dl-1', 'dl-3']);
+        expect(await repos.deadlines.get('dl-1')).toMatchObject({ status: 'dismissed' });
+      });
+
+      it('keeps a date the person set, and knows the old date when it comes back', async () => {
+        await analyzedOnce();
+        await repos.deadlines.changeDate('dl-1', '2026-11-14');
+
+        await analyzeAgain();
+
+        expect(await liveDeadlines()).toEqual(['dl-3', 'dl-1']);
+        expect(await repos.deadlines.get('dl-1')).toMatchObject({
+          dueDate: '2026-11-14',
+          dateSource: 'user',
+          originalDate: '2026-10-31',
+          status: 'open',
+        });
+        expect(await liveActions()).toEqual(['ac-1']);
+      });
+
+      it('keeps a title the person gave the document', async () => {
+        await analyzedOnce();
+        await repos.documents.update('doc-1', { title: 'Свет, сентябрь' });
+
+        await analyzeAgain();
+
+        expect(await repos.documents.get('doc-1')).toMatchObject({ title: 'Свет, сентябрь' });
+        expect((await repos.documents.search('свет')).map((d) => d.id)).toEqual(['doc-1']);
+      });
+
+      it('keeps a title given before the first analysis', async () => {
+        await repos.documents.create(newDocument('doc-1', 'Письмо со дня рождения'));
+        await repos.documents.startAnalysis('doc-1');
+
+        await repos.documents.saveAnalysis('doc-1', outcome('doc-1'));
+
+        expect(await repos.documents.get('doc-1')).toMatchObject({
+          title: 'Письмо со дня рождения',
+          analysis: invoice,
+        });
+      });
+
+      it('leaves the previous analysis in place when the new one fails', async () => {
+        await analyzedOnce();
+        await repos.documents.startAnalysis('doc-1');
+
+        await repos.documents.failAnalysis('doc-1', 'network');
+
+        expect(await repos.documents.get('doc-1')).toMatchObject({
+          status: 'failed',
+          errorCode: 'network',
+          analysis: invoice,
+          title: invoice.title,
+        });
+        expect(await liveDeadlines()).toEqual(['dl-1']);
+      });
     });
 
     it('stores nothing for a document deleted while it was analyzed', async () => {

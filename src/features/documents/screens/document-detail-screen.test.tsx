@@ -1,13 +1,15 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
 import DocumentRoute from '@/app/documents/[id]';
 import { analysisRecords } from '@/features/analysis/analysis-records';
+import * as analysisApi from '@/features/analysis/api';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import type { AnalysisResult } from '@/shared/analysis/schema';
-import { fakeFileSystem } from '@/test/fake-file-system';
+import { Directory, fakeFileSystem, Paths } from '@/test/fake-file-system';
 import { createTestProviders } from '@/test/render';
 import { installTestRepositories } from '@/test/sqlite';
 
@@ -16,6 +18,10 @@ import { copyToClipboard } from '../clipboard';
 
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));
 jest.mock('../clipboard', () => ({ copyToClipboard: jest.fn(async () => {}) }));
+// The native date pickers can't run in Jest; the web field stands in for them.
+jest.mock('@/components/ui/date-picker', () =>
+  jest.requireActual('@/components/ui/date-picker.web')
+);
 
 const copy = jest.mocked(copyToClipboard);
 
@@ -23,6 +29,14 @@ const copy = jest.mocked(copyToClipboard);
 function renderDocument(id = 'doc-1') {
   return renderRouter(
     { 'documents/[id]': DocumentRoute },
+    { initialUrl: `/documents/${id}`, wrapper: createTestProviders() }
+  );
+}
+
+/** Inside the stack, so the header with «⋯» renders too; «/» is where «Delete» goes back to. */
+function renderDocumentWithHeader(id = 'doc-1') {
+  return renderRouter(
+    { _layout: () => <Stack />, index: () => null, 'documents/[id]': DocumentRoute },
     { initialUrl: `/documents/${id}`, wrapper: createTestProviders() }
   );
 }
@@ -267,6 +281,48 @@ describe('DocumentDetailScreen', () => {
       ).toBeOnTheScreen();
     });
 
+    it('changes a deadline’s date and says it was changed (US-8)', async () => {
+      const user = userEvent.setup();
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocument();
+
+      await user.press(
+        await screen.findByRole('button', {
+          name: 'Change the date of the deadline of Oct 31, 2026',
+        })
+      );
+      const field = screen.getByLabelText(/^New date: /);
+      await user.clear(field);
+      await user.type(field, '2026-11-14');
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      expect(await screen.findByText('By Nov 14, 2026')).toBeOnTheScreen();
+      expect(
+        screen.getByText('You changed this date. The analysis said Oct 31, 2026.')
+      ).toBeOnTheScreen();
+      expect(await repositories.deadlines.list({ documentId: 'doc-1' })).toMatchObject([
+        { dueDate: '2026-11-14', dateSource: 'user', originalDate: '2026-10-31' },
+      ]);
+    });
+
+    it('leaves the date as it was when changing it is cancelled', async () => {
+      const user = userEvent.setup();
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocument();
+
+      await user.press(
+        await screen.findByRole('button', {
+          name: 'Change the date of the deadline of Oct 31, 2026',
+        })
+      );
+      await user.press(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByLabelText(/^New date: /)).not.toBeOnTheScreen();
+      expect(await repositories.deadlines.list({ documentId: 'doc-1' })).toMatchObject([
+        { dueDate: '2026-10-31', dateSource: 'explicit' },
+      ]);
+    });
+
     it('says when an open deadline has passed', async () => {
       const notice = ANALYSIS_FIXTURES.officialNotice;
       await seedAnalyzed({
@@ -385,6 +441,114 @@ describe('DocumentDetailScreen', () => {
 
       expect(await screen.findByText(/The original isn't available/)).toBeOnTheScreen();
       expect(await screen.findByRole('heading', { name: 'What to do' })).toBeOnTheScreen();
+    });
+  });
+
+  describe('document actions (DET-9)', () => {
+    async function openActions() {
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Document actions' }));
+      return user;
+    }
+
+    it('renames the document, and not to a blank title', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Rename' }));
+      const field = screen.getByLabelText('Document title');
+      expect(field).toHaveDisplayValue(ANALYSIS_FIXTURES.invoice.title);
+      await user.clear(field);
+      expect(screen.getByRole('button', { name: 'Save' })).toBeDisabled();
+      await user.type(field, '  Свет, сентябрь ');
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(() => expect(screen.queryByLabelText('Document title')).not.toBeOnTheScreen());
+      expect(screen.getAllByRole('heading', { name: 'Свет, сентябрь' }).length).toBeGreaterThan(0);
+      expect(await repositories.documents.get('doc-1')).toMatchObject({ title: 'Свет, сентябрь' });
+    });
+
+    it('analyzes a ready document again once asked (ANL-8)', async () => {
+      const analyze = jest.spyOn(analysisApi, 'analyzeDocument').mockResolvedValue();
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Analyze again' }));
+      expect(
+        screen.getByRole('heading', { name: 'Analyze the document again?' })
+      ).toBeOnTheScreen();
+      expect(screen.getByText(/Deadlines whose date you changed/)).toBeOnTheScreen();
+      expect(analyze).not.toHaveBeenCalled();
+      await user.press(screen.getByRole('button', { name: 'Analyze again' }));
+
+      expect(analyze).toHaveBeenCalledWith('doc-1', expect.any(Function));
+    });
+
+    it('offers no second analysis before the first one', async () => {
+      await seedDocument();
+      await renderDocumentWithHeader();
+      await openActions();
+
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Delete' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Analyze again' })).not.toBeOnTheScreen();
+    });
+
+    it('deletes the document with its files once asked, and goes back (STO-6)', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      new Directory(Paths.document, 'documents', 'doc-1').create({ intermediates: true });
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+      expect(screen.getByRole('heading', { name: 'Delete the document?' })).toBeOnTheScreen();
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => expect(screen).toHavePathname('/'));
+      expect(await repositories.documents.get('doc-1')).toBeNull();
+      expect(await repositories.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
+      expect(fakeFileSystem.files()).toEqual([]);
+    });
+
+    it('keeps the document when deleting is cancelled', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+      await user.press(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByRole('heading', { name: 'Delete the document?' })).not.toBeOnTheScreen();
+      expect(screen).toHavePathname('/documents/doc-1');
+      expect(await repositories.documents.get('doc-1')).not.toBeNull();
+    });
+  });
+
+  describe('a new analysis of an analyzed document (ANL-8)', () => {
+    it('shows the previous result while the new one is on its way', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await repositories.documents.startAnalysis('doc-1');
+
+      await renderDocument();
+
+      expect(await screen.findByText('Reading the document…')).toBeOnTheScreen();
+      expect(screen.getByText(/The previous result stays below/)).toBeOnTheScreen();
+      expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
+    });
+
+    it('keeps the previous result when the new one fails', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await repositories.documents.startAnalysis('doc-1');
+      await repositories.documents.failAnalysis('doc-1', 'network');
+
+      await renderDocument();
+
+      expect(await screen.findByRole('alert')).toHaveTextContent(/connection to the server/i);
+      expect(screen.getByText('Below is the result of the previous analysis.')).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+      expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
     });
   });
 

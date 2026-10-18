@@ -1,6 +1,7 @@
 import { getRepositories } from '@/lib/db/repositories';
 import type { DocumentRecord } from '@/lib/db/types';
-import { pageFileExists, pageFileUri } from '@/lib/files/page-files';
+import { deleteDocumentFiles, pageFileExists, pageFileUri } from '@/lib/files/page-files';
+import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 
 import type { DeadlineSummary, DocumentDetail, DocumentPage, DocumentSummary } from './types';
 
@@ -55,6 +56,23 @@ export async function listOpenDeadlines(): Promise<DeadlineSummary[]> {
 /** «Got it» in «Needs attention»: the document's fraud signs or high risk are seen (HOME-1). */
 export async function dismissAttention(id: string): Promise<void> {
   await getRepositories().documents.dismissAttention(id);
+}
+
+/** «Rename» (DET-9): a blank title is refused; a new analysis keeps the title (ANL-8). */
+export async function renameDocument(id: string, title: string): Promise<void> {
+  const trimmed = title.trim().slice(0, ANALYSIS_BOUNDS.title);
+  if (!trimmed) throw new Error('A document needs a title');
+  await getRepositories().documents.update(id, { title: trimmed });
+}
+
+/**
+ * «Delete» (DET-9, STO-6): the content is wiped in the database at once and the page files go with
+ * the document's folder. Cancelling its reminders in the OS arrives with the notifications adapter
+ * (task 5.1); before it nothing is scheduled.
+ */
+export async function deleteDocument(id: string): Promise<void> {
+  const removed = await getRepositories().documents.remove(id);
+  if (removed) await deleteDocumentFiles(id);
 }
 
 /** `null` when the document doesn't exist or was deleted. */

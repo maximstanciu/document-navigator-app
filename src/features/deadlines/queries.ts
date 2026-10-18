@@ -2,7 +2,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dbKeys } from '@/lib/db/query-keys';
 
-import { dismissDeadline, restoreDeadline, setActionDone, setDeadlineDone } from './api';
+import {
+  changeDeadlineDate,
+  dismissDeadline,
+  restoreDeadline,
+  setActionDone,
+  setDeadlineDone,
+} from './api';
 
 /**
  * A change to deadlines or actions refreshes both tables: a deadline's status follows its actions
@@ -38,4 +44,10 @@ export function useDismissDeadline() {
 
 export function useRestoreDeadline() {
   return useDeadlinesMutation(restoreDeadline);
+}
+
+export function useChangeDeadlineDate() {
+  return useDeadlinesMutation(({ id, dueDate }: { id: string; dueDate: string }) =>
+    changeDeadlineDate(id, dueDate)
+  );
 }

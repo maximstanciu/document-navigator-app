@@ -59,6 +59,17 @@ export function daysBetween(from: string, to: string): number {
   return Math.round((utcMidnight(to).getTime() - utcMidnight(from).getTime()) / 86_400_000);
 }
 
+/**
+ * Noon of `date` in the runtime's time zone, for pickers that take a `Date`: noon stays on the same
+ * calendar day whatever the daylight saving time does that night.
+ */
+export function localNoon(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const moment = new Date(2000, 0, 1, 12);
+  moment.setFullYear(year, month - 1, day);
+  return moment;
+}
+
 /** The calendar date of `moment` in the runtime's time zone: on the client, the device's "today". */
 export function localCalendarDate(moment: Date): string {
   return format(moment.getFullYear(), moment.getMonth() + 1, moment.getDate());

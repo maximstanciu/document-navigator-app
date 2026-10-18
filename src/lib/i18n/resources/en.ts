@@ -6,6 +6,11 @@ export const en = {
     errorTitle: 'Something went wrong',
     retry: 'Try again',
     cancel: 'Cancel',
+    save: 'Save',
+  },
+  datePicker: {
+    placeholder: 'YYYY-MM-DD',
+    invalid: 'Enter the date as YYYY-MM-DD, for example 2026-10-31.',
   },
   fileSize: {
     kb: '{{value}} KB',
@@ -51,6 +56,24 @@ export const en = {
       noMatchMessage: 'Choose another document type or “All”.',
     },
     allDocuments: 'All documents',
+    actions: {
+      open: 'Document actions',
+      close: 'Close',
+      rename: 'Rename',
+      reanalyze: 'Analyze again',
+      reanalyzeTitle: 'Analyze the document again?',
+      reanalyzeMessage:
+        'The document is analyzed from scratch, and the new result replaces this one. Deadlines whose date you changed, or that you marked done or not relevant, stay with their actions.',
+      delete: 'Delete',
+      deleteTitle: 'Delete the document?',
+      deleteMessage:
+        "The document, its pages, deadlines and reminders are deleted from this device. This can't be undone.",
+      deleteFailed: "Couldn't delete the document. Try again.",
+    },
+    rename: {
+      label: 'Document title',
+      failed: "Couldn't rename the document. Try again.",
+    },
     attention: {
       title: 'Needs attention',
       today: 'Today',
@@ -138,6 +161,11 @@ export const en = {
       computed: 'Calculated: {{computation}}',
       checkOriginal: 'Check this date against the original.',
       changedByYou: 'You changed this date.',
+      changedByYouFrom: 'You changed this date. The analysis said {{date}}.',
+      changeDate: 'Change date',
+      changeDateLabel: 'Change the date of the deadline of {{date}}',
+      newDate: 'New date: {{description}}',
+      changeDateFailed: "Couldn't change the date. Try again.",
       notRelevant: 'Not relevant',
       notRelevantLabel: 'Mark the deadline of {{date}} as not relevant',
       restore: 'Restore',
@@ -205,6 +233,8 @@ export const en = {
     draft: "This document hasn't been analyzed yet.",
     start: 'Analyze the document',
     progress: 'Reading the document…',
+    previousShown: 'The previous result stays below until the new one is ready.',
+    previousKept: 'Below is the result of the previous analysis.',
     keepOpen:
       'Keep the app open until the analysis is done: if you leave it or the screen turns off, the analysis stops.',
     rateLimitedUntil: 'The analysis limit is reached. You can try again after {{time}}.',

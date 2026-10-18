@@ -1,4 +1,12 @@
-import { addDays, addYears, daysBetween, isCalendarDate, isClockTime } from './calendar-date';
+import {
+  addDays,
+  addYears,
+  daysBetween,
+  isCalendarDate,
+  isClockTime,
+  localCalendarDate,
+  localNoon,
+} from './calendar-date';
 
 describe('isCalendarDate', () => {
   it.each(['2026-10-18', '2028-02-29', '2000-02-29', '2026-12-31', '0001-01-01'])(
@@ -71,4 +79,15 @@ describe('daysBetween', () => {
   ])('from %s to %s is %d days', (from, to, expected) => {
     expect(daysBetween(from, to)).toBe(expected);
   });
+});
+
+describe('localNoon', () => {
+  it.each(['2026-10-25', '2027-03-28', '2028-02-29', '0050-06-15'])(
+    'lands on %s and back again',
+    (date) => {
+      const moment = localNoon(date);
+      expect(moment.getHours()).toBe(12);
+      expect(localCalendarDate(moment)).toBe(date);
+    }
+  );
 });

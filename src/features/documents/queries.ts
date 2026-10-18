@@ -3,6 +3,7 @@ import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 
 import {
+  deleteDocument,
   dismissAttention,
   getDocument,
   getDocumentPages,
@@ -10,6 +11,7 @@ import {
   listDocumentDeadlines,
   listDocuments,
   listOpenDeadlines,
+  renameDocument,
   searchDocuments,
 } from './api';
 
@@ -69,5 +71,26 @@ export function useDismissAttention() {
   return useMutation({
     mutationFn: dismissAttention,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
+  });
+}
+
+/** «Rename» on the document screen (DET-9). */
+export function useRenameDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, title }: { id: string; title: string }) => renameDocument(id, title),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
+  });
+}
+
+/**
+ * «Delete» on the document screen (DET-9, STO-6). Every local query is refreshed: the document's
+ * pages, deadlines and actions are gone too.
+ */
+export function useDeleteDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: deleteDocument,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.all() }),
   });
 }

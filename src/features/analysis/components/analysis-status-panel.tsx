@@ -35,12 +35,13 @@ function failureMessage(
 /**
  * Where the analysis of a document stands, until it's ready (SPEC §6.3): a draft offers to analyze
  * it, an analysis in progress asks to keep the app open (D-1), a failed one says why and offers
- * «Try again» when that can help (ANL-3, ANL-9). Nothing once the document is ready.
+ * «Try again» when that can help (ANL-3, ANL-9). Nothing once the document is ready. Analyzed
+ * before, the document still shows that result meanwhile, and keeps it if the new one fails (ANL-8).
  */
 export function AnalysisStatusPanel({
   document,
 }: {
-  document: Pick<DocumentRecord, 'id' | 'status' | 'errorCode'>;
+  document: Pick<DocumentRecord, 'id' | 'status' | 'errorCode' | 'analyzedAt'>;
 }) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
@@ -62,6 +63,11 @@ export function AnalysisStatusPanel({
           <ThemedText type="small" themeColor="textSecondary">
             {t('analysis.keepOpen')}
           </ThemedText>
+          {document.analyzedAt && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('analysis.previousShown')}
+            </ThemedText>
+          )}
         </ThemedView>
       );
 
@@ -73,6 +79,11 @@ export function AnalysisStatusPanel({
           <ThemedText type="small" role="alert">
             {failureMessage(code, lastError, t, i18n.language)}
           </ThemedText>
+          {document.analyzedAt && (
+            <ThemedText type="small" themeColor="textSecondary">
+              {t('analysis.previousKept')}
+            </ThemedText>
+          )}
           {isRetryable(code) && (
             <Button label={t('common.retry')} disabled={analyze.isPending} onPress={start} />
           )}
