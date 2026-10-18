@@ -29,11 +29,12 @@ export async function handleAnalyze(request: Request, deps: AnalyzeDeps): Promis
     const upload = await readAnalyzeUpload(request);
     const pageCount = await countPages(upload);
     const output = await callProvider(deps.provider, upload, request.signal);
-    const analysis = finalizeAnalysis(output);
-    if (!analysis) {
+    // A retry with the error for the model comes with the real provider (task 3.2).
+    const finalized = finalizeAnalysis(output, { today: upload.today, pageCount });
+    if (!finalized.ok) {
       throw new ApiFailure('analysis_failed', 'The model returned an invalid analysis.');
     }
-    return Response.json({ analysis, pageCount } satisfies AnalyzeResponse);
+    return Response.json({ analysis: finalized.analysis, pageCount } satisfies AnalyzeResponse);
   } catch (error) {
     if (error instanceof ApiFailure) return error.toResponse();
     throw error;

@@ -98,9 +98,30 @@ describe('handleAnalyze', () => {
 
     it('adds schemaVersion to what the model returns', async () => {
       const { provider } = recordingProvider();
-      const response = await handleAnalyze(analyzeRequest(), deps({ provider }));
+      // The contract fixture quotes page 4.
+      const files = Array.from({ length: 4 }, () => jpeg());
+      const response = await handleAnalyze(analyzeRequest({ files }), deps({ provider }));
 
       expect((await response.json()).analysis).toEqual(ANALYSIS_FIXTURES.contract);
+    });
+
+    it('post-processes the answer with the request date and the page count (SPEC §7.4)', async () => {
+      const { contract } = ANALYSIS_FIXTURES;
+      const { provider } = recordingProvider(async () => ({
+        ...validResult(),
+        summary: `  ${contract.summary}  `,
+        deadlines: [{ ...contract.deadlines[0], date: '2040-01-01' }, contract.deadlines[1]],
+      }));
+
+      const response = await handleAnalyze(analyzeRequest(), deps({ provider }));
+
+      expect(response.status).toBe(200);
+      const { analysis } = await response.json();
+      expect(analysis.summary).toBe(contract.summary);
+      // More than 10 years after `today`: dropped, and its action loses the link. The other
+      // deadline becomes d1, and its page 3 isn't in a one-page upload.
+      expect(analysis.deadlines).toEqual([{ ...contract.deadlines[1], id: 'd1', page: null }]);
+      expect(analysis.actions).toEqual([{ ...contract.actions[0], deadlineId: null }]);
     });
 
     it('serves the minimum app version and newer ones', async () => {

@@ -1,11 +1,10 @@
-import { z } from 'zod';
-
 import {
   ANALYZE_FIELDS,
   IMAGE_MIME_TYPE,
   PDF_MIME_TYPE,
   type UploadMimeType,
 } from '@/shared/analysis/contract';
+import { isCalendarDate } from '@/shared/calendar-date';
 import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
 import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
@@ -97,12 +96,6 @@ function checkFiles(values: unknown[]): FormFile[] {
 
 function invalid(message: string) {
   return new ApiFailure('invalid_request', message);
-}
-
-const calendarDate = z.iso.date();
-
-function isCalendarDate(value: unknown): value is string {
-  return calendarDate.safeParse(value).success;
 }
 
 function isTimeZone(value: unknown): value is string {
