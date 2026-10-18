@@ -11,6 +11,7 @@ import type { DocumentSource } from '@/lib/db/types';
 import { useCaptureSession } from '../capture-session';
 import { CaptureStatus } from '../components/capture-status';
 import { SourceOption } from '../components/source-option';
+import { SCANNER_SUPPORTED } from '../scanner';
 import { useCapturePages } from '../use-capture-pages';
 
 const SOURCES = [
@@ -27,12 +28,14 @@ const SOURCES = [
 
 /**
  * Where a new document comes from (CAP-1): the scanner, photos from the gallery or a file (CAP-3).
- * The captured pages are prepared for upload (CAP-4, CAP-7) before the review opens.
+ * Web has no scanner, so it offers only photos and files (CAP-10). The captured pages are prepared
+ * for upload (CAP-4, CAP-7) before the review opens.
  */
 export function CaptureSourceScreen() {
   const { t } = useTranslation();
   const session = useCaptureSession();
   const { notice, progress, capture } = useCapturePages();
+  const sources = SOURCES.filter(({ source }) => source !== 'scan' || SCANNER_SUPPORTED);
 
   async function choose(source: DocumentSource) {
     const pages = await capture(source);
@@ -49,7 +52,7 @@ export function CaptureSourceScreen() {
       <Stack.Screen options={{ title: t('capture.title') }} />
       <ScrollView contentInsetAdjustmentBehavior="automatic" contentContainerStyle={styles.content}>
         <CaptureStatus progress={progress} notice={notice} />
-        {SOURCES.map(({ source, icon }) => (
+        {sources.map(({ source, icon }) => (
           <SourceOption
             key={source}
             icon={icon}

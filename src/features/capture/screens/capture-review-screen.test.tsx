@@ -18,7 +18,7 @@ import type { PickedFile } from '../picked-files';
 import { pickFile, pickPhotos } from '../pickers';
 import { scanDocument } from '../scanner';
 
-jest.mock('../scanner', () => ({ scanDocument: jest.fn() }));
+jest.mock('../scanner', () => ({ scanDocument: jest.fn(), SCANNER_SUPPORTED: true }));
 jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
 jest.mock('../normalize-image', () => ({ normalizeImage: jest.fn() }));
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));

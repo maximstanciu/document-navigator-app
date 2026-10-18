@@ -1,6 +1,7 @@
 import DocumentScanner, { ScanDocumentResponseStatus } from 'react-native-document-scanner-plugin';
 
-import { scanDocument, UNAVAILABLE_CANCEL_MS } from './scanner';
+import { SCANNER_SUPPORTED, scanDocument, UNAVAILABLE_CANCEL_MS } from './scanner';
+import * as webScanner from './scanner.web';
 
 const pluginScan = jest.mocked(DocumentScanner.scanDocument);
 const { Success, Cancel } = ScanDocumentResponseStatus;
@@ -67,5 +68,13 @@ describe('scanDocument (CAP-2)', () => {
     pluginAnswers({ status: Cancel, scannedImages: [] });
     expect(await scanDocument({ maxPages: 30 })).toEqual({ status: 'cancelled' });
     expect(pluginScan).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('scanner on web (CAP-10)', () => {
+  it('reports that there is no scanner, so the capture screen hides the option', async () => {
+    expect(SCANNER_SUPPORTED).toBe(true);
+    expect(webScanner.SCANNER_SUPPORTED).toBe(false);
+    expect(await webScanner.scanDocument({ maxPages: 30 })).toEqual({ status: 'unavailable' });
   });
 });

@@ -12,12 +12,17 @@ import { createTestProviders } from '@/test/render';
 import { normalizeImage, type NormalizedImage } from '../normalize-image';
 import type { PickedFile } from '../picked-files';
 import { pickFile, pickPhotos } from '../pickers';
-import { scanDocument } from '../scanner';
+import * as scanner from '../scanner';
 
-jest.mock('../scanner', () => ({ scanDocument: jest.fn() }));
+// `__esModule` keeps one module object, so jest.replaceProperty() reaches the screen too.
+jest.mock('../scanner', () => ({
+  __esModule: true,
+  scanDocument: jest.fn(),
+  SCANNER_SUPPORTED: true,
+}));
 jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
 jest.mock('../normalize-image', () => ({ normalizeImage: jest.fn() }));
-const scan = jest.mocked(scanDocument);
+const scan = jest.mocked(scanner.scanDocument);
 const photos = jest.mocked(pickPhotos);
 const pickedFile = jest.mocked(pickFile);
 const normalize = jest.mocked(normalizeImage);
@@ -66,6 +71,7 @@ function normalizesTo(size = 400 * 1024) {
 beforeEach(() => normalizesTo());
 
 afterEach(() => {
+  jest.restoreAllMocks();
   scan.mockReset();
   photos.mockReset();
   pickedFile.mockReset();
@@ -80,6 +86,15 @@ describe('CaptureSourceScreen (CAP-1)', () => {
     expect(screen.getByRole('button', { name: 'Photo from gallery' })).toBeEnabled();
     expect(screen.getByRole('button', { name: 'File' })).toBeEnabled();
     expect(screen.getByText('A PDF or an image from your files')).toBeOnTheScreen();
+  });
+
+  it('offers only photos and files where there is no scanner, as on web (CAP-10)', async () => {
+    jest.replaceProperty(scanner, 'SCANNER_SUPPORTED', false);
+    await renderCapture('/capture');
+
+    expect(await screen.findByRole('button', { name: 'Photo from gallery' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'File' })).toBeEnabled();
+    expect(screen.queryByRole('button', { name: 'Scan' })).not.toBeOnTheScreen();
   });
 
   it('shows the options in Russian', async () => {

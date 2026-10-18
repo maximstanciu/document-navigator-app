@@ -48,6 +48,7 @@ Deep links: `adb shell am start -a android.intent.action.VIEW -d "docnavigator:/
 - Port busy → stop the other Metro (`lsof -i :8081`) or pass `--port 8082` and point the dev client at it.
 - Phone not listed by `adb devices`, or `unauthorized` → unlock it, enable USB debugging, accept the RSA prompt; on Samsung turn off Auto Blocker (Security and privacy) for USB commands.
 - Stale bundle or weird resolution errors → `npx expo start --clear`.
+- Web shows «Could not open the app data» with `createSyncAccessHandle … another open Access Handle` → another page or a leftover worker of the same origin holds the SQLite file in OPFS. Close other tabs of that origin, or open the preview by another host name (`127.0.0.1`, `[::1]` instead of `localhost`): a different origin has its own storage.
 - A change on disk doesn't reach the app (e.g. `undefined is not a function` for an export the file has) → a long-running Metro missed file changes (seen in task 2.4 with a day-old server). Start a fresh Metro on another port and open the dev client on it with the `adb shell am start` command above.
 - `TurboModuleRegistry.getEnforcing(...): 'X' could not be found` → the installed build predates the native module; rebuild (see `add-dependency`).
 - Gradle `Java heap space` during the build → `cd android && ./gradlew --stop`, then rebuild.

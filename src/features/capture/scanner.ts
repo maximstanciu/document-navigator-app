@@ -18,6 +18,9 @@ export type ScanResult =
   /** A scan is already open; the extra call is ignored. */
   | { status: 'busy' };
 
+/** The system scanner exists on Android and iOS; web has none (CAP-10, scanner.web.ts). */
+export const SCANNER_SUPPORTED: boolean = true;
+
 /**
  * An unavailable scanner comes back as a cancel, often at once (spike 0.4). A person can't open the
  * scanner and close it this fast, so a quicker cancel means the scanner isn't there.
