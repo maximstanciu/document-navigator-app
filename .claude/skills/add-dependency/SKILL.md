@@ -63,18 +63,18 @@ Then mention in your summary: the package added, any `app.json` change, and whet
 
 ## Common choices in this app
 
-| Need                    | Use                                                                                                        |
-| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Local data and settings | `expo-sqlite` through repositories in `src/lib/db` (settings are a table, not AsyncStorage)                |
-| `deviceId`              | `expo-secure-store`                                                                                        |
-| Page files              | `expo-file-system` under `Paths.document` (`src/lib/files`)                                                |
-| Document scanning       | `react-native-document-scanner-plugin` (installed; fork as fallback, spike 0.4)                            |
-| Photos / files          | `expo-image-picker`, `expo-document-picker` (installed, task 2.3); normalize with `expo-image-manipulator` |
-| Images in UI            | `expo-image`                                                                                               |
-| Notifications           | `expo-notifications` (local only)                                                                          |
-| "Add to calendar"       | Android: `expo-intent-launcher` `ACTION_INSERT`; iOS: `expo-calendar` (spike 0.7)                          |
-| Validation / schema     | `zod` v4 in `src/shared`                                                                                   |
-| Localization            | `expo-localization`, `i18next` + `react-i18next` (installed, task 1.1)                                     |
-| Plurals in Hermes       | `@formatjs/intl-pluralrules` + `@formatjs/intl-locale` polyfills (installed, task 1.1)                     |
+| Need                    | Use                                                                                                                              |
+| ----------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| Local data and settings | `expo-sqlite` through repositories in `src/lib/db` (settings are a table, not AsyncStorage)                                      |
+| `deviceId`              | `expo-secure-store`                                                                                                              |
+| Page files              | `expo-file-system` under `Paths.document` (`src/lib/files`)                                                                      |
+| Document scanning       | `react-native-document-scanner-plugin` (installed; fork as fallback, spike 0.4)                                                  |
+| Photos / files          | `expo-image-picker`, `expo-document-picker` (installed, task 2.3); normalize with `expo-image-manipulator` (installed, task 2.4) |
+| Images in UI            | `expo-image`                                                                                                                     |
+| Notifications           | `expo-notifications` (local only)                                                                                                |
+| "Add to calendar"       | Android: `expo-intent-launcher` `ACTION_INSERT`; iOS: `expo-calendar` (spike 0.7)                                                |
+| Validation / schema     | `zod` v4 in `src/shared`                                                                                                         |
+| Localization            | `expo-localization`, `i18next` + `react-i18next` (installed, task 1.1)                                                           |
+| Plurals in Hermes       | `@formatjs/intl-pluralrules` + `@formatjs/intl-locale` polyfills (installed, task 1.1)                                           |
 
 Not on SPEC §10 (ask first): form libraries, global state managers, UI kits, analytics, crash reporting (open question 6). Confirm each API against the versioned docs before relying on it — names and APIs change between SDKs.

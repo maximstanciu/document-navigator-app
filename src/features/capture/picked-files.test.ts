@@ -1,4 +1,4 @@
-import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
 import { capturedMimeType, checkPickedFiles, type PickedFile } from './picked-files';
 
@@ -73,8 +73,22 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
     expect(checkPickedFiles('gallery', photos)).toEqual({
       status: 'ok',
       pages: [
-        { uri: 'file:///p1.jpg', mimeType: 'image/jpeg', size: 100, name: 'p1.jpg' },
-        { uri: 'file:///p2.heic', mimeType: 'image/heic', size: 200, name: 'p2.heic' },
+        {
+          uri: 'file:///p1.jpg',
+          mimeType: 'image/jpeg',
+          size: 100,
+          name: 'p1.jpg',
+          width: null,
+          height: null,
+        },
+        {
+          uri: 'file:///p2.heic',
+          mimeType: 'image/heic',
+          size: 200,
+          name: 'p2.heic',
+          width: null,
+          height: null,
+        },
       ],
     });
   });
@@ -97,10 +111,11 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
     });
   });
 
-  it('leaves the size of photos to the check after normalization (CAP-4)', () => {
+  it('leaves the size to the check after normalization (CAP-4, CAP-7)', () => {
     const photos = [file({ size: 15 * MB }), file({ uri: 'file:///p2.jpg', size: 15 * MB })];
 
     expect(checkPickedFiles('gallery', photos).status).toBe('ok');
+    expect(checkPickedFiles('file', [pdf({ size: 50 * MB })]).status).toBe('ok');
   });
 
   it('takes a PDF as the whole document', () => {
@@ -112,6 +127,8 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
           mimeType: 'application/pdf',
           size: 3 * MB,
           name: 'letter.pdf',
+          width: null,
+          height: null,
         },
       ],
     });
@@ -122,18 +139,6 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
       status: 'ok',
       pages: [expect.objectContaining({ mimeType: 'image/png' })],
     });
-  });
-
-  it('refuses a PDF over the size limit, which is uploaded as is', () => {
-    expect(checkPickedFiles('file', [pdf({ size: MAX_DOCUMENT_BYTES })]).status).toBe('ok');
-    expect(checkPickedFiles('file', [pdf({ size: MAX_DOCUMENT_BYTES + 1 })])).toEqual({
-      status: 'too_large',
-      size: MAX_DOCUMENT_BYTES + 1,
-    });
-  });
-
-  it('lets a PDF of unknown size through to the server check', () => {
-    expect(checkPickedFiles('file', [pdf({ size: null })]).status).toBe('ok');
   });
 
   it('refuses a PDF from the gallery or together with other files', () => {

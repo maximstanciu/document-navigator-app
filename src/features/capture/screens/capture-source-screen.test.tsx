@@ -9,15 +9,18 @@ import { Button } from '@/components/ui/button';
 import { i18n } from '@/lib/i18n/i18n';
 import { createTestProviders } from '@/test/render';
 
+import { normalizeImage, type NormalizedImage } from '../normalize-image';
 import type { PickedFile } from '../picked-files';
 import { pickFile, pickPhotos } from '../pickers';
 import { scanDocument } from '../scanner';
 
 jest.mock('../scanner', () => ({ scanDocument: jest.fn() }));
 jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
+jest.mock('../normalize-image', () => ({ normalizeImage: jest.fn() }));
 const scan = jest.mocked(scanDocument);
 const photos = jest.mocked(pickPhotos);
 const pickedFile = jest.mocked(pickFile);
+const normalize = jest.mocked(normalizeImage);
 
 const MB = 1024 * 1024;
 
@@ -50,10 +53,23 @@ function renderCapture(initialUrl: string) {
   );
 }
 
+/** Every image normalizes to a 400 KB JPEG next to it. */
+function normalizesTo(size = 400 * 1024) {
+  normalize.mockImplementation(async (uri) => ({
+    uri: `${uri}.normalized.jpg`,
+    width: 1448,
+    height: 2048,
+    size,
+  }));
+}
+
+beforeEach(() => normalizesTo());
+
 afterEach(() => {
   scan.mockReset();
   photos.mockReset();
   pickedFile.mockReset();
+  normalize.mockReset();
 });
 
 describe('CaptureSourceScreen (CAP-1)', () => {
@@ -83,6 +99,8 @@ describe('CaptureSourceScreen (CAP-1)', () => {
     await user.press(await screen.findByRole('button', { name: 'Scan' }));
 
     expect(scan).toHaveBeenCalledWith({ maxPages: 30 });
+    // The review shows the pages as they will be uploaded (CAP-4).
+    expect(normalize.mock.calls.map(([uri]) => uri)).toEqual(['file:///p1.jpg', 'file:///p2.jpg']);
     expect(screen).toHavePathname('/capture/review');
     expect(await screen.findByText('2 pages')).toBeOnTheScreen();
     expect(screen.getByLabelText('Page 1')).toBeOnTheScreen();
@@ -237,6 +255,69 @@ describe('CaptureSourceScreen (CAP-1)', () => {
       "Couldn't get the files. Try again."
     );
     expect(screen).toHavePathname('/capture');
+  });
+
+  it('shows progress while the pages are prepared, with the sources disabled (CAP-4)', async () => {
+    const user = userEvent.setup();
+    let finish: (image: NormalizedImage) => void = () => {};
+    normalize.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    scan.mockResolvedValue({ status: 'scanned', pages: ['file:///p1.jpg', 'file:///p2.jpg'] });
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Scan' }));
+
+    expect(await screen.findByText('Preparing the pages: 0 of 2')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Scan' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'File' })).toBeDisabled();
+    finish({ uri: 'file:///p1.out.jpg', width: 1448, height: 2048, size: 1 });
+
+    expect(await screen.findByText('2 pages')).toBeOnTheScreen();
+    expect(screen).toHavePathname('/capture/review');
+  });
+
+  it('explains the size limit when the pages together are too large (CAP-7)', async () => {
+    const user = userEvent.setup();
+    normalizesTo(11 * MB);
+    photos.mockResolvedValue(picked({}, {}));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Photo from gallery' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Together the pages are larger than 20 MB, so the document can't be analyzed. Scan or choose fewer pages."
+    );
+    expect(screen).toHavePathname('/capture');
+    expect(screen.getByRole('button', { name: 'Photo from gallery' })).toBeEnabled();
+  });
+
+  it('explains an image that can not be opened', async () => {
+    const user = userEvent.setup();
+    normalize.mockRejectedValue(new Error('Could not decode'));
+    pickedFile.mockResolvedValue(picked({ name: 'IMG_1.HEIC', mimeType: 'image/heic' }));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'File' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't open the image. Choose another photo or file."
+    );
+  });
+
+  it('stops preparing the pages when the modal is closed', async () => {
+    const user = userEvent.setup();
+    let finish: (image: NormalizedImage) => void = () => {};
+    normalize.mockReturnValueOnce(new Promise((resolve) => (finish = resolve)));
+    photos.mockResolvedValue(picked({}, {}));
+    await renderCapture('/');
+    await user.press(await screen.findByRole('button', { name: 'Open capture' }));
+
+    await user.press(await screen.findByRole('button', { name: 'Photo from gallery' }));
+    await user.press(await screen.findByRole('button', { name: 'Cancel' }));
+    finish({ uri: 'file:///p1.out.jpg', width: 1448, height: 2048, size: 1 });
+
+    expect(await screen.findByRole('button', { name: 'Open capture' })).toBeOnTheScreen();
+    expect(screen).toHavePathname('/');
+    expect(normalize).toHaveBeenCalledTimes(1);
   });
 
   it('closes with Cancel and returns to the screen it was opened from', async () => {

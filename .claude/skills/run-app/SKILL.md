@@ -27,7 +27,7 @@ The app uses native modules Expo Go doesn't have (document scanner, calendar), s
 | iOS                 | EAS only: `npx eas-cli@latest build --profile development --platform ios` (ask first) | Needs a paid Apple Developer account and a registered iPhone            |
 
 - `npm run android` runs `expo run:android` (a native build), not Expo Go.
-- `--no-bundler` builds and installs without starting Metro; start Metro yourself in a terminal tab.
+- `--no-bundler` builds and installs without starting Metro; start Metro yourself in a terminal tab, or with `preview_start` and the `metro` configuration in `.claude/launch.json` (`expo start --dev-client`, port 8082 or the next free one).
 - After installing a native module or changing a config plugin in `app.json`: `npx expo prebuild --platform android --clean`, then rebuild. JS-only changes need no rebuild.
 - An APK built for one device contains only that device's architecture (x86_64 emulator vs arm64 phone); build per target.
 - Open the dev client on a given Metro: `adb shell am start -a android.intent.action.VIEW -d "exp+docnavigator://expo-development-client/?url=http%3A%2F%2F<host>%3A<port>"` (`10.0.2.2` from the emulator, `localhost` with `adb reverse`).
@@ -48,6 +48,7 @@ Deep links: `adb shell am start -a android.intent.action.VIEW -d "docnavigator:/
 - Port busy → stop the other Metro (`lsof -i :8081`) or pass `--port 8082` and point the dev client at it.
 - Phone not listed by `adb devices`, or `unauthorized` → unlock it, enable USB debugging, accept the RSA prompt; on Samsung turn off Auto Blocker (Security and privacy) for USB commands.
 - Stale bundle or weird resolution errors → `npx expo start --clear`.
+- A change on disk doesn't reach the app (e.g. `undefined is not a function` for an export the file has) → a long-running Metro missed file changes (seen in task 2.4 with a day-old server). Start a fresh Metro on another port and open the dev client on it with the `adb shell am start` command above.
 - `TurboModuleRegistry.getEnforcing(...): 'X' could not be found` → the installed build predates the native module; rebuild (see `add-dependency`).
 - Gradle `Java heap space` during the build → `cd android && ./gradlew --stop`, then rebuild.
 - More: `troubleshoot` skill.

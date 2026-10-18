@@ -78,6 +78,11 @@ export const en = {
     unsupportedFile: "This file isn't supported. Choose a PDF or a JPEG, PNG or HEIC image.",
     fileTooLarge:
       "The file is larger than {{limit}} MB, so the document can't be analyzed. Compress the PDF or scan the pages you need.",
+    pagesTooLarge:
+      "Together the pages are larger than {{limit}} MB, so the document can't be analyzed. Scan or choose fewer pages.",
+    unreadableImage: "Couldn't open the image. Choose another photo or file.",
+    preparingPages: 'Preparing the pages…',
+    preparingPagesProgress: 'Preparing the pages: {{done}} of {{total}}',
     pickerFailed: "Couldn't get the files. Try again.",
     reviewTitle: 'Check the pages',
     noPages: 'No pages yet',

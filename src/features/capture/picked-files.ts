@@ -1,4 +1,4 @@
-import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
 import type { CapturedMimeType, CapturedPage } from './types';
 
@@ -58,17 +58,15 @@ export type PickedFilesCheck =
   | { status: 'ok'; pages: CapturedPage[] }
   /** A format the app doesn't take, such as a WebP photo or a Word file. */
   | { status: 'unsupported_type' }
-  | { status: 'too_many_pages'; pageCount: number }
-  | { status: 'too_large'; size: number };
+  | { status: 'too_many_pages'; pageCount: number };
 
 /**
  * Checks picked files before they become a document (CAP-3, CAP-7). Photos from the gallery are its
  * pages; a file is either a PDF, which is the whole document, or one image. The pickers' type filters
  * are only hints (Android file managers and browsers may ignore them), so every format is checked.
  *
- * The size limit is checked here only for a PDF, which is uploaded as is. Images shrink several
- * times when normalized (CAP-4), so their total is checked after that (task 2.4). A PDF's page count
- * is unknown on the client: the server checks it (D-4).
+ * The size limit is checked later by preparePages(), once images are normalized (CAP-4). A PDF's
+ * page count is unknown on the client: the server checks it (D-4).
  */
 export function checkPickedFiles(
   source: 'gallery' | 'file',
@@ -81,20 +79,18 @@ export function checkPickedFiles(
     if (!mimeType || (mimeType === 'application/pdf' && !pdfAllowed)) {
       return { status: 'unsupported_type' };
     }
-    pages.push({ uri: file.uri, mimeType, size: file.size, name: file.name });
+    pages.push({
+      uri: file.uri,
+      mimeType,
+      size: file.size,
+      name: file.name,
+      width: null,
+      height: null,
+    });
   }
   // The pickers stop at the limit on Android and iOS, but not on web.
   if (pages.length > MAX_DOCUMENT_PAGES) {
     return { status: 'too_many_pages', pageCount: pages.length };
-  }
-  const [first] = pages;
-  // A size the picker didn't report passes: the server answers 413 then (CAP-7).
-  if (
-    first?.mimeType === 'application/pdf' &&
-    first.size !== null &&
-    first.size > MAX_DOCUMENT_BYTES
-  ) {
-    return { status: 'too_large', size: first.size };
   }
   return { status: 'ok', pages };
 }
