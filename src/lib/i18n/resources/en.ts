@@ -63,6 +63,14 @@ export const en = {
       gallery: 'One or more photos, as pages of one document',
       file: 'A PDF or an image from your files',
     },
+    scannerUnavailable:
+      "The scanner isn't available on this device. Add a photo from the gallery or a file instead.",
+    tooManyPages_one: 'A document can have at most {{count}} page. Scan it again with fewer pages.',
+    tooManyPages_other:
+      'A document can have at most {{count}} pages. Scan it again with fewer pages.',
+    reviewTitle: 'Check the pages',
+    noPages: 'No pages yet',
+    pageLabel: 'Page {{number}}',
   },
   settings: {
     title: 'Settings',
