@@ -1,10 +1,14 @@
+import { File } from 'expo-file-system';
+
 /** A file on the device to send in `multipart/form-data`. */
 export type UploadFile = { uri: string; name: string; type: string };
 
 /**
- * React Native's `FormData` takes `{ uri, name, type }` and streams the file from disk itself, so a
- * 20 MB document is never read into JS memory. The DOM typings don't know that form, hence the cast.
+ * Since SDK 58 the global `fetch` on Android and iOS is `expo/fetch`, which rejects React Native's
+ * `{ uri, name, type }` parts («Unsupported FormDataPart implementation»). It takes a `Blob`, and an
+ * `expo-file-system` `File` is one: its type comes from the extension (`.jpg`, `.pdf`). `fetch`
+ * reads each part into memory while it builds the body, so a 20 MB PDF (CAP-7) is held there once.
  */
 export async function appendUploadFile(form: FormData, field: string, file: UploadFile) {
-  form.append(field, { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  form.append(field, new File(file.uri), file.name);
 }

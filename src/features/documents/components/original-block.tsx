@@ -20,29 +20,32 @@ function PageTile({ page }: { page: DocumentPage }) {
   const { t } = useTranslation();
   const number = page.index + 1;
 
-  if (page.uri === null) {
-    return (
-      <ThemedView
-        type="backgroundElement"
-        style={[styles.tile, styles.missing]}
-        accessible
-        aria-label={t('documents.original.pageMissing', { number })}>
-        <SymbolView
-          name={{ ios: 'photo', android: 'broken_image', web: 'broken_image' }}
-          size={24}
-          tintColor={theme.textSecondary}
-        />
-      </ThemedView>
-    );
-  }
+  // The cell takes the share of the row, as on the review screen: on Android, expo-image with its
+  // own percentage width here kept its space but never loaded (smoke test after task 4.2).
   return (
-    <Image
-      source={{ uri: page.uri }}
-      accessible
-      alt={t('documents.original.page', { number })}
-      contentFit="cover"
-      style={styles.tile}
-    />
+    <View style={styles.cell}>
+      {page.uri === null ? (
+        <ThemedView
+          type="backgroundElement"
+          style={[styles.tile, styles.missing]}
+          accessible
+          aria-label={t('documents.original.pageMissing', { number })}>
+          <SymbolView
+            name={{ ios: 'photo', android: 'broken_image', web: 'broken_image' }}
+            size={24}
+            tintColor={theme.textSecondary}
+          />
+        </ThemedView>
+      ) : (
+        <Image
+          source={{ uri: page.uri }}
+          accessible
+          alt={t('documents.original.page', { number })}
+          contentFit="cover"
+          style={styles.tile}
+        />
+      )}
+    </View>
   );
 }
 
@@ -88,8 +91,11 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: Spacing.two,
   },
-  tile: {
+  cell: {
     width: '31%',
+  },
+  tile: {
+    width: '100%',
     // Close to A4, the most common page shape.
     aspectRatio: 0.71,
     borderRadius: Spacing.two,
