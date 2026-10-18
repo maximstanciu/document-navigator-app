@@ -223,6 +223,20 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
+     * «Got it» in «Needs attention» (HOME-1): the user has seen the fraud signs or high risk of the
+     * current analysis. `false` if the document is gone.
+     */
+    async dismissAttention(id: string): Promise<boolean> {
+      const timestamp = now().toISOString();
+      const result = await db.runAsync(
+        `UPDATE documents SET attention_dismissed_at = ?, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL`,
+        [timestamp, timestamp, id]
+      );
+      return result.changes > 0;
+    },
+
+    /**
      * Moves a draft or a failed document to `analyzing` and clears the previous error (SPEC §6.3).
      * `false` when the document is gone or in another status, e.g. already being analyzed: the
      * check and the change are one statement, so two taps can't start two analyses.

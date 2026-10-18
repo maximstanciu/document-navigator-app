@@ -1,4 +1,4 @@
-import { addYears, isCalendarDate, isClockTime } from './calendar-date';
+import { addDays, addYears, daysBetween, isCalendarDate, isClockTime } from './calendar-date';
 
 describe('isCalendarDate', () => {
   it.each(['2026-10-18', '2028-02-29', '2000-02-29', '2026-12-31', '0001-01-01'])(
@@ -42,5 +42,33 @@ describe('addYears', () => {
     ['2026-01-31', 1, '2027-01-31'],
   ])('%s %+d years is %s', (date, years, expected) => {
     expect(addYears(date, years)).toBe(expected);
+  });
+});
+
+describe('addDays', () => {
+  it.each([
+    ['2026-10-18', 14, '2026-11-01'],
+    ['2026-10-18', 0, '2026-10-18'],
+    ['2026-10-18', -18, '2026-09-30'],
+    ['2026-12-25', 7, '2027-01-01'],
+    ['2028-02-28', 1, '2028-02-29'],
+    ['2026-02-28', 1, '2026-03-01'],
+    ['0050-01-01', 1, '0050-01-02'],
+  ])('%s %+d days is %s', (date, days, expected) => {
+    expect(addDays(date, days)).toBe(expected);
+  });
+});
+
+describe('daysBetween', () => {
+  it.each([
+    ['2026-10-18', '2026-10-18', 0],
+    ['2026-10-18', '2026-10-19', 1],
+    ['2026-10-18', '2026-10-15', -3],
+    ['2026-10-18', '2027-10-18', 365],
+    ['2028-02-01', '2028-03-01', 29],
+    // Daylight saving time changes in Europe on 2026-10-25; calendar days don't notice.
+    ['2026-10-24', '2026-10-26', 2],
+  ])('from %s to %s is %d days', (from, to, expected) => {
+    expect(daysBetween(from, to)).toBe(expected);
   });
 });

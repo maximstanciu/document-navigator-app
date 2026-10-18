@@ -38,6 +38,27 @@ export function addYears(date: string, years: number): string {
   return format(target, month, Math.min(day, daysInMonth(target, month)));
 }
 
+/** Midnight UTC of `date`: a calendar day as an instant, for day arithmetic without time zones. */
+function utcMidnight(date: string): Date {
+  const [year, month, day] = date.split('-').map(Number);
+  const moment = new Date(0);
+  // Not Date.UTC(), which reads years below 100 as 19xx.
+  moment.setUTCFullYear(year, month - 1, day);
+  return moment;
+}
+
+/** The date `days` calendar days later (or earlier), across months and years. */
+export function addDays(date: string, days: number): string {
+  const moment = utcMidnight(date);
+  moment.setUTCDate(moment.getUTCDate() + days);
+  return format(moment.getUTCFullYear(), moment.getUTCMonth() + 1, moment.getUTCDate());
+}
+
+/** Calendar days from `from` to `to`: negative when `to` is earlier. */
+export function daysBetween(from: string, to: string): number {
+  return Math.round((utcMidnight(to).getTime() - utcMidnight(from).getTime()) / 86_400_000);
+}
+
 /** The calendar date of `moment` in the runtime's time zone: on the client, the device's "today". */
 export function localCalendarDate(moment: Date): string {
   return format(moment.getFullYear(), moment.getMonth() + 1, moment.getDate());

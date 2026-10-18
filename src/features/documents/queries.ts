@@ -1,13 +1,16 @@
-import { queryOptions } from '@tanstack/react-query';
+import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 
 import {
+  dismissAttention,
   getDocument,
   getDocumentPages,
   listDocumentActions,
   listDocumentDeadlines,
   listDocuments,
+  listOpenDeadlines,
+  searchDocuments,
 } from './api';
 
 /**
@@ -19,6 +22,19 @@ export const documentQueries = {
     queryOptions({
       queryKey: dbKeys.documents.list(),
       queryFn: listDocuments,
+      ...localQueryDefaults,
+    }),
+  search: (query: string) =>
+    queryOptions({
+      queryKey: dbKeys.documents.search(query),
+      queryFn: () => searchDocuments(query),
+      ...localQueryDefaults,
+    }),
+  /** Under the deadlines key: «Done» and «Not relevant» on any screen refresh the home screen. */
+  openDeadlines: () =>
+    queryOptions({
+      queryKey: dbKeys.deadlines.list({ statuses: ['open'] }),
+      queryFn: listOpenDeadlines,
       ...localQueryDefaults,
     }),
   detail: (id: string) =>
@@ -46,3 +62,12 @@ export const documentQueries = {
       ...localQueryDefaults,
     }),
 };
+
+/** «Got it» on a warning in «Needs attention» (HOME-1). */
+export function useDismissAttention() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: dismissAttention,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
+  });
+}

@@ -102,6 +102,20 @@ describe('documents repository', () => {
     await expect(repos.documents.update('missing', { title: 'x' })).rejects.toThrow(/not found/);
   });
 
+  it('records «Got it» with the time from the clock (HOME-1)', async () => {
+    await repos.documents.create(newDocument('doc-1'));
+    clock.advance(5000);
+
+    expect(await repos.documents.dismissAttention('doc-1')).toBe(true);
+
+    expect(await repos.documents.get('doc-1')).toMatchObject({
+      attentionDismissedAt: '2026-10-17T09:00:05.000Z',
+      updatedAt: '2026-10-17T09:00:05.000Z',
+    });
+    await repos.documents.remove('doc-1');
+    expect(await repos.documents.dismissAttention('doc-1')).toBe(false);
+  });
+
   describe('search (HOME-3)', () => {
     beforeEach(async () => {
       await repos.documents.create(newDocument('fine', 'Штраф за парковку'));

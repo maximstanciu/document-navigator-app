@@ -13,7 +13,7 @@ import { formatCalendarDate, formatTimestampDate } from '@/lib/i18n/format';
 
 import { DocumentResult } from '../components/document-result';
 import { OriginalBlock } from '../components/original-block';
-import { displayTitle } from '../format';
+import { displayTitle, formatDocumentType } from '../format';
 import { documentQueries } from '../queries';
 import type { DocumentDetail } from '../types';
 
@@ -22,9 +22,8 @@ function documentMeta(document: DocumentDetail, t: TFunction, language: string) 
   if (!document.analysis) {
     return t('documents.addedOn', { date: formatTimestampDate(document.createdAt, language) });
   }
-  const type = document.documentType;
   return [
-    type && type !== 'other' && type !== 'unknown' ? t(`documents.documentType.${type}`) : null,
+    formatDocumentType(document.documentType, t),
     document.senderName,
     document.documentDate ? formatCalendarDate(document.documentDate, language) : null,
   ]

@@ -2,7 +2,7 @@ import { getRepositories } from '@/lib/db/repositories';
 import type { DocumentRecord } from '@/lib/db/types';
 import { pageFileExists, pageFileUri } from '@/lib/files/page-files';
 
-import type { DocumentDetail, DocumentPage, DocumentSummary } from './types';
+import type { DeadlineSummary, DocumentDetail, DocumentPage, DocumentSummary } from './types';
 
 /**
  * Data access for the documents feature: reads local documents through the repositories in
@@ -14,9 +14,14 @@ function toSummary(document: DocumentRecord): DocumentSummary {
     id: document.id,
     title: document.title,
     status: document.status,
+    documentType: document.documentType,
     senderName: document.senderName,
     pageCount: document.pageCount,
     createdAt: document.createdAt,
+    analyzedAt: document.analyzedAt,
+    attentionDismissedAt: document.attentionDismissedAt,
+    hasFraudSignals: (document.analysis?.fraudSignals.length ?? 0) > 0,
+    hasHighRisk: document.analysis?.risks.some((risk) => risk.severity === 'high') ?? false,
   };
 }
 
@@ -26,15 +31,39 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
   return documents.map(toSummary);
 }
 
+/**
+ * Documents whose title, sender, summary or key facts contain `query`, in any case, newest first
+ * (HOME-3). An empty query finds nothing.
+ */
+export async function searchDocuments(query: string): Promise<DocumentSummary[]> {
+  const documents = await getRepositories().documents.search(query);
+  return documents.map(toSummary);
+}
+
+/** Open deadlines of all documents, soonest first: for the cards and «Needs attention» (HOME-1, HOME-2). */
+export async function listOpenDeadlines(): Promise<DeadlineSummary[]> {
+  const deadlines = await getRepositories().deadlines.list({ statuses: ['open'] });
+  return deadlines.map(({ id, documentId, description, dueDate, dueTime }) => ({
+    id,
+    documentId,
+    description,
+    dueDate,
+    dueTime,
+  }));
+}
+
+/** «Got it» in «Needs attention»: the document's fraud signs or high risk are seen (HOME-1). */
+export async function dismissAttention(id: string): Promise<void> {
+  await getRepositories().documents.dismissAttention(id);
+}
+
 /** `null` when the document doesn't exist or was deleted. */
 export async function getDocument(id: string): Promise<DocumentDetail | null> {
   const document = await getRepositories().documents.get(id);
   if (!document) return null;
   return {
     ...toSummary(document),
-    documentType: document.documentType,
     documentDate: document.documentDate,
-    analyzedAt: document.analyzedAt,
     mimeType: document.mimeType,
     errorCode: document.errorCode,
     fileSize: document.fileSize,
