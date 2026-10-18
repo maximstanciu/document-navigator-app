@@ -23,7 +23,8 @@
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "blockedPermissions": ["android.permission.CAMERA"]
     },
     "web": {
       "output": "server",
@@ -63,6 +64,14 @@
         "react-native-document-scanner-plugin",
         {
           "cameraPermission": "DocNavigator uses the camera to scan your documents."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "DocNavigator opens the photos you choose to add them as pages of a document.",
+          "cameraPermission": "DocNavigator uses the camera to scan your documents.",
+          "microphonePermission": false
         }
       ],
       "expo-sqlite",

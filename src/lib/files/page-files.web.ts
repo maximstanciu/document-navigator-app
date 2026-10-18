@@ -17,6 +17,11 @@ export async function savePageFile(
   return relativePath;
 }
 
+/** Browser pickers always report sizes (from the `File` object), so this fallback has nothing to read. */
+export function capturedFileSize(_uri: string): number | null {
+  return null;
+}
+
 export function pageFileUri(relativePath: string): string {
   splitPageRelativePath(relativePath);
   return files.get(relativePath) ?? '';

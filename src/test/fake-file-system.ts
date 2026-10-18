@@ -57,6 +57,11 @@ export class File {
     return files.has(this.uri);
   }
 
+  /** Like the real API: 0 when the file is missing. */
+  get size() {
+    return files.get(this.uri)?.length ?? 0;
+  }
+
   async copy(destination: File, options: { overwrite?: boolean } = {}) {
     const content = files.get(this.uri);
     if (content === undefined) throw new Error(`Source missing: ${this.uri}`);

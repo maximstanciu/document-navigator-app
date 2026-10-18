@@ -1,6 +1,7 @@
 import { fakeFileSystem } from '@/test/fake-file-system';
 
 import {
+  capturedFileSize,
   deleteAllDocumentFiles,
   deleteDocumentFiles,
   deletePageFiles,
@@ -81,5 +82,17 @@ describe('page files (STO-2, STO-3)', () => {
     await deleteAllDocumentFiles();
 
     expect(fakeFileSystem.files()).toEqual([SCAN]);
+  });
+});
+
+describe('capturedFileSize', () => {
+  it('reads the size of a file in the picker cache', () => {
+    fakeFileSystem.addFile('file:///data/cache/picked.pdf', '1234567');
+
+    expect(capturedFileSize('file:///data/cache/picked.pdf')).toBe(7);
+  });
+
+  it('is null for a file that is gone', () => {
+    expect(capturedFileSize('file:///data/cache/gone.pdf')).toBeNull();
   });
 });

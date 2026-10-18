@@ -2,8 +2,7 @@ import { createContext, use, useState, type PropsWithChildren } from 'react';
 
 import type { DocumentSource } from '@/lib/db/types';
 
-/** A page that is captured but not saved yet: a file in the scanner's or picker's cache. */
-export type CapturedPage = { uri: string };
+import type { CapturedPage } from './types';
 
 type CaptureState = { source: DocumentSource | null; pages: CapturedPage[] };
 

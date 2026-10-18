@@ -28,6 +28,19 @@ export async function savePageFile(
   return relativePath;
 }
 
+/**
+ * Size in bytes of a captured file that isn't saved yet (picker or scanner cache), for when the
+ * source doesn't report it. `null` when the file can't be read.
+ */
+export function capturedFileSize(uri: string): number | null {
+  try {
+    const file = new File(uri);
+    return file.exists ? file.size : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Absolute URI for `<Image>`, sharing and upload. */
 export function pageFileUri(relativePath: string): string {
   return pageFile(relativePath).uri;

@@ -32,7 +32,8 @@ Never `npm install <pkg>` for anything that touches React Native — `expo insta
 
 - **Config plugin**: if the library has one, add it to `plugins` in `app.json` with its options (permission strings, API keys from env, etc.). `npx expo install` adds some automatically — check the diff.
 - **Permissions**: every iOS permission needs a human-readable purpose string explaining _why_ (App Store review rejects vague ones). Set them through the plugin options, or `ios.infoPlist` / `android.permissions` in `app.json`. Request at the moment of use, handle "denied" and "blocked" states in the UI.
-- **Check the generated manifest**: prebuild can add Android permissions you didn't ask for (e.g. `READ_CALENDAR`/`WRITE_CALENDAR` with `expo-calendar`, spike 0.7). Inspect `android/app/src/main/AndroidManifest.xml` after `npx expo prebuild --platform android --clean` and remove unneeded ones with `android.blockedPermissions` in `app.json` — sensitive permissions must be declared in Play's Data safety form.
+- **Plugins share iOS keys**: setting a permission to `false` in one plugin deletes the key for everyone. `expo-image-picker` with `cameraPermission: false` would remove the `NSCameraUsageDescription` the scanner needs, so `app.json` passes it the same camera text and blocks Android's `CAMERA` with `android.blockedPermissions` instead (task 2.3).
+- **Check the generated manifest**: prebuild can add Android permissions you didn't ask for (e.g. `READ_CALENDAR`/`WRITE_CALENDAR` with `expo-calendar`, spike 0.7; `CAMERA` from `expo-image-picker`'s library manifest). Inspect `android/app/src/main/AndroidManifest.xml` after `npx expo prebuild --platform android --clean` and remove unneeded ones with `android.blockedPermissions` in `app.json` — sensitive permissions must be declared in Play's Data safety form.
 - **Never** create or edit `ios/` or `android/` — they're generated (Continuous Native Generation) and git-ignored. All native config goes through `app.json` and config plugins. If no plugin exists, write a local one in `plugins/` and reference it by path.
 - **Rebuild**: native changes don't reach the app via Fast Refresh. Expo Go only contains the Expo SDK's built-in modules; anything else needs a development build:
 
@@ -62,18 +63,18 @@ Then mention in your summary: the package added, any `app.json` change, and whet
 
 ## Common choices in this app
 
-| Need                    | Use                                                                                         |
-| ----------------------- | ------------------------------------------------------------------------------------------- |
-| Local data and settings | `expo-sqlite` through repositories in `src/lib/db` (settings are a table, not AsyncStorage) |
-| `deviceId`              | `expo-secure-store`                                                                         |
-| Page files              | `expo-file-system` under `Paths.document` (`src/lib/files`)                                 |
-| Document scanning       | `react-native-document-scanner-plugin` (installed; fork as fallback, spike 0.4)             |
-| Photos / files          | `expo-image-picker`, `expo-document-picker`; normalize with `expo-image-manipulator`        |
-| Images in UI            | `expo-image`                                                                                |
-| Notifications           | `expo-notifications` (local only)                                                           |
-| "Add to calendar"       | Android: `expo-intent-launcher` `ACTION_INSERT`; iOS: `expo-calendar` (spike 0.7)           |
-| Validation / schema     | `zod` v4 in `src/shared`                                                                    |
-| Localization            | `expo-localization`, `i18next` + `react-i18next` (installed, task 1.1)                      |
-| Plurals in Hermes       | `@formatjs/intl-pluralrules` + `@formatjs/intl-locale` polyfills (installed, task 1.1)      |
+| Need                    | Use                                                                                                        |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Local data and settings | `expo-sqlite` through repositories in `src/lib/db` (settings are a table, not AsyncStorage)                |
+| `deviceId`              | `expo-secure-store`                                                                                        |
+| Page files              | `expo-file-system` under `Paths.document` (`src/lib/files`)                                                |
+| Document scanning       | `react-native-document-scanner-plugin` (installed; fork as fallback, spike 0.4)                            |
+| Photos / files          | `expo-image-picker`, `expo-document-picker` (installed, task 2.3); normalize with `expo-image-manipulator` |
+| Images in UI            | `expo-image`                                                                                               |
+| Notifications           | `expo-notifications` (local only)                                                                          |
+| "Add to calendar"       | Android: `expo-intent-launcher` `ACTION_INSERT`; iOS: `expo-calendar` (spike 0.7)                          |
+| Validation / schema     | `zod` v4 in `src/shared`                                                                                   |
+| Localization            | `expo-localization`, `i18next` + `react-i18next` (installed, task 1.1)                                     |
+| Plurals in Hermes       | `@formatjs/intl-pluralrules` + `@formatjs/intl-locale` polyfills (installed, task 1.1)                     |
 
 Not on SPEC §10 (ask first): form libraries, global state managers, UI kits, analytics, crash reporting (open question 6). Confirm each API against the versioned docs before relying on it — names and APIs change between SDKs.

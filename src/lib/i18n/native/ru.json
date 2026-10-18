@@ -1,5 +1,6 @@
 {
   "ios": {
-    "NSCameraUsageDescription": "DocNavigator использует камеру, чтобы сканировать ваши документы."
+    "NSCameraUsageDescription": "DocNavigator использует камеру, чтобы сканировать ваши документы.",
+    "NSPhotoLibraryUsageDescription": "DocNavigator открывает выбранные вами фото, чтобы добавить их страницами документа."
   }
 }

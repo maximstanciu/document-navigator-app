@@ -7,6 +7,10 @@ export const en = {
     retry: 'Try again',
     cancel: 'Cancel',
   },
+  fileSize: {
+    kb: '{{value}} KB',
+    mb: '{{value}} MB',
+  },
   app: {
     databaseError: 'Could not open the app data',
   },
@@ -68,9 +72,17 @@ export const en = {
     tooManyPages_one: 'A document can have at most {{count}} page. Scan it again with fewer pages.',
     tooManyPages_other:
       'A document can have at most {{count}} pages. Scan it again with fewer pages.',
+    tooManyPhotos_one: 'A document can have at most {{count}} page. Choose fewer photos.',
+    tooManyPhotos_other: 'A document can have at most {{count}} pages. Choose fewer photos.',
+    unsupportedPhoto: "This photo format isn't supported. Choose JPEG, PNG or HEIC photos.",
+    unsupportedFile: "This file isn't supported. Choose a PDF or a JPEG, PNG or HEIC image.",
+    fileTooLarge:
+      "The file is larger than {{limit}} MB, so the document can't be analyzed. Compress the PDF or scan the pages you need.",
+    pickerFailed: "Couldn't get the files. Try again.",
     reviewTitle: 'Check the pages',
     noPages: 'No pages yet',
     pageLabel: 'Page {{number}}',
+    pdfLabel: 'PDF, {{name}}, {{size}}',
   },
   settings: {
     title: 'Settings',

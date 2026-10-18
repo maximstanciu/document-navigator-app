@@ -21,3 +21,21 @@ export function formatCalendarDate(isoDate: string, language: string): string {
     timeZone: 'UTC',
   }).format(new Date(`${isoDate}T00:00:00Z`));
 }
+
+/**
+ * A file size for the `fileSize.kb` / `fileSize.mb` strings: whole kilobytes below 1 MB, megabytes
+ * with one decimal above. The unit comes from the dictionaries rather than the `unit` style of
+ * `Intl.NumberFormat`, which Hermes wasn't checked for (spike 0.7).
+ */
+export function formatFileSize(
+  bytes: number,
+  language: string
+): { unit: 'kb' | 'mb'; value: string } {
+  const megabytes = bytes / (1024 * 1024);
+  if (megabytes < 1) {
+    const kilobytes = Math.max(1, Math.round(bytes / 1024));
+    return { unit: 'kb', value: new Intl.NumberFormat(language).format(kilobytes) };
+  }
+  const value = new Intl.NumberFormat(language, { maximumFractionDigits: 1 }).format(megabytes);
+  return { unit: 'mb', value };
+}

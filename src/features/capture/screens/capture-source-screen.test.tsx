@@ -9,10 +9,30 @@ import { Button } from '@/components/ui/button';
 import { i18n } from '@/lib/i18n/i18n';
 import { createTestProviders } from '@/test/render';
 
+import type { PickedFile } from '../picked-files';
+import { pickFile, pickPhotos } from '../pickers';
 import { scanDocument } from '../scanner';
 
 jest.mock('../scanner', () => ({ scanDocument: jest.fn() }));
+jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
 const scan = jest.mocked(scanDocument);
+const photos = jest.mocked(pickPhotos);
+const pickedFile = jest.mocked(pickFile);
+
+const MB = 1024 * 1024;
+
+function picked(...files: Partial<PickedFile>[]) {
+  return {
+    status: 'picked' as const,
+    files: files.map((file, i) => ({
+      uri: `file:///cache/picked-${i}.jpg`,
+      name: `picked-${i}.jpg`,
+      mimeType: 'image/jpeg',
+      size: MB,
+      ...file,
+    })),
+  };
+}
 
 function Home() {
   return <Button label="Open capture" onPress={() => router.push('/capture')} />;
@@ -30,16 +50,19 @@ function renderCapture(initialUrl: string) {
   );
 }
 
-afterEach(() => scan.mockReset());
+afterEach(() => {
+  scan.mockReset();
+  photos.mockReset();
+  pickedFile.mockReset();
+});
 
 describe('CaptureSourceScreen (CAP-1)', () => {
   it('offers scanning, a photo from the gallery and a file', async () => {
     await renderCapture('/capture');
 
     expect(await screen.findByRole('button', { name: 'Scan' })).toBeEnabled();
-    // Disabled until the pickers exist (task 2.3).
-    expect(screen.getByRole('button', { name: 'Photo from gallery' })).toBeDisabled();
-    expect(screen.getByRole('button', { name: 'File' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Photo from gallery' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'File' })).toBeEnabled();
     expect(screen.getByText('A PDF or an image from your files')).toBeOnTheScreen();
   });
 
@@ -101,6 +124,119 @@ describe('CaptureSourceScreen (CAP-1)', () => {
     expect(scan).toHaveBeenCalledTimes(1);
     expect(screen).toHavePathname('/capture');
     expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+  });
+
+  it('shows the photos picked from the gallery for review (CAP-3)', async () => {
+    const user = userEvent.setup();
+    photos.mockResolvedValue(picked({}, { mimeType: 'image/heic', name: 'IMG_2.HEIC' }));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Photo from gallery' }));
+
+    expect(photos).toHaveBeenCalledWith({ maxPages: 30 });
+    expect(screen).toHavePathname('/capture/review');
+    expect(await screen.findByText('2 pages')).toBeOnTheScreen();
+    expect(screen.getByLabelText('Page 2')).toBeOnTheScreen();
+  });
+
+  it('explains which photo formats fit when one does not (CAP-3)', async () => {
+    const user = userEvent.setup();
+    photos.mockResolvedValue(picked({}, { mimeType: 'image/webp', name: 'screen.webp' }));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Photo from gallery' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This photo format isn't supported. Choose JPEG, PNG or HEIC photos."
+    );
+    expect(screen).toHavePathname('/capture');
+  });
+
+  it('explains the page limit when too many photos are picked (CAP-7)', async () => {
+    const user = userEvent.setup();
+    photos.mockResolvedValue(picked(...Array.from({ length: 31 }, () => ({}))));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Photo from gallery' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A document can have at most 30 pages. Choose fewer photos.'
+    );
+  });
+
+  it('shows a picked PDF with its name and size instead of pages (CAP-5, D-4)', async () => {
+    const user = userEvent.setup();
+    pickedFile.mockResolvedValue(
+      picked({
+        uri: 'file:///cache/letter.pdf',
+        name: 'Tax letter.pdf',
+        mimeType: 'application/pdf',
+        size: 1.5 * MB,
+      })
+    );
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'File' }));
+
+    expect(screen).toHavePathname('/capture/review');
+    expect(await screen.findByText('Tax letter.pdf')).toBeOnTheScreen();
+    expect(screen.getByText('1.5 MB')).toBeOnTheScreen();
+    expect(screen.queryByLabelText('Page 1')).not.toBeOnTheScreen();
+  });
+
+  it('takes an image file as a one-page document', async () => {
+    const user = userEvent.setup();
+    pickedFile.mockResolvedValue(picked({ mimeType: 'image/png', name: 'scan.png' }));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'File' }));
+
+    expect(await screen.findByText('1 page')).toBeOnTheScreen();
+  });
+
+  it('refuses a PDF over the size limit before upload (CAP-7)', async () => {
+    const user = userEvent.setup();
+    pickedFile.mockResolvedValue(
+      picked({ name: 'big.pdf', mimeType: 'application/pdf', size: 21 * MB })
+    );
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'File' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "The file is larger than 20 MB, so the document can't be analyzed. Compress the PDF or scan the pages you need."
+    );
+    expect(screen).toHavePathname('/capture');
+  });
+
+  it('refuses a file of another type in Russian', async () => {
+    const user = userEvent.setup();
+    await i18n.changeLanguage('ru');
+    pickedFile.mockResolvedValue(picked({ name: 'contract.docx', mimeType: 'application/msword' }));
+    await renderCapture('/capture');
+
+    await user.press(await screen.findByRole('button', { name: 'Файл' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Такой файл не подходит. Выберите PDF или изображение JPEG, PNG или HEIC.'
+    );
+  });
+
+  it('says so when the picker fails, and stays quiet on a cancel', async () => {
+    const user = userEvent.setup();
+    pickedFile.mockResolvedValueOnce({ status: 'cancelled' });
+    pickedFile.mockResolvedValueOnce({ status: 'failed' });
+    await renderCapture('/capture');
+    const fileButton = await screen.findByRole('button', { name: 'File' });
+
+    await user.press(fileButton);
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+    await user.press(fileButton);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Couldn't get the files. Try again."
+    );
+    expect(screen).toHavePathname('/capture');
   });
 
   it('closes with Cancel and returns to the screen it was opened from', async () => {

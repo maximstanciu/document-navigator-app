@@ -1,4 +1,4 @@
-import { formatCalendarDate, formatTimestampDate } from './format';
+import { formatCalendarDate, formatFileSize, formatTimestampDate } from './format';
 
 describe('date formatting', () => {
   it('formats in the interface language', () => {
@@ -9,5 +9,18 @@ describe('date formatting', () => {
   it('keeps calendar dates on their day in any time zone', () => {
     expect(formatCalendarDate('2026-10-31', 'ru')).toMatch(/^31 /);
     expect(formatCalendarDate('2026-01-01', 'en')).toMatch(/Jan 1, 2026/);
+  });
+});
+
+describe('file size formatting', () => {
+  it('shows whole kilobytes below a megabyte, never zero', () => {
+    expect(formatFileSize(300 * 1024, 'en')).toEqual({ unit: 'kb', value: '300' });
+    expect(formatFileSize(100, 'en')).toEqual({ unit: 'kb', value: '1' });
+  });
+
+  it('shows megabytes with one decimal in the interface language', () => {
+    expect(formatFileSize(1.55 * 1024 * 1024, 'en')).toEqual({ unit: 'mb', value: '1.6' });
+    expect(formatFileSize(1.55 * 1024 * 1024, 'ru')).toEqual({ unit: 'mb', value: '1,6' });
+    expect(formatFileSize(20 * 1024 * 1024, 'ru')).toEqual({ unit: 'mb', value: '20' });
   });
 });
