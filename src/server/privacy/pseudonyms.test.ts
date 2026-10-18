@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { hashDeviceId } from './device-hash';
+import { hashClientIp, hashDeviceId } from './pseudonyms';
 
 const DEVICE_ID = '6f1c2a9e-3b7d-4c8e-9f0a-1b2c3d4e5f60';
 
@@ -25,5 +25,15 @@ describe('hashDeviceId', () => {
     await expect(hashDeviceId(other, 'key-1')).resolves.not.toBe(
       await hashDeviceId(DEVICE_ID, 'key-1')
     );
+  });
+});
+
+describe('hashClientIp', () => {
+  it('gives a pseudonym that differs from a device id hashed the same way', async () => {
+    const ip = await hashClientIp('203.0.113.7', 'key-1');
+
+    expect(ip).toMatch(/^[0-9a-f]{16}$/);
+    await expect(hashClientIp('203.0.113.7', 'key-1')).resolves.toBe(ip);
+    await expect(hashDeviceId('203.0.113.7', 'key-1')).resolves.not.toBe(ip);
   });
 });

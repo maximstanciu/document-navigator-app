@@ -26,7 +26,6 @@ describe('createAnalyzeDeps', () => {
     [{ LLM_PROVIDER: 'gpt-0' }, 'LLM_PROVIDER'],
     [{ LLM_MOCK_FIXTURE: 'receipt' }, 'LLM_MOCK_FIXTURE'],
     [{ LLM_MOCK_DELAY_MS: '1.5s' }, 'LLM_MOCK_DELAY_MS'],
-    [{ MIN_APP_VERSION: 'v2' }, 'MIN_APP_VERSION'],
   ])('fails on a misconfigured %o', (env, name) => {
     expect(() => createAnalyzeDeps(env)).toThrow(name);
   });

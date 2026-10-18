@@ -56,8 +56,11 @@ src/
                        #   OS-level strings such as permission texts (native/, wired in app.json)
   shared/              # pure TS shared by client and server: limits.ts, explanation-locales.ts,
                        #   analysis/ (zod schema, API contract, LLM JSON Schema, synthetic fixtures)
-  server/              # server-only code for API routes: http/ (errors, client headers, multipart),
-                       #   analysis/ (handler, LlmProvider, providers/), testing/ (request and PDF helpers)
+  server/              # server-only code for API routes: server-deps.ts (shared deps from env),
+                       #   http/ (errors, client headers and IP, multipart), analysis/ (handler,
+                       #   LlmProvider, providers/, post-processing), limits/ (daily limits, budget),
+                       #   metrics/ (beta report), store/ (counters: memory, Upstash), logs/, privacy/
+                       #   (pseudonyms), testing/ (request, PDF and deps helpers)
   providers/           # AppProviders (React Query, navigation theme)
   test/                # test helpers (renderWithProviders)
 scripts/eval/          # analysis quality evaluation: synthetic test documents with reference labels

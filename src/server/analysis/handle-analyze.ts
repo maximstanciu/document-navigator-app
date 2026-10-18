@@ -2,25 +2,19 @@ import type { AnalyzeResponse } from '@/shared/analysis/contract';
 import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
 import { ApiFailure } from '../http/api-failure';
-import type { AppVersion } from '../http/app-version';
 import { readClientHeaders } from '../http/client-headers';
-import { redactError, type ServerLog } from '../logs/server-log';
-import { hashDeviceId } from '../privacy/device-hash';
+import { readClientIp } from '../http/client-ip';
+import type { UsageSession } from '../limits/analysis-usage';
+import type { EndCode } from '../limits/usage-keys';
+import { redactError } from '../logs/server-log';
+import { hashClientIp, hashDeviceId } from '../privacy/pseudonyms';
+import type { ServerDeps } from '../server-deps';
 import { finalizeAnalysis } from './finalize-analysis';
 import { inspectPdf } from './inspect-pdf';
 import type { LlmProvider } from './llm-provider';
 import { readAnalyzeUpload, type AnalyzeUpload } from './read-analyze-upload';
 
-export type AnalyzeDeps = {
-  provider: LlmProvider;
-  /** Older apps get `426 upgrade_required`; `null` serves every version. */
-  minAppVersion: AppVersion | null;
-  /** HMAC key that turns device ids into the pseudonyms in logs. */
-  deviceHashKey: string;
-  log: ServerLog;
-  /** Milliseconds. On Workers the clock stands still during computation and moves across I/O. */
-  now: () => number;
-};
+export type AnalyzeDeps = ServerDeps & { provider: LlmProvider };
 
 /**
  * What `analyze.end` reports besides the outcome: metadata only, never content (SPEC §7.1). Filled
@@ -41,6 +35,8 @@ type AnalyzeFacts = {
   deadlines: number | null;
   fraudSignals: number | null;
   readable: boolean | null;
+  /** Set once the limits are checked; the end of the request is counted against it. */
+  usage: UsageSession | null;
 };
 
 /**
@@ -70,8 +66,10 @@ export async function handleAnalyze(request: Request, deps: AnalyzeDeps): Promis
     deadlines: null,
     fraudSignals: null,
     readable: null,
+    usage: null,
   };
-  const logEnd = (status: number, code: string, error: string | null = null) =>
+  const end = async (status: number, code: EndCode, error: string | null = null) => {
+    const { usage, ...logged } = facts;
     deps.log({
       event: 'analyze.end',
       requestId,
@@ -79,22 +77,31 @@ export async function handleAnalyze(request: Request, deps: AnalyzeDeps): Promis
       code,
       error,
       ms: deps.now() - startedAt,
-      ...facts,
+      ...logged,
     });
+    if (usage) {
+      await deps.usage.end(usage, {
+        code,
+        charged: code === 'ok',
+        costUsd: facts.costUsd,
+        hasDeadline: (facts.deadlines ?? 0) > 0,
+      });
+    }
+  };
 
   try {
     const response = await analyze(request, deps, requestId, facts);
-    logEnd(200, 'ok');
+    await end(200, 'ok');
     return response;
   } catch (error) {
     // The client is gone; on Workers this code doesn't even run. No end event either way.
     if (request.signal.aborted) throw error;
     if (error instanceof ApiFailure) {
-      logEnd(error.status, error.code);
+      await end(error.status, error.code);
       return error.toResponse();
     }
     const redacted = redactError(error);
-    logEnd(500, 'internal', redacted.name);
+    await end(500, 'internal', redacted.name);
     throw redacted;
   }
 }
@@ -109,16 +116,26 @@ async function analyze(
   facts.platform = client.platform;
   facts.appVersion = client.appVersion.join('.');
   const declaredBytes = Number(request.headers.get('Content-Length'));
+  const device = await hashDeviceId(client.deviceId, deps.deviceHashKey);
   deps.log({
     event: 'analyze.start',
     requestId,
-    device: await hashDeviceId(client.deviceId, deps.deviceHashKey),
-    platform: facts.platform,
+    device,
+    platform: client.platform,
     appVersion: facts.appVersion,
     bodyBytes: Number.isFinite(declaredBytes) && declaredBytes > 0 ? declaredBytes : null,
   });
 
-  // Limits (task 3.4) go here, before the body is read.
+  // Before the body is read, so a client over its limit doesn't upload 20 MB for nothing.
+  const { session, rejection } = await deps.usage.begin({
+    requestId,
+    device,
+    ip: await hashClientIp(readClientIp(request.headers), deps.deviceHashKey),
+    platform: client.platform,
+  });
+  facts.usage = session;
+  if (rejection) throw rejection;
+
   const upload = await readAnalyzeUpload(request);
   facts.kind = upload.kind;
   facts.bytes = upload.files.reduce((sum, file) => sum + file.bytes.byteLength, 0);

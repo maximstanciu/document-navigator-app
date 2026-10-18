@@ -8,3 +8,6 @@ export const MAX_DOCUMENT_PAGES = 30;
  * can't keep memory within three file sizes (SPEC §7.1, task 3.1).
  */
 export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
+
+/** Analyses a device gets per day, counted in UTC (SPEC §8.3); the server enforces it. */
+export const DAILY_ANALYSES_PER_DEVICE = 10;

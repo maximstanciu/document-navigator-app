@@ -13,22 +13,19 @@ import {
   TEST_URL,
 } from '../testing/analyze-request';
 import type { LogEvent } from '../logs/server-log';
+import { readBetaReport } from '../metrics/beta-report';
+import { StoreUnavailableError } from '../store/counter-store';
+import { testServerDeps, type TestServerDeps } from '../testing/server-deps';
 import { handleAnalyze, type AnalyzeDeps } from './handle-analyze';
 import * as inspectPdfModule from './inspect-pdf';
 import type { LlmAnalyzeInput, LlmProvider } from './llm-provider';
 import { MockLlmProvider } from './providers/mock-llm-provider';
 
+let server: TestServerDeps;
 let events: LogEvent[] = [];
 
 function deps(overrides: Partial<AnalyzeDeps> = {}): AnalyzeDeps {
-  return {
-    provider: new MockLlmProvider(),
-    minAppVersion: null,
-    deviceHashKey: 'test-key',
-    log: (event) => events.push(event),
-    now: Date.now,
-    ...overrides,
-  };
+  return { ...server, provider: new MockLlmProvider(), ...overrides };
 }
 
 /** A provider that records what it got and answers with `result`. */
@@ -57,7 +54,8 @@ async function expectError(response: Response, status: number, code: string) {
 
 describe('handleAnalyze', () => {
   beforeEach(() => {
-    events = [];
+    server = testServerDeps();
+    events = server.events;
     // pdf-lib reports skipped objects of damaged files on the console.
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
@@ -344,7 +342,8 @@ describe('handleAnalyze logs', () => {
   const ofType = (event: string) => events.filter((logged) => logged.event === event);
 
   beforeEach(() => {
-    events = [];
+    server = testServerDeps();
+    events = server.events;
     jest.spyOn(console, 'log').mockImplementation(() => {});
     jest.spyOn(console, 'warn').mockImplementation(() => {});
   });
@@ -496,3 +495,112 @@ function stringsIn(value: unknown): string[] {
   if (value && typeof value === 'object') return Object.values(value).flatMap(stringsIn);
   return [];
 }
+
+describe('handleAnalyze limits (SPEC §8.3)', () => {
+  beforeEach(() => {
+    server = testServerDeps();
+    events = server.events;
+    jest.spyOn(console, 'log').mockImplementation(() => {});
+    jest.spyOn(console, 'warn').mockImplementation(() => {});
+  });
+
+  afterEach(() => jest.restoreAllMocks());
+
+  const fromDevice = (deviceId: string, ip = '203.0.113.7') =>
+    analyzeRequest({ headers: { [API_HEADERS.deviceId]: deviceId, 'X-Real-IP': ip } });
+
+  it('answers 429 with Retry-After once the device used its analyses, before reading the body', async () => {
+    for (let i = 0; i < 10; i++) {
+      expect((await handleAnalyze(analyzeRequest(), deps())).status).toBe(200);
+    }
+    const { provider, calls } = recordingProvider();
+    const request = analyzeRequest();
+
+    const response = await handleAnalyze(request, deps({ provider }));
+
+    await expectError(response, 429, 'rate_limited');
+    expect(response.headers.get('Retry-After')).toBe(String(12 * 60 * 60));
+    expect(request.bodyUsed).toBe(false);
+    expect(calls).toHaveLength(0);
+    expect(events.at(-1)).toMatchObject({ event: 'analyze.end', status: 429, kind: null });
+  });
+
+  it('charges only analyses the device got', async () => {
+    server = testServerDeps({ limits: { devicePerDay: 1 } });
+    const encrypted = { files: [pdf(minimalPdf({ encrypted: true }))] };
+    for (let i = 0; i < 3; i++) {
+      expect((await handleAnalyze(analyzeRequest(encrypted), deps())).status).toBe(422);
+    }
+    const { provider } = recordingProvider(async () => ({ summary: 42 }));
+    expect((await handleAnalyze(analyzeRequest(), deps({ provider }))).status).toBe(502);
+
+    expect((await handleAnalyze(analyzeRequest(), deps())).status).toBe(200);
+    expect((await handleAnalyze(analyzeRequest(), deps())).status).toBe(429);
+  });
+
+  it('limits attempts from one IP address whatever the device id says', async () => {
+    server = testServerDeps({ limits: { ipPerHour: 2 } });
+
+    const statuses = [];
+    for (let i = 0; i < 3; i++) {
+      statuses.push((await handleAnalyze(fromDevice(crypto.randomUUID()), deps())).status);
+    }
+    const otherNetwork = await handleAnalyze(
+      fromDevice(crypto.randomUUID(), '198.51.100.1'),
+      deps()
+    );
+
+    expect(statuses).toEqual([200, 200, 429]);
+    expect(otherNetwork.status).toBe(200);
+  });
+
+  it('answers 503 once the day’s budget is spent', async () => {
+    server = testServerDeps({ limits: { dailyBudgetUsd: 1 } });
+    const provider: LlmProvider = {
+      id: 'pricey',
+      analyze: async () => ({
+        result: validResult(),
+        usage: { inputTokens: 1, outputTokens: 1 },
+        costUsd: 1,
+      }),
+    };
+
+    expect((await handleAnalyze(analyzeRequest(), deps({ provider }))).status).toBe(200);
+    const response = await handleAnalyze(fromDevice(crypto.randomUUID()), deps({ provider }));
+
+    await expectError(response, 503, 'unavailable');
+    expect(response.headers.get('Retry-After')).toBe(String(12 * 60 * 60));
+  });
+
+  it('still analyzes when the counter store is down', async () => {
+    server = testServerDeps({
+      store: {
+        run: async () => {
+          throw new StoreUnavailableError('down');
+        },
+      },
+    });
+    events = server.events;
+
+    const response = await handleAnalyze(analyzeRequest(), deps());
+
+    expect(response.status).toBe(200);
+    expect(events.filter((event) => event.event === 'limits.unavailable')).toHaveLength(2);
+  });
+
+  it('counts the beta metrics of the request', async () => {
+    await handleAnalyze(analyzeRequest(), deps());
+    await handleAnalyze(analyzeRequest({ files: [pdf(minimalPdf({ encrypted: true }))] }), deps());
+
+    const [today] = await readBetaReport(server.store, server.now(), 1);
+
+    expect(today).toMatchObject({
+      started: 2,
+      ended: 2,
+      interrupted: 0,
+      withDeadline: 1,
+      devices: 1,
+      outcomes: expect.objectContaining({ ok: 1, encrypted_pdf: 1 }),
+    });
+  });
+});

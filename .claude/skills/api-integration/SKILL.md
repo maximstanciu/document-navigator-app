@@ -71,7 +71,7 @@ export function useMarkDeadlineDone() {
 
 ## 2. Calling the app's API routes
 
-Only two endpoints exist: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC §7.2). Their client functions live in `features/analysis/api.ts` (and settings for limits).
+The app calls two endpoints: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC §7.2). Their client functions live in `features/analysis/api.ts` (and settings for limits). `GET /api/v1/metrics` is for the team only (bearer `METRICS_TOKEN`), never called from the app.
 
 - Base URL: `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). New public config → `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access. Never secrets in `EXPO_PUBLIC_*`.
 - Request types and the response schema come from `src/shared/`: the zod schema is the single source of truth. Validate the response at the boundary (`analyzeResponseSchema.parse` from `@/shared/analysis/contract`); error codes are `ANALYZE_ERROR_CODES` there.
@@ -99,7 +99,8 @@ export function POST(request: Request) {
 }
 ```
 
-- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes; `createAnalyzeDeps()` (`src/server/analysis/analyze-deps.ts`) builds them from server env vars. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts` (`LLM_MOCK_FIXTURE` picks one, `LLM_MOCK_DELAY_MS` makes it slow).
+- Handlers take their dependencies (provider, counter store, limits, log, clock) as an argument so tests can pass fakes; `createServerDeps()` (`src/server/server-deps.ts`) builds the shared ones from server env vars and `createAnalyzeDeps()` adds the provider. In tests use `testServerDeps()` from `src/server/testing/server-deps.ts`: counters in memory, a clock that moves only with `advance()`, logs in `events`.
+- Limits and beta metrics go through `AnalysisUsage` (`src/server/limits/`): `begin()` before the body is read (429/503 with `Retry-After`), `end()` with the outcome; the device is charged only for a `200`. Counters live in a `CounterStore` (Redis commands; Upstash REST on EAS Hosting, `MemoryCounterStore` otherwise); keys come from `usage-keys.ts` with pseudonyms, never raw ids or IPs. A store failure lets the analysis through and logs `limits.unavailable`. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts` (`LLM_MOCK_FIXTURE` picks one, `LLM_MOCK_DELAY_MS` makes it slow).
 - Check a request with the helpers in `src/server/http/` (`readClientHeaders()`, `readMultipartForm()` with a byte limit) and fail with `throw new ApiFailure(code, message)`; the handler turns it into the SPEC §7.2 body.
 - The provider sends `toLlmJsonSchema()` as its structured-output schema: the model's output without `schemaVersion`, which the server adds. `finalizeAnalysis()` checks the output's shape with `llmAnalysisShapeSchema` (a failure there is worth a retry), then `postProcessAnalysis()` repairs bounds, dates, pages and `deadlineId` links, and the result always passes the strict `analysisResultSchema`.
 - Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
