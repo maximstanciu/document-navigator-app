@@ -41,7 +41,7 @@ src/
     _layout.tsx        # root Stack + AppProviders
     (tabs)/            # tab group (NativeTabs on iOS/Android, custom tab bar on web)
     documents/[id].tsx # thin route: reads params, renders a feature screen
-    api/v1/*+api.ts    # (planned, 3.1) thin API routes: parse request, call a handler in src/server
+    api/v1/*+api.ts    # thin API routes: parse request, call a handler in src/server
   features/<feature>/  # one folder per domain area: capture, documents, analysis, deadlines,
                        #   reminders, onboarding, settings (see the plan's target structure)
     types.ts api.ts queries.ts
@@ -56,7 +56,8 @@ src/
                        #   OS-level strings such as permission texts (native/, wired in app.json)
   shared/              # pure TS shared by client and server: limits.ts, explanation-locales.ts,
                        #   analysis/ (zod schema, API contract, LLM JSON Schema, synthetic fixtures)
-  server/              # (planned, 3.1) server-only code for API routes: handlers, LLM providers, limits
+  server/              # server-only code for API routes: http/ (errors, client headers, multipart),
+                       #   analysis/ (handler, LlmProvider, providers/), testing/ (request and PDF helpers)
   providers/           # AppProviders (React Query, navigation theme)
   test/                # test helpers (renderWithProviders)
 scripts/eval/          # analysis quality evaluation: synthetic test documents with reference labels
@@ -85,7 +86,7 @@ scripts/eval/          # analysis quality evaluation: synthetic test documents w
 Tests live next to the code as `*.test.ts(x)` (never under `src/app/`). Render data-driven UI with `renderWithProviders` from `@/test/render`; test navigation with `renderRouter` from `expo-router/testing-library`.
 
 - Pure logic (date handling, `planReminders`, response post-processing, re-analysis merge) gets plain unit tests — that's where most edge cases are covered.
-- API handlers are tested in `src/server/` by calling them with a `Request` and asserting on the `Response`, with `MockLlmProvider` instead of a real model.
+- API handlers are tested in `src/server/` by calling them with a `Request` and asserting on the `Response`, with `MockLlmProvider` instead of a real model (`/** @jest-environment node */`; request and PDF builders in `src/server/testing/`, since server code can't import `@/test`).
 - Repositories run on real SQLite in memory in Jest (`installTestRepositories()` from `@/test/sqlite`, Node's built-in `node:sqlite`); native modules are replaced at the adapter boundary (mocked adapter), not deep inside library internals.
 - Native flows that Jest can't reach (scanner, notifications, calendar) are covered by the manual checklist in `docs/smoke-test.md` (task 4.7).
 

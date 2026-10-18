@@ -99,10 +99,11 @@ export function POST(request: Request) {
 }
 ```
 
-- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts`.
+- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes; `createAnalyzeDeps()` (`src/server/analysis/analyze-deps.ts`) builds them from server env vars. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts` (`LLM_MOCK_FIXTURE` picks one, `LLM_MOCK_DELAY_MS` makes it slow).
+- Check a request with the helpers in `src/server/http/` (`readClientHeaders()`, `readMultipartForm()` with a byte limit) and fail with `throw new ApiFailure(code, message)`; the handler turns it into the SPEC §7.2 body.
 - The provider sends `toLlmJsonSchema()` as its structured-output schema: the model's output without `schemaVersion`, which the server adds. Post-processing (trimming, date range, `deadlineId` links) runs before the strict `analysisResultSchema`.
 - Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
-- Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**. Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
+- Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**, and on the Free plan 10 ms CPU per request, enforced after a burst of heavy requests (`504 CPU time limit exceeded`, re-measured in task 3.1). Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
 - Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.
 - Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**`; server code may import only `src/server`, `src/shared` and `expo-server` (ESLint enforces both). `npm run check:bundle` fails if an `LLM_*` name reaches a client bundle.
 - Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1).
@@ -111,7 +112,7 @@ export function POST(request: Request) {
 
 - Feature data and screens: `await installTestRepositories()` from `@/test/sqlite` (real SQLite in memory, installed as `getRepositories()`), seed through the repositories, render with `renderWithProviders`; `setRepositories(null)` in `afterEach`. Don't mock React Query or SQLite.
 - API client functions: `jest.spyOn(globalThis, 'fetch')` and assert URL, method, headers and body; cover every error code the UI distinguishes (`src/lib/api/client.test.ts` shows the pattern).
-- Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. If the Jest environment lacks a Fetch API global you need, add `/** @jest-environment node */` at the top of the server test file.
+- Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. Server tests start with `/** @jest-environment node */` and build requests and PDFs with `src/server/testing/analyze-request.ts` (server code can't import `@/test`). Jest's stream globals come from another realm than Node's `fetch`, so `pipeThrough()` on a request body fails there: wrap the reader in a plain `ReadableStream` instead.
 - Pure post-processing (dates, `deadlineId` links, trimming) gets plain unit tests.
 
 Then run the `verify` skill.

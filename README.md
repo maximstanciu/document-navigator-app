@@ -30,7 +30,7 @@ src/
   components/   общий UI (ui/ — примитивы)
   lib/          инфраструктура клиента: env, api-клиент, query-клиент, db/ (SQLite), files/ (страницы), i18n/ (ru/en)
   shared/       чистый TS для клиента и сервера: zod-схема анализа, контракт API, фикстуры, лимиты
-  server/       код API routes: обработчики, провайдеры LLM, лимиты (этап 3)
+  server/       код API routes: обработчики, провайдеры LLM, лимиты (только для src/app/api)
   constants/ hooks/ providers/ test/
 docs/           спецификация, план, отчёты спайков
 .claude/        скиллы и настройки Claude Code
