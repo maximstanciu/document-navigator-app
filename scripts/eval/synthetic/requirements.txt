@@ -1,0 +1,6 @@
+cryptography==50.0.2
+pillow==13.0.0
+pillow_heif==1.8.1
+pypdf==6.21.1
+pypdfium2==5.14.0
+reportlab==5.0.1

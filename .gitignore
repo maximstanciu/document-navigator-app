@@ -39,6 +39,10 @@ yarn-error.*
 # test coverage
 coverage/
 
+# analysis evaluation: Python environment and generated test documents
+scripts/eval/.venv/
+scripts/eval/out/
+
 
 # generated native folders
 /ios

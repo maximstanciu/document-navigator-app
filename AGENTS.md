@@ -59,7 +59,8 @@ src/
   server/              # (planned, 3.1) server-only code for API routes: handlers, LLM providers, limits
   providers/           # AppProviders (React Query, navigation theme)
   test/                # test helpers (renderWithProviders)
-scripts/eval/          # (planned, 0.3/3.7) analysis quality evaluation
+scripts/eval/          # analysis quality evaluation: synthetic test documents with reference labels
+                       #   (synthetic/, Python, task 0.6); the evaluation runner is (planned, 0.3/3.7)
 ```
 
 ## Conventions
