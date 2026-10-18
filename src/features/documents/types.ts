@@ -8,4 +8,4 @@ export type DocumentSummary = Pick<
 
 /** What the document screen shows until the full analysis blocks arrive in task 4.2. */
 export type DocumentDetail = DocumentSummary &
-  Pick<DocumentRecord, 'documentDate' | 'analyzedAt' | 'mimeType'>;
+  Pick<DocumentRecord, 'documentDate' | 'analyzedAt' | 'mimeType' | 'errorCode'>;

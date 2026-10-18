@@ -9,6 +9,16 @@ export function formatTimestampDate(isoTimestamp: string, language: string): str
   }).format(new Date(isoTimestamp));
 }
 
+/** A moment with its time of day in the device's time zone, e.g. when a limit resets (ANL-9). */
+export function formatTimestampDateTime(isoTimestamp: string, language: string): string {
+  return new Intl.DateTimeFormat(language, {
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(new Date(isoTimestamp));
+}
+
 /**
  * A calendar date (YYYY-MM-DD, no time zone), e.g. a document date or a deadline. Formatted in UTC so
  * it never shifts by a day in time zones west of UTC.

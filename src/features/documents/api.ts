@@ -34,5 +34,6 @@ export async function getDocument(id: string): Promise<DocumentDetail | null> {
     documentDate: document.documentDate,
     analyzedAt: document.analyzedAt,
     mimeType: document.mimeType,
+    errorCode: document.errorCode,
   };
 }

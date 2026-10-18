@@ -93,6 +93,37 @@ export const en = {
     analyze: 'Analyze the document',
     saveFailed: "Couldn't save the document. Try again.",
   },
+  analysis: {
+    draft: "This document hasn't been analyzed yet.",
+    start: 'Analyze the document',
+    progress: 'Reading the document…',
+    keepOpen:
+      'Keep the app open until the analysis is done: if you leave it or the screen turns off, the analysis stops.',
+    rateLimitedUntil: 'The analysis limit is reached. You can try again after {{time}}.',
+    error: {
+      offline: "No internet connection. The document is saved: analyze it once you're online.",
+      network:
+        'The connection to the server was lost. Check the internet and keep the app open until the analysis is done.',
+      timeout: "The server didn't answer in time. Try again.",
+      interrupted:
+        'The analysis stopped before it finished, for example because the app was closed. Try again.',
+      files_missing:
+        "This document's pages are no longer on the device, so it can't be analyzed. Add the document again.",
+      invalid_request: "The server couldn't accept the document. Add it again.",
+      too_large_one:
+        'The document is too large to analyze: it can have at most {{count}} page and {{limit}} MB.',
+      too_large_other:
+        'The document is too large to analyze: it can have at most {{count}} pages and {{limit}} MB.',
+      encrypted_pdf:
+        'The file is password-protected. Open it, save a copy without the password and add that copy.',
+      invalid_pdf:
+        "The PDF is damaged and can't be read. Save it again or scan the paper document.",
+      upgrade_required: 'This version of the app is too old to analyze documents. Update the app.',
+      rate_limited: 'The analysis limit is reached. Try again later.',
+      analysis_failed: "The analysis didn't return a usable result. Try again.",
+      unavailable: 'The analysis service is unavailable right now. Try again later.',
+    },
+  },
   settings: {
     title: 'Settings',
     language: 'Language',

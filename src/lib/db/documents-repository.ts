@@ -1,4 +1,6 @@
+import { insertAction, type NewAction } from './actions-repository';
 import type { SqlDatabase } from './database';
+import { insertDeadline, type NewDeadline } from './deadlines-repository';
 import type { NewPage } from './pages-repository';
 import { buildSearchText, normalizeForSearch, searchablePartsOfAnalysis } from './search-text';
 import {
@@ -114,6 +116,19 @@ const PATCH_COLUMNS = {
 /** What the caller still has to clean up outside the database after a delete (STO-6). */
 export type RemovedDocument = { pagePaths: string[]; notificationIds: string[] };
 
+/** A finished analysis with the deadlines and actions made from it, ready to store. */
+export type AnalysisOutcome = {
+  analysis: NonNullable<DocumentRecord['analysis']>;
+  /** What the server counted (D-4). */
+  pageCount: number;
+  analysisLocale: string;
+  deadlines: readonly NewDeadline[];
+  actions: readonly NewAction[];
+};
+
+/** Statuses an analysis can start from (SPEC §6.3). Re-analysis of `ready` arrives with ANL-8. */
+const ANALYZABLE = `('draft', 'failed')`;
+
 export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
   async function get(id: string): Promise<DocumentRecord | null> {
     const row = await db.getFirstAsync<DocumentRow>(
@@ -205,6 +220,83 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         );
         return toRecord(updated as DocumentRow);
       });
+    },
+
+    /**
+     * Moves a draft or a failed document to `analyzing` and clears the previous error (SPEC §6.3).
+     * `false` when the document is gone or in another status, e.g. already being analyzed: the
+     * check and the change are one statement, so two taps can't start two analyses.
+     */
+    async startAnalysis(id: string): Promise<boolean> {
+      const result = await db.runAsync(
+        `UPDATE documents SET status = 'analyzing', error_code = NULL, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL AND status IN ${ANALYZABLE}`,
+        [now().toISOString(), id]
+      );
+      return result.changes > 0;
+    },
+
+    /**
+     * Stores a finished analysis (ANL-2): the document takes its title, type, sender and date from
+     * it and becomes `ready`, and its deadlines and actions are inserted, in one transaction.
+     * Only a document that is still `analyzing` is written: `false` when it was deleted meanwhile.
+     */
+    async saveAnalysis(id: string, outcome: AnalysisOutcome): Promise<boolean> {
+      const timestamp = now().toISOString();
+      return db.transaction(async (tx) => {
+        const exists = await tx.getFirstAsync<{ id: string }>(
+          `SELECT id FROM documents WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
+          [id]
+        );
+        if (!exists) return false;
+        const { analysis } = outcome;
+        const named = { title: analysis.title, senderName: analysis.sender?.name ?? null };
+        await tx.runAsync(
+          `UPDATE documents SET title = ?, document_type = ?, sender_name = ?, document_date = ?,
+             status = 'ready', error_code = NULL, page_count = ?, analysis = ?, analysis_locale = ?,
+             analyzed_at = ?, search_text = ?, updated_at = ?
+           WHERE id = ?`,
+          [
+            named.title,
+            analysis.documentType,
+            named.senderName,
+            analysis.documentDate,
+            outcome.pageCount,
+            toJson(analysis),
+            outcome.analysisLocale,
+            timestamp,
+            searchTextOf({ ...named, analysis }),
+            timestamp,
+            id,
+          ]
+        );
+        for (const deadline of outcome.deadlines) await insertDeadline(tx, deadline, timestamp);
+        for (const action of outcome.actions) await insertAction(tx, action, timestamp);
+        return true;
+      });
+    },
+
+    /** Marks an analysis in progress as failed with `code` (SPEC §6.3). `false` if it isn't running. */
+    async failAnalysis(id: string, code: NonNullable<DocumentRecord['errorCode']>) {
+      const result = await db.runAsync(
+        `UPDATE documents SET status = 'failed', error_code = ?, updated_at = ?
+         WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
+        [code, now().toISOString(), id]
+      );
+      return result.changes > 0;
+    },
+
+    /**
+     * At startup nothing can be analyzing: such a document lost its request with the previous run of
+     * the app, so it becomes `failed` with `interrupted` (ANL-4). Returns how many there were.
+     */
+    async failInterruptedAnalyses(): Promise<number> {
+      const result = await db.runAsync(
+        `UPDATE documents SET status = 'failed', error_code = 'interrupted', updated_at = ?
+         WHERE deleted_at IS NULL AND status = 'analyzing'`,
+        [now().toISOString()]
+      );
+      return result.changes;
     },
 
     /**

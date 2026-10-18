@@ -1,4 +1,4 @@
-import type { SqlDatabase, SqlValue } from './database';
+import type { SqlDatabase, SqlExecutor, SqlValue } from './database';
 import { buildAssignments, fromJson, placeholders, toJson, type Clock } from './sql';
 import type { DeadlineRecord, DeadlineStatus } from './types';
 
@@ -85,6 +85,28 @@ const PATCH_COLUMNS = {
 
 export type DeadlineFilter = { documentId?: string; statuses?: readonly DeadlineStatus[] };
 
+/** Inserts one deadline through `tx`, so other repositories can add deadlines inside their transaction. */
+export async function insertDeadline(tx: SqlExecutor, deadline: NewDeadline, timestamp: string) {
+  await tx.runAsync(
+    `INSERT INTO deadlines (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+    [
+      deadline.id,
+      deadline.documentId,
+      deadline.kind,
+      deadline.description,
+      deadline.dueDate,
+      deadline.dueTime ?? null,
+      deadline.dateSource,
+      deadline.originalDate ?? null,
+      deadline.confidence,
+      deadline.status ?? 'open',
+      toJson(deadline.reminderOffsetsDays ?? null),
+      timestamp,
+      timestamp,
+    ]
+  );
+}
+
 export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
   async function get(id: string): Promise<DeadlineRecord | null> {
     const row = await db.getFirstAsync<DeadlineRow>(
@@ -101,26 +123,7 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
       if (deadlines.length === 0) return;
       const timestamp = now().toISOString();
       await db.transaction(async (tx) => {
-        for (const deadline of deadlines) {
-          await tx.runAsync(
-            `INSERT INTO deadlines (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-            [
-              deadline.id,
-              deadline.documentId,
-              deadline.kind,
-              deadline.description,
-              deadline.dueDate,
-              deadline.dueTime ?? null,
-              deadline.dateSource,
-              deadline.originalDate ?? null,
-              deadline.confidence,
-              deadline.status ?? 'open',
-              toJson(deadline.reminderOffsetsDays ?? null),
-              timestamp,
-              timestamp,
-            ]
-          );
-        }
+        for (const deadline of deadlines) await insertDeadline(tx, deadline, timestamp);
       });
     },
 

@@ -7,6 +7,7 @@ import CaptureLayout from '@/app/capture/_layout';
 import ReviewRoute from '@/app/capture/review';
 import DocumentRoute from '@/app/documents/[id]';
 import { Button } from '@/components/ui/button';
+import { analyzeDocument } from '@/features/analysis/api';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
 import { fakeFileSystem } from '@/test/fake-file-system';
@@ -21,6 +22,8 @@ import { scanDocument } from '../scanner';
 jest.mock('../scanner', () => ({ scanDocument: jest.fn(), SCANNER_SUPPORTED: true }));
 jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
 jest.mock('../normalize-image', () => ({ normalizeImage: jest.fn() }));
+// The analysis itself is tested in features/analysis; here it only has to be started.
+jest.mock('@/features/analysis/api', () => ({ analyzeDocument: jest.fn(async () => {}) }));
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));
 let mockUuidCounter = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid-${++mockUuidCounter}` }));
@@ -29,6 +32,7 @@ const scan = jest.mocked(scanDocument);
 const photos = jest.mocked(pickPhotos);
 const pickedFile = jest.mocked(pickFile);
 const normalize = jest.mocked(normalizeImage);
+const analyze = jest.mocked(analyzeDocument);
 
 const MB = 1024 * 1024;
 
@@ -96,6 +100,7 @@ afterEach(() => {
   photos.mockReset();
   pickedFile.mockReset();
   normalize.mockReset();
+  analyze.mockClear();
 });
 
 describe('CaptureReviewScreen (CAP-5)', () => {
@@ -155,7 +160,7 @@ describe('CaptureReviewScreen (CAP-5)', () => {
     expect(screen.getByText('2 pages')).toBeOnTheScreen();
   });
 
-  it('saves a draft and opens it in place of the capture modal (SPEC §6.3)', async () => {
+  it('saves a draft, starts its analysis and opens it in place of the capture modal (SPEC §6.3)', async () => {
     scan.mockResolvedValue({ status: 'scanned', pages: ['file:///p1.jpg', 'file:///p2.jpg'] });
     const user = await captureFrom('Scan');
 
@@ -163,6 +168,8 @@ describe('CaptureReviewScreen (CAP-5)', () => {
 
     expect(await screen.findByText('Not analyzed')).toBeOnTheScreen();
     expect(screen).toHavePathname('/documents/uuid-1');
+    expect(analyze).toHaveBeenCalledTimes(1);
+    expect(analyze).toHaveBeenCalledWith('uuid-1', expect.any(Function));
     expect(await repositories.documents.get('uuid-1')).toMatchObject({
       status: 'draft',
       source: 'scan',
@@ -206,6 +213,7 @@ describe('CaptureReviewScreen (CAP-5)', () => {
       "Couldn't save the document. Try again."
     );
     expect(screen).toHavePathname('/capture/review');
+    expect(analyzeDocument).not.toHaveBeenCalled();
     await user.press(analyze);
     expect(await screen.findByText('Not analyzed')).toBeOnTheScreen();
   });

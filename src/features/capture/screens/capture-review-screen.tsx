@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { useAnalyzeDocument } from '@/features/analysis/queries';
 import type { DocumentSource } from '@/lib/db/types';
 import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
@@ -26,7 +27,8 @@ const MORE_PAGES_FROM: Partial<Record<DocumentSource, 'scan' | 'gallery'>> = {
 
 /**
  * The pages of the document being added, or the PDF file (CAP-5): remove a page, add more, then
- * «Analyze the document» saves a draft (SPEC §6.3) and opens it in place of the capture modal.
+ * «Analyze the document» saves a draft (SPEC §6.3), starts its analysis (ANL-1) and opens it in
+ * place of the capture modal. The analysis goes on there, or wherever the person goes next (ANL-3).
  */
 export function CaptureReviewScreen() {
   const { t } = useTranslation();
@@ -35,6 +37,7 @@ export function CaptureReviewScreen() {
   const { source, pages } = session;
   const { notice, progress, capture } = useCapturePages();
   const saveDraft = useSaveDraft();
+  const analysis = useAnalyzeDocument();
 
   const pdf = pages.find((page) => page.mimeType === 'application/pdf');
   const busy = progress !== null || saveDraft.isPending;
@@ -51,8 +54,11 @@ export function CaptureReviewScreen() {
     saveDraft.mutate(
       { source, pages },
       {
-        // The document replaces the modal, so «Back» from it leads to the documents list.
-        onSuccess: (id) => router.replace({ pathname: '/documents/[id]', params: { id } }),
+        onSuccess: (id) => {
+          analysis.mutate(id);
+          // The document replaces the modal, so «Back» from it leads to the documents list.
+          router.replace({ pathname: '/documents/[id]', params: { id } });
+        },
       }
     );
   }

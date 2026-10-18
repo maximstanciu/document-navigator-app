@@ -18,6 +18,9 @@ export async function openAppDatabase(): Promise<SqlDatabase> {
   await db.execAsync('PRAGMA foreign_keys = ON');
   await migrate(db);
   await purgeTombstones(db, new Date(Date.now() - TOMBSTONE_RETENTION_DAYS * 24 * 60 * 60 * 1000));
-  setRepositories(createRepositories(db));
+  const repositories = createRepositories(db);
+  // An analysis that was running when the app was closed has lost its request (ANL-4).
+  await repositories.documents.failInterruptedAnalyses();
+  setRepositories(repositories);
   return db;
 }

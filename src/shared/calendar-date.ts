@@ -37,3 +37,8 @@ export function addYears(date: string, years: number): string {
   const target = year + years;
   return format(target, month, Math.min(day, daysInMonth(target, month)));
 }
+
+/** The calendar date of `moment` in the runtime's time zone: on the client, the device's "today". */
+export function localCalendarDate(moment: Date): string {
+  return format(moment.getFullYear(), moment.getMonth() + 1, moment.getDate());
+}

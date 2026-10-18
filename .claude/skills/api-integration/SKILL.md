@@ -75,9 +75,10 @@ The app calls two endpoints: `POST /api/v1/analyze` and `GET /api/v1/limits` (SP
 
 - Base URL: `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). New public config → `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access. Never secrets in `EXPO_PUBLIC_*`.
 - Request types and the response schema come from `src/shared/`: the zod schema is the single source of truth. Validate the response at the boundary (`analyzeResponseSchema.parse` from `@/shared/analysis/contract`); error codes are `ANALYZE_ERROR_CODES` there.
-- Headers on every call: `X-Device-Id`, `X-App-Version`, `X-Platform` (SPEC §7.2). There are no accounts in MVP; `setAccessTokenGetter` stays unused.
-- `analyzeDocument` is a mutation **without retries**, `multipart/form-data`, 90 s client timeout (task 4.1 extends `apiClient` for `FormData` and timeouts). Background behavior follows D-1 = A (ANL-3).
-- Errors: server errors are `{ error: { code, message } }` → `ApiError`. Network `TypeError`, timeout, offline (check `expo-network` first, ANL-10) and app restart mid-analysis map to `ClientErrorCode`. Do the mapping **once**, in `features/analysis`, not per screen. A `5xx` without a JSON body (isolate crash, spike 0.2) is `unavailable`.
+- Headers on every call: `X-Device-Id`, `X-App-Version`, `X-Platform` (SPEC §7.2). `apiClient` adds them itself (`src/lib/api/client-headers.ts`). There are no accounts in MVP; `setAccessTokenGetter` stays unused.
+- `apiClient` sends a `FormData` body as it is (multipart, no JSON `Content-Type`) and takes `timeoutMs`, which aborts the request with `ApiTimeoutError`; `ApiError` keeps the response `headers` (`Retry-After`).
+- `useAnalyzeDocument()` (`features/analysis/queries.ts`) is a mutation **without retries** and with `networkMode: 'always'`, `multipart/form-data`, 90 s client timeout. `analyzeDocument()` in `features/analysis/api.ts` owns the document's way through `analyzing` to `ready` or `failed`, with the screen kept on meanwhile (D-1 = A, ANL-3). Files go up through the `upload-file` adapter: `{ uri, name, type }` on native, a Blob on web.
+- Errors: server errors are `{ error: { code, message } }` → `ApiError`. Network `TypeError`, timeout, offline (`isOnline()` from `src/lib/network.ts` first, ANL-10), missing page files and app restart mid-analysis map to `ClientErrorCode`. The mapping happens **once**, in `features/analysis/errors.ts` (`toAnalysisError`), not per screen. A `5xx` without a JSON body (isolate crash, spike 0.2) is `unavailable`.
 - Never log or send to crash reporting the document or its analysis — metadata only.
 
 ## 3. Writing an API route (server side)

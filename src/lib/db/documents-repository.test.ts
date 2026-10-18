@@ -132,6 +132,128 @@ describe('documents repository', () => {
     });
   });
 
+  describe('analysis status (SPEC §6.3)', () => {
+    const invoice = ANALYSIS_FIXTURES.invoice;
+    const outcome = (documentId: string) => ({
+      analysis: invoice,
+      pageCount: 2,
+      analysisLocale: 'ru',
+      deadlines: [
+        {
+          id: 'dl-1',
+          documentId,
+          kind: 'payment' as const,
+          description: 'Оплатить счёт',
+          dueDate: '2026-10-31',
+          dateSource: 'explicit' as const,
+          confidence: 'high' as const,
+        },
+      ],
+      actions: [
+        {
+          id: 'ac-1',
+          documentId,
+          description: 'Оплатить 84,20 €',
+          priority: 'high' as const,
+          deadlineId: 'dl-1',
+        },
+      ],
+    });
+
+    it('starts an analysis of a draft once, and of a failed document again', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+
+      expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
+      expect(await repos.documents.startAnalysis('doc-1')).toBe(false);
+      expect(await repos.documents.failAnalysis('doc-1', 'network')).toBe(true);
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        status: 'failed',
+        errorCode: 'network',
+      });
+
+      expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        status: 'analyzing',
+        errorCode: null,
+      });
+    });
+
+    it('does not start an analysis of a ready, deleted or missing document', async () => {
+      await repos.documents.create({ ...newDocument('ready'), status: 'ready' });
+      await repos.documents.create(newDocument('deleted'));
+      await repos.documents.remove('deleted');
+
+      expect(await repos.documents.startAnalysis('ready')).toBe(false);
+      expect(await repos.documents.startAnalysis('deleted')).toBe(false);
+      expect(await repos.documents.startAnalysis('missing')).toBe(false);
+    });
+
+    it('stores the analysis with its deadlines and actions and makes the document ready', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1');
+      clock.advance(30_000);
+
+      expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1'))).toBe(true);
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        title: invoice.title,
+        documentType: 'invoice',
+        senderName: 'Stadtwerke Musterstadt GmbH',
+        documentDate: '2026-10-03',
+        status: 'ready',
+        errorCode: null,
+        pageCount: 2,
+        analysis: invoice,
+        analysisLocale: 'ru',
+        analyzedAt: '2026-10-17T09:00:30.000Z',
+      });
+      expect((await repos.documents.search('stadtwerke')).map((d) => d.id)).toEqual(['doc-1']);
+      expect(await repos.deadlines.list({ documentId: 'doc-1' })).toMatchObject([
+        { id: 'dl-1', status: 'open', reminderOffsetsDays: null, dueTime: null },
+      ]);
+      expect(await repos.actions.listByDocument('doc-1')).toMatchObject([
+        { id: 'ac-1', deadlineId: 'dl-1', done: false },
+      ]);
+    });
+
+    it('stores nothing for a document deleted while it was analyzed', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1');
+      await repos.documents.remove('doc-1');
+
+      expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1'))).toBe(false);
+      expect(await repos.documents.failAnalysis('doc-1', 'network')).toBe(false);
+      expect(await repos.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
+    });
+
+    it('writes neither the document nor any deadline when one record can not be stored', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1');
+      const broken = outcome('doc-1');
+      // The action points to a deadline that doesn't exist: the foreign key rejects it.
+      broken.actions[0] = { ...broken.actions[0], deadlineId: 'missing-deadline' };
+
+      await expect(repos.documents.saveAnalysis('doc-1', broken)).rejects.toThrow();
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({ status: 'analyzing' });
+      expect(await repos.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
+    });
+
+    it('fails analyses that were running when the app was closed as interrupted (ANL-4)', async () => {
+      await repos.documents.create(newDocument('running'));
+      await repos.documents.startAnalysis('running');
+      await repos.documents.create(newDocument('draft'));
+
+      expect(await repos.documents.failInterruptedAnalyses()).toBe(1);
+
+      expect(await repos.documents.get('running')).toMatchObject({
+        status: 'failed',
+        errorCode: 'interrupted',
+      });
+      expect(await repos.documents.get('draft')).toMatchObject({ status: 'draft' });
+    });
+  });
+
   describe('remove (STO-6)', () => {
     beforeEach(async () => {
       await repos.documents.create(newDocument('doc-1', 'Договор аренды'));

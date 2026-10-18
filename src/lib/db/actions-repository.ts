@@ -1,4 +1,4 @@
-import type { SqlDatabase } from './database';
+import type { SqlDatabase, SqlExecutor } from './database';
 import { buildAssignments, toFlag, type Clock } from './sql';
 import type { ActionRecord } from './types';
 
@@ -45,6 +45,20 @@ const PATCH_COLUMNS = {
   done: { column: 'done', toSql: (value: boolean | null) => toFlag(Boolean(value)) },
 } as const;
 
+/** Inserts one action through `tx`, so other repositories can add actions inside their transaction. */
+export async function insertAction(tx: SqlExecutor, action: NewAction, timestamp: string) {
+  await tx.runAsync(`INSERT INTO actions (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`, [
+    action.id,
+    action.documentId,
+    action.deadlineId ?? null,
+    action.description,
+    action.priority,
+    toFlag(action.done ?? false),
+    timestamp,
+    timestamp,
+  ]);
+}
+
 export function createActionsRepository(db: SqlDatabase, now: Clock) {
   async function get(id: string): Promise<ActionRecord | null> {
     const row = await db.getFirstAsync<ActionRow>(
@@ -61,21 +75,7 @@ export function createActionsRepository(db: SqlDatabase, now: Clock) {
       if (actions.length === 0) return;
       const timestamp = now().toISOString();
       await db.transaction(async (tx) => {
-        for (const action of actions) {
-          await tx.runAsync(
-            `INSERT INTO actions (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
-            [
-              action.id,
-              action.documentId,
-              action.deadlineId ?? null,
-              action.description,
-              action.priority,
-              toFlag(action.done ?? false),
-              timestamp,
-              timestamp,
-            ]
-          );
-        }
+        for (const action of actions) await insertAction(tx, action, timestamp);
       });
     },
 

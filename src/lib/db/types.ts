@@ -10,7 +10,7 @@ export type DocumentSource = 'scan' | 'gallery' | 'file';
 export type DocumentMimeType = 'application/pdf' | 'image/jpeg';
 
 /** Errors the client records without a server response (SPEC §7.2). */
-export type ClientErrorCode = 'interrupted' | 'network' | 'timeout' | 'offline';
+export type ClientErrorCode = 'interrupted' | 'network' | 'timeout' | 'offline' | 'files_missing';
 
 export type DocumentRecord = {
   id: string;

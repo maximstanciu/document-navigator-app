@@ -7,8 +7,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { AnalysisStatusPanel } from '@/features/analysis/components/analysis-status-panel';
 import { useTheme } from '@/hooks/use-theme';
-
 import { formatCalendarDate, formatTimestampDate } from '@/lib/i18n/format';
 
 import { displayTitle, formatPageCount, formatStatus } from '../format';
@@ -25,7 +25,10 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-/** Basic document facts from SQLite; the analysis blocks (DET-1…DET-10) arrive in task 4.2. */
+/**
+ * Basic document facts from SQLite and where its analysis stands; the analysis blocks
+ * (DET-1…DET-10) arrive in task 4.2.
+ */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
@@ -54,6 +57,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       <ThemedText type="subtitle" role="heading">
         {title}
       </ThemedText>
+      <AnalysisStatusPanel document={data} />
       <ThemedView style={styles.rows}>
         <InfoRow label={t('documents.field.status')} value={formatStatus(data.status, t)} />
         {data.senderName && <InfoRow label={t('documents.field.from')} value={data.senderName} />}
