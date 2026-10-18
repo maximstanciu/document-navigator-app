@@ -20,12 +20,12 @@ Both `documents` screens read local data through `documentQueries` and handle lo
 
 ## 1. Pick the route file
 
-| Want                           | File                                                                                                                                                  |
-| ------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Screen pushed over the tabs    | `src/app/<feature>/<name>.tsx` or `src/app/<feature>/[id].tsx`                                                                                        |
-| New tab                        | `src/app/(tabs)/<name>.tsx` **and** a trigger in both `app-tabs.tsx` and `app-tabs.web.tsx`                                                           |
-| Modal                          | `src/app/<name>.tsx` + `<Stack.Screen name="<name>" options={{ presentation: 'modal' }} />` in `src/app/_layout.tsx` (e.g. `capture/index`, task 2.1) |
-| Nested flow with its own stack | `src/app/<group>/_layout.tsx` exporting a `<Stack />`                                                                                                 |
+| Want                           | File                                                                                                                                                                                                                                                          |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Screen pushed over the tabs    | `src/app/<feature>/<name>.tsx` or `src/app/<feature>/[id].tsx`                                                                                                                                                                                                |
+| New tab                        | `src/app/(tabs)/<name>.tsx` **and** a trigger in both `app-tabs.tsx` and `app-tabs.web.tsx`                                                                                                                                                                   |
+| Modal                          | `src/app/<name>.tsx` + `<Stack.Screen name="<name>" options={{ presentation: 'modal' }} />` in `src/app/_layout.tsx`; a multi-screen modal flow is a group with its own stack, like `capture/` (`_layout.tsx` + `index.tsx`, presented with `name="capture"`) |
+| Nested flow with its own stack | `src/app/<group>/_layout.tsx` exporting a `<Stack />`                                                                                                                                                                                                         |
 
 File names are kebab-case. `index.tsx` is the folder's default route. `(group)` folders don't appear in the URL.
 

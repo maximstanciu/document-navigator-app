@@ -5,6 +5,7 @@ export const ru = {
     loading: 'Загрузка',
     errorTitle: 'Что-то пошло не так',
     retry: 'Повторить',
+    cancel: 'Отмена',
   },
   app: {
     databaseError: 'Не удалось открыть данные приложения',
@@ -20,6 +21,8 @@ export const ru = {
   },
   documents: {
     title: 'Документы',
+    add: 'Добавить',
+    addDocument: 'Добавить документ',
     loadingList: 'Загружаем документы',
     loadingOne: 'Загружаем документ',
     emptyTitle: 'Документов пока нет',
@@ -48,6 +51,19 @@ export const ru = {
     kind: {
       pdf: 'PDF',
       image: 'Фото или скан',
+    },
+  },
+  capture: {
+    title: 'Добавить документ',
+    source: {
+      scan: 'Сканировать',
+      gallery: 'Фото из галереи',
+      file: 'Файл',
+    },
+    sourceHint: {
+      scan: 'Камера сама найдёт края листа и выровняет страницы',
+      gallery: 'Одно или несколько фото — страницы одного документа',
+      file: 'PDF или изображение из файлов телефона',
     },
   },
   settings: {

@@ -1,6 +1,8 @@
 import { screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
+import CaptureRoute from '@/app/capture';
+import CaptureLayout from '@/app/capture/_layout';
 import DocumentRoute from '@/app/documents/[id]';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
@@ -86,10 +88,11 @@ describe('DocumentListScreen', () => {
     expect(screen.queryByText('Удалённый')).not.toBeOnTheScreen();
   });
 
-  it('shows an empty state when there are no documents', async () => {
+  it('shows an empty state with «Add» when there are no documents', async () => {
     await renderWithProviders(<DocumentListScreen />);
 
     expect(await screen.findByText('No documents yet')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Add a document' })).toBeOnTheScreen();
   });
 
   it('shows an error with a retry that reloads', async () => {
@@ -116,5 +119,23 @@ describe('DocumentListScreen', () => {
 
     expect(screen).toHavePathname('/documents/doc-1');
     expect(await screen.findByRole('heading', { name: 'Счёт за газ' })).toBeOnTheScreen();
+  });
+
+  it('opens the choice of source from «Add» (CAP-1)', async () => {
+    const user = userEvent.setup();
+    await addDocument('doc-1', 'Счёт за газ');
+    await renderRouter(
+      {
+        index: DocumentListScreen,
+        'capture/_layout': CaptureLayout,
+        'capture/index': CaptureRoute,
+      },
+      { initialUrl: '/', wrapper: createTestProviders() }
+    );
+
+    await user.press(await screen.findByRole('button', { name: 'Add a document' }));
+
+    expect(screen).toHavePathname('/capture');
+    expect(await screen.findByRole('button', { name: 'Scan' })).toBeOnTheScreen();
   });
 });

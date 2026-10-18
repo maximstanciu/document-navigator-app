@@ -14,6 +14,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="documents/[id]" options={{ title: '' }} />
+        <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </AppProviders>
   );

@@ -5,6 +5,7 @@ export const en = {
     loading: 'Loading',
     errorTitle: 'Something went wrong',
     retry: 'Try again',
+    cancel: 'Cancel',
   },
   app: {
     databaseError: 'Could not open the app data',
@@ -20,6 +21,8 @@ export const en = {
   },
   documents: {
     title: 'Documents',
+    add: 'Add',
+    addDocument: 'Add a document',
     loadingList: 'Loading documents',
     loadingOne: 'Loading document',
     emptyTitle: 'No documents yet',
@@ -46,6 +49,19 @@ export const en = {
     kind: {
       pdf: 'PDF',
       image: 'Photo or scan',
+    },
+  },
+  capture: {
+    title: 'Add a document',
+    source: {
+      scan: 'Scan',
+      gallery: 'Photo from gallery',
+      file: 'File',
+    },
+    sourceHint: {
+      scan: 'The camera finds the page edges and straightens each page',
+      gallery: 'One or more photos, as pages of one document',
+      file: 'A PDF or an image from your files',
     },
   },
   settings: {
