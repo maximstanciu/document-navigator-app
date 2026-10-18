@@ -5,7 +5,7 @@ import type { DeadlineRecord, DeadlineStatus } from './types';
 type DeadlineRow = {
   id: string;
   document_id: string;
-  kind: string;
+  kind: DeadlineRecord['kind'];
   description: string;
   due_date: string;
   due_time: string | null;

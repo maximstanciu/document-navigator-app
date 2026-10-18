@@ -54,7 +54,8 @@ src/
     files/             # page files under Paths.document/documents/<id>/ (relative paths in the DB)
     i18n/              # i18next instance, Intl polyfills, ru/en dictionaries (resources/),
                        #   OS-level strings such as permission texts (native/, wired in app.json)
-  shared/              # (planned, 1.2) pure TS shared by client and server: zod schemas, types, limits
+  shared/              # pure TS shared by client and server: limits.ts, explanation-locales.ts,
+                       #   analysis/ (zod schema, API contract, LLM JSON Schema, synthetic fixtures)
   server/              # (planned, 3.1) server-only code for API routes: handlers, LLM providers, limits
   providers/           # AppProviders (React Query, navigation theme)
   test/                # test helpers (renderWithProviders)

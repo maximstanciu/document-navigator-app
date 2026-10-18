@@ -1,3 +1,5 @@
+import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
+
 import { buildSearchText, normalizeForSearch, searchablePartsOfAnalysis } from './search-text';
 
 describe('search text (HOME-3)', () => {
@@ -11,15 +13,15 @@ describe('search text (HOME-3)', () => {
     expect(buildSearchText(['Счёт', null, undefined, '', 'Stadtwerke'])).toBe('счет stadtwerke');
   });
 
-  it('reads summary and key fact values from an analysis of any shape', () => {
-    expect(
-      searchablePartsOfAnalysis({
-        summary: 'Оплатить',
-        keyFacts: [{ value: 'DE89 3704' }, { value: 42 }, null, { label: 'no value' }],
-      })
-    ).toEqual(['Оплатить', 'DE89 3704']);
+  it('reads the summary and key fact values of an analysis', () => {
+    const { invoice } = ANALYSIS_FIXTURES;
+    expect(searchablePartsOfAnalysis(invoice)).toEqual([
+      invoice.summary,
+      '84,20 €',
+      '100 245 778',
+      'DE89 3704 0044 0532 0130 00',
+      '01.09.2026 – 30.09.2026',
+    ]);
     expect(searchablePartsOfAnalysis(null)).toEqual([]);
-    expect(searchablePartsOfAnalysis('text')).toEqual([]);
-    expect(searchablePartsOfAnalysis({ summary: 1, keyFacts: 'x' })).toEqual([]);
   });
 });

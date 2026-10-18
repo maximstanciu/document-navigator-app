@@ -1,21 +1,13 @@
+import type { AnalyzeErrorCode } from '@/shared/analysis/contract';
+import type { AnalysisResult, DeadlineKind, DocumentType, Level } from '@/shared/analysis/schema';
+import type { ExplanationLocale } from '@/shared/explanation-locales';
+
 // Records stored on the device (SPEC §6.1). Timestamps are ISO 8601 strings, calendar dates YYYY-MM-DD.
-// `documentType`, `kind` and `analysis` are typed loosely here; task 1.2 narrows them to the shared
-// zod schema in src/shared, which is the single source of truth for the analysis shape.
+// The analysis, its enums and the server error codes come from the shared schema in src/shared.
 
 export type DocumentStatus = 'draft' | 'analyzing' | 'ready' | 'failed';
 export type DocumentSource = 'scan' | 'gallery' | 'file';
 export type DocumentMimeType = 'application/pdf' | 'image/jpeg';
-
-/** Server error codes (SPEC §7.2). Moves to src/shared with the API contract in task 1.2. */
-export type AnalyzeErrorCode =
-  | 'invalid_request'
-  | 'too_large'
-  | 'encrypted_pdf'
-  | 'invalid_pdf'
-  | 'upgrade_required'
-  | 'rate_limited'
-  | 'analysis_failed'
-  | 'unavailable';
 
 /** Errors the client records without a server response (SPEC §7.2). */
 export type ClientErrorCode = 'interrupted' | 'network' | 'timeout' | 'offline';
@@ -23,7 +15,7 @@ export type ClientErrorCode = 'interrupted' | 'network' | 'timeout' | 'offline';
 export type DocumentRecord = {
   id: string;
   title: string;
-  documentType: string | null;
+  documentType: DocumentType | null;
   senderName: string | null;
   documentDate: string | null;
   status: DocumentStatus;
@@ -32,7 +24,7 @@ export type DocumentRecord = {
   mimeType: DocumentMimeType;
   pageCount: number | null;
   fileSize: number;
-  analysis: unknown;
+  analysis: AnalysisResult | null;
   analysisLocale: string | null;
   analyzedAt: string | null;
   searchText: string;
@@ -56,13 +48,13 @@ export type DeadlineStatus = 'open' | 'done' | 'dismissed';
 export type DeadlineRecord = {
   id: string;
   documentId: string;
-  kind: string;
+  kind: DeadlineKind;
   description: string;
   dueDate: string;
   dueTime: string | null;
   dateSource: 'explicit' | 'computed' | 'user';
   originalDate: string | null;
-  confidence: 'high' | 'medium' | 'low';
+  confidence: Level;
   status: DeadlineStatus;
   /** `null` — defaults from settings, `[]` — reminders off. */
   reminderOffsetsDays: number[] | null;
@@ -76,7 +68,7 @@ export type ActionRecord = {
   documentId: string;
   deadlineId: string | null;
   description: string;
-  priority: 'high' | 'medium' | 'low';
+  priority: Level;
   done: boolean;
   createdAt: string;
   updatedAt: string;
@@ -90,7 +82,6 @@ export type ScheduledNotificationRecord = {
 };
 
 export type InterfaceLocale = 'system' | 'ru' | 'en';
-export type ExplanationLocale = 'ru' | 'en';
 
 export type Settings = {
   locale: InterfaceLocale;

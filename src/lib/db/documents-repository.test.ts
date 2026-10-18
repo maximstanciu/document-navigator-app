@@ -1,3 +1,4 @@
+import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import { createFakeClock, createTestDatabase } from '@/test/sqlite';
 
 import type { SqlDatabase } from './database';
@@ -51,20 +52,20 @@ describe('documents repository', () => {
     await repos.documents.create(newDocument('doc-1', 'Письмо'));
     clock.advance(1000);
 
+    const analysis = {
+      ...ANALYSIS_FIXTURES.invoice,
+      summary: 'Нужно оплатить ШТРАФ до конца месяца.',
+      keyFacts: [{ kind: 'amount' as const, label: 'Сумма', value: '84,20 €' }],
+    };
+
     const updated = await repos.documents.update('doc-1', {
       status: 'ready',
       senderName: 'Finanzamt Berlin',
-      analysis: {
-        summary: 'Нужно оплатить ШТРАФ до конца месяца.',
-        keyFacts: [{ kind: 'amount', label: 'Сумма', value: '84,20 €' }],
-      },
+      analysis,
       analysisLocale: 'ru',
     });
 
-    expect(updated.analysis).toEqual({
-      summary: 'Нужно оплатить ШТРАФ до конца месяца.',
-      keyFacts: [{ kind: 'amount', label: 'Сумма', value: '84,20 €' }],
-    });
+    expect(updated.analysis).toEqual(analysis);
     expect(updated.searchText).toBe(
       'письмо finanzamt berlin нужно оплатить штраф до конца месяца. 84,20 €'
     );
@@ -111,7 +112,7 @@ describe('documents repository', () => {
       await repos.documents.create(newDocument('doc-1', 'Договор аренды'));
       await repos.documents.update('doc-1', {
         senderName: 'ООО Ромашка',
-        analysis: { summary: 'Секретное содержание' },
+        analysis: { ...ANALYSIS_FIXTURES.contract, summary: 'Секретное содержание' },
       });
       await repos.pages.replaceForDocument('doc-1', [
         { id: 'p1', relativePath: 'documents/doc-1/page-1.jpg', width: 100, height: 200 },

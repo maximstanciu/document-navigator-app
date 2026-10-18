@@ -13,7 +13,7 @@ import type { DocumentRecord } from './types';
 type DocumentRow = {
   id: string;
   title: string;
-  document_type: string | null;
+  document_type: DocumentRecord['documentType'];
   sender_name: string | null;
   document_date: string | null;
   status: DocumentRecord['status'];
@@ -49,7 +49,8 @@ function toRecord(row: DocumentRow): DocumentRecord {
     mimeType: row.mime_type,
     pageCount: row.page_count,
     fileSize: row.file_size,
-    analysis: fromJson(row.analysis),
+    // Only an analysis that passed the shared schema is written; a new shape bumps `schemaVersion`.
+    analysis: fromJson(row.analysis) as DocumentRecord['analysis'],
     analysisLocale: row.analysis_locale,
     analyzedAt: row.analyzed_at,
     searchText: row.search_text,
@@ -103,7 +104,7 @@ const PATCH_COLUMNS = {
   errorCode: { column: 'error_code', toSql: text },
   pageCount: { column: 'page_count', toSql: (value: number | null) => value },
   fileSize: { column: 'file_size', toSql: (value: number | null) => value },
-  analysis: { column: 'analysis', toSql: (value: unknown) => toJson(value) },
+  analysis: { column: 'analysis', toSql: (value: DocumentRecord['analysis']) => toJson(value) },
   analysisLocale: { column: 'analysis_locale', toSql: text },
   analyzedAt: { column: 'analyzed_at', toSql: text },
   attentionDismissedAt: { column: 'attention_dismissed_at', toSql: text },

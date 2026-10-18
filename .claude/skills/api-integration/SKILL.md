@@ -74,7 +74,7 @@ export function useMarkDeadlineDone() {
 Only two endpoints exist: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC §7.2). Their client functions live in `features/analysis/api.ts` (and settings for limits).
 
 - Base URL: `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). New public config → `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access. Never secrets in `EXPO_PUBLIC_*`.
-- Request types and the response schema come from `src/shared/` (_planned, 1.2_): the zod schema is the single source of truth. Validate the response at the boundary (`schema.parse`).
+- Request types and the response schema come from `src/shared/`: the zod schema is the single source of truth. Validate the response at the boundary (`analyzeResponseSchema.parse` from `@/shared/analysis/contract`); error codes are `ANALYZE_ERROR_CODES` there.
 - Headers on every call: `X-Device-Id`, `X-App-Version`, `X-Platform` (SPEC §7.2). There are no accounts in MVP; `setAccessTokenGetter` stays unused.
 - `analyzeDocument` is a mutation **without retries**, `multipart/form-data`, 90 s client timeout (task 4.1 extends `apiClient` for `FormData` and timeouts). Background behavior follows D-1 = A (ANL-3).
 - Errors: server errors are `{ error: { code, message } }` → `ApiError`. Network `TypeError`, timeout, offline (check `expo-network` first, ANL-10) and app restart mid-analysis map to `ClientErrorCode`. Do the mapping **once**, in `features/analysis`, not per screen. A `5xx` without a JSON body (isolate crash, spike 0.2) is `unavailable`.
@@ -86,7 +86,8 @@ Only two endpoints exist: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC 
 src/app/api/v1/analyze+api.ts            thin: parse request, call the handler, return its Response
 src/server/analysis/handle-analyze.ts     validation, limits, provider call, post-processing
 src/server/analysis/providers/*.ts        LlmProvider implementations (mock + the chosen one)
-src/shared/analysis/*.ts                  zod schema, types, limits (no react/react-native/expo imports)
+src/shared/analysis/*.ts                  zod schema, API contract, toLlmJsonSchema(), fixtures
+src/shared/limits.ts                      pages and bytes per document (no react/react-native/expo imports)
 ```
 
 ```ts
@@ -98,7 +99,8 @@ export function POST(request: Request) {
 }
 ```
 
-- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes. `MockLlmProvider` is used when `LLM_PROVIDER` is unset.
+- Handlers take their dependencies (provider, limits store, clock) as an argument so tests can pass fakes. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts`.
+- The provider sends `toLlmJsonSchema()` as its structured-output schema: the model's output without `schemaVersion`, which the server adds. Post-processing (trimming, date range, `deadlineId` links) runs before the strict `analysisResultSchema`.
 - Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
 - Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**. Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
 - Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.

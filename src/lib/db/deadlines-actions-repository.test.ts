@@ -28,7 +28,7 @@ function deadline(id: string, documentId: string, dueDate: string, dueTime: stri
   return {
     id,
     documentId,
-    kind: 'payment',
+    kind: 'payment' as const,
     description: `Срок ${id}`,
     dueDate,
     dueTime,

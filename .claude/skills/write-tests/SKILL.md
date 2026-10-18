@@ -129,6 +129,8 @@ One test per error code. If a Fetch API global is missing in the default Jest en
 
 Synthetic only. Never put real documents, names, IBANs or addresses in fixtures or snapshots (eval sets included).
 
+For an analysis, start from `ANALYSIS_FIXTURES` in `src/shared/analysis/fixtures.ts` (invoice, official notice, contract, fraudulent invoice, unreadable) and override only the fields the test is about: `{ ...ANALYSIS_FIXTURES.invoice, summary: '…' }`. They pass `analysisResultSchema`, so the type checker and the schema both accept them.
+
 ## Bug fixes
 
 Write the failing test first, watch it fail for the right reason, then fix. Name the test after the behavior, not the bug ID.

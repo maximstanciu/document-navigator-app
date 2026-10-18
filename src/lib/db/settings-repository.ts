@@ -1,3 +1,5 @@
+import { isExplanationLocale } from '@/shared/explanation-locales';
+
 import type { SqlDatabase } from './database';
 import { fromJson } from './sql';
 import { DEFAULT_SETTINGS, type Settings } from './types';
@@ -19,7 +21,7 @@ function isValid<K extends keyof Settings>(key: K, value: unknown): value is Set
     case 'locale':
       return value === 'system' || value === 'ru' || value === 'en';
     case 'explanationLocale':
-      return value === null || value === 'ru' || value === 'en';
+      return value === null || isExplanationLocale(value);
     case 'reminderOffsetsDays':
       return Array.isArray(value) && value.every((item) => Number.isInteger(item) && item >= 0);
     case 'reminderTime':

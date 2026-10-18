@@ -29,7 +29,7 @@ src/
   features/     доменные модули: capture, documents, analysis, deadlines, reminders, onboarding, settings
   components/   общий UI (ui/ — примитивы)
   lib/          инфраструктура клиента: env, api-клиент, query-клиент, db/ (SQLite), files/ (страницы), i18n/ (ru/en)
-  shared/       чистый TS для клиента и сервера: zod-схема анализа, лимиты (этап 1)
+  shared/       чистый TS для клиента и сервера: zod-схема анализа, контракт API, фикстуры, лимиты
   server/       код API routes: обработчики, провайдеры LLM, лимиты (этап 3)
   constants/ hooks/ providers/ test/
 docs/           спецификация, план, отчёты спайков
