@@ -200,6 +200,22 @@ export const en = {
       unavailable: 'The analysis service is unavailable right now. Try again later.',
     },
   },
+  reminders: {
+    notification: {
+      neutral: {
+        today: 'A document deadline is today',
+        tomorrow: 'A document deadline is tomorrow',
+        inDays_one: 'A document deadline is in {{count}} day',
+        inDays_other: 'A document deadline is in {{count}} days',
+      },
+      detailed: {
+        today: 'Today: {{description}}',
+        tomorrow: 'Tomorrow: {{description}}',
+        inDays_one: 'In {{count}} day: {{description}}',
+        inDays_other: 'In {{count}} days: {{description}}',
+      },
+    },
+  },
   settings: {
     title: 'Settings',
     language: 'Language',

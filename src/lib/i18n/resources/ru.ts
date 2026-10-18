@@ -216,6 +216,26 @@ export const ru = {
       unavailable: 'Сервис анализа сейчас недоступен. Попробуйте позже.',
     },
   },
+  reminders: {
+    notification: {
+      neutral: {
+        today: 'Срок по документу сегодня',
+        tomorrow: 'Срок по документу завтра',
+        inDays_one: 'Срок по документу через {{count}} день',
+        inDays_few: 'Срок по документу через {{count}} дня',
+        inDays_many: 'Срок по документу через {{count}} дней',
+        inDays_other: 'Срок по документу через {{count}} дня',
+      },
+      detailed: {
+        today: 'Сегодня: {{description}}',
+        tomorrow: 'Завтра: {{description}}',
+        inDays_one: 'Через {{count}} день: {{description}}',
+        inDays_few: 'Через {{count}} дня: {{description}}',
+        inDays_many: 'Через {{count}} дней: {{description}}',
+        inDays_other: 'Через {{count}} дня: {{description}}',
+      },
+    },
+  },
   settings: {
     title: 'Настройки',
     language: 'Язык интерфейса',
