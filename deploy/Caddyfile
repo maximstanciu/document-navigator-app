@@ -1,0 +1,16 @@
+# HTTPS in front of the API server. With a domain name in API_DOMAIN, Caddy gets a Let's Encrypt
+# certificate by itself (ports 80 and 443 must reach this machine); `:80` serves plain HTTP for
+# tests on the local network. No access log: client IP addresses stay out of the logs (SPEC §7.1).
+
+{$API_DOMAIN} {
+	reverse_proxy api:3000 {
+		# The limits count the address Caddy sees, not one a client claims (SPEC §8.3).
+		header_up X-Real-IP {remote_host}
+		# Request ids come from the server itself; only EAS Hosting sets a genuine Cf-Ray.
+		header_up -Cf-Ray
+		transport http {
+			# Shorter than the server's keep-alive (65 s), so Caddy never reuses a closed connection.
+			keepalive 30s
+		}
+	}
+}

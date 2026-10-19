@@ -1,0 +1,23 @@
+# Build context of deploy/Dockerfile. Secrets and env files never enter the image: the server
+# reads its variables from compose at runtime.
+.git
+node_modules
+dist
+web-build
+.expo
+.kotlin
+android
+ios
+coverage
+.env*
+!.env.example
+deploy/.env
+*.jks
+*.p8
+*.p12
+*.key
+*.pem
+*.mobileprovision
+scripts/eval/.venv
+scripts/eval/out
+scripts/smoke/out

@@ -13,13 +13,14 @@
 | [docs/SPEC.md](docs/SPEC.md)                               | Требования (ID вида CAP-2, ANL-8), модель данных, контракт API, схема анализа |
 | [docs/IMPLEMENTATION_PLAN.md](docs/IMPLEMENTATION_PLAN.md) | Этапы, задачи, критерии приёмки, риски                                        |
 | [docs/spikes/](docs/spikes/)                               | Отчёты спайков: EAS Hosting (0.2), сканер (0.4), календарь и `Intl` (0.7)     |
+| [deploy/README.md](deploy/README.md)                       | Бэкенд на своём сервере: Docker Compose с HTTPS и Redis                       |
 | [AGENTS.md](AGENTS.md)                                     | Архитектурные соглашения и правила для разработчиков и агентов                |
 
 ## Как устроено
 
 - **iOS и Android** на Expo SDK 58 (React Native 0.88, New Architecture, Expo Router, TypeScript). Web — только превью для разработки: без сканера, уведомлений и календаря.
 - **Данные только на устройстве.** Документы, страницы, сроки, действия и настройки хранятся в SQLite и файловой системе телефона. Аккаунтов нет.
-- **Анализ** делает свой бэкенд: Expo API routes (`/api/v1/analyze`, `/api/v1/limits`) на EAS Hosting, LLM-провайдер за интерфейсом `LlmProvider`. Сервер не хранит ни документы, ни результаты; логирует только метаданные.
+- **Анализ** делает свой бэкенд: Expo API routes (`/api/v1/analyze`, `/api/v1/limits`) на EAS Hosting или на своём сервере в Docker ([deploy/](deploy/README.md)), LLM-провайдер за интерфейсом `LlmProvider`. Сервер не хранит ни документы, ни результаты; логирует только метаданные.
 - **Напоминания** — локальные уведомления и кнопка «В календарь».
 - **Сканер** — системный: ML Kit на Android, VisionKit на iOS (`react-native-document-scanner-plugin`).
 
