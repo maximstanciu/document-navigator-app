@@ -1,6 +1,6 @@
 import { router, Stack } from 'expo-router';
 import { useTranslation } from 'react-i18next';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EmptyState } from '@/components/screen-state';
@@ -14,7 +14,7 @@ import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
 
 import { useCaptureSession } from '../capture-session';
 import { CaptureStatus } from '../components/capture-status';
-import { PageThumbnail } from '../components/page-thumbnail';
+import { PageGrid } from '../components/page-grid';
 import { PdfFileCard } from '../components/pdf-file-card';
 import { useSaveDraft } from '../queries';
 import { useCapturePages } from '../use-capture-pages';
@@ -26,7 +26,8 @@ const MORE_PAGES_FROM: Partial<Record<DocumentSource, 'scan' | 'gallery'>> = {
 };
 
 /**
- * The pages of the document being added, or the PDF file (CAP-5): remove a page, add more, then
+ * The pages of the document being added, or the PDF file (CAP-5): remove a page, add more, drag a
+ * page to change the order (CAP-6), then
  * «Analyze the document» saves a draft (SPEC §6.3), starts its analysis (ANL-1) and opens it in
  * place of the capture modal. The analysis goes on there, or wherever the person goes next (ANL-3).
  */
@@ -66,12 +67,9 @@ export function CaptureReviewScreen() {
   return (
     <ThemedView style={styles.container}>
       <Stack.Screen options={{ title: t('capture.reviewTitle') }} />
-      <FlatList
-        data={pdf ? [] : pages}
-        keyExtractor={(page) => page.uri}
-        numColumns={3}
-        contentInsetAdjustmentBehavior="automatic"
-        ListHeaderComponent={
+      <PageGrid
+        pages={pdf ? [] : pages}
+        header={
           <View style={styles.header}>
             <CaptureStatus progress={progress} notice={saveDraft.isError ? 'saveFailed' : notice} />
             {pdf ? (
@@ -83,18 +81,17 @@ export function CaptureReviewScreen() {
                 </ThemedText>
               )
             )}
+            {!pdf && pages.length > 1 && (
+              <ThemedText type="small" themeColor="textSecondary">
+                {t('capture.reorderHint')}
+              </ThemedText>
+            )}
           </View>
         }
-        ListEmptyComponent={pdf ? undefined : <EmptyState title={t('capture.noPages')} />}
-        renderItem={({ item, index }) => (
-          <PageThumbnail
-            uri={item.uri}
-            number={index + 1}
-            onRemove={busy ? undefined : () => session.remove(index)}
-          />
-        )}
-        columnWrapperStyle={styles.row}
+        empty={pdf ? undefined : <EmptyState title={t('capture.noPages')} />}
         contentContainerStyle={styles.content}
+        onMove={busy ? undefined : session.move}
+        onRemove={busy ? undefined : session.remove}
       />
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.three) }]}>
         {moreFrom && pages.length < MAX_DOCUMENT_PAGES && (
@@ -127,9 +124,6 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
   },
   header: {
-    gap: Spacing.two,
-  },
-  row: {
     gap: Spacing.two,
   },
   footer: {

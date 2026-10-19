@@ -17,6 +17,9 @@ module.exports = {
       ? pattern.replace('/node_modules/(?!(', '/node_modules/(?!(@formatjs|')
       : pattern
   ),
+  resolver: '<rootDir>/src/test/jest-resolver.js',
+  // Jest adds this after the preset's own setup files: mocks of the gesture handler's native parts.
+  setupFiles: ['react-native-gesture-handler/jestSetup.js'],
   // Every test runs with the app's i18n setup (polyfills included) in English, and with mocks for
   // native libraries that have none of their own.
   setupFilesAfterEnv: [

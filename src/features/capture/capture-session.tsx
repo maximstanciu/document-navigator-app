@@ -2,6 +2,7 @@ import { createContext, use, useState, type PropsWithChildren } from 'react';
 
 import type { DocumentSource } from '@/lib/db/types';
 
+import { moveItem } from './page-grid-layout';
 import type { CapturedPage } from './types';
 
 type CaptureState = { source: DocumentSource | null; pages: CapturedPage[] };
@@ -13,6 +14,8 @@ export type CaptureSession = CaptureState & {
   add: (pages: CapturedPage[]) => void;
   /** Removes the page at `index` (CAP-5). */
   remove: (index: number) => void;
+  /** Moves the page at `from` to `to`; the pages in between shift by one (CAP-6). */
+  move: (from: number, to: number) => void;
 };
 
 const CaptureSessionContext = createContext<CaptureSession | null>(null);
@@ -29,6 +32,8 @@ export function CaptureSessionProvider({ children }: PropsWithChildren) {
     add: (pages) => setState((current) => ({ ...current, pages: [...current.pages, ...pages] })),
     remove: (index) =>
       setState((current) => ({ ...current, pages: current.pages.filter((_, i) => i !== index) })),
+    move: (from, to) =>
+      setState((current) => ({ ...current, pages: moveItem(current.pages, from, to) })),
   };
   return <CaptureSessionContext value={session}>{children}</CaptureSessionContext>;
 }

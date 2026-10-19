@@ -1,7 +1,13 @@
 import { Image } from 'expo-image';
 import { SymbolView } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import {
+  AccessibilityInfo,
+  Pressable,
+  StyleSheet,
+  View,
+  type AccessibilityActionEvent,
+} from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
 import { MinTouchTarget, Spacing } from '@/constants/theme';
@@ -13,24 +19,49 @@ type PageThumbnailProps = {
   uri: string;
   /** 1-based, as people count pages. */
   number: number;
+  /** How many pages the document has, so the last one isn't offered to move further. */
+  count: number;
   /** Without a handler the page can't be removed (e.g. while pages are prepared). */
   onRemove?: () => void;
+  /**
+   * Moves the page one place earlier (`-1`) or later (`1`): the screen reader's way to change the
+   * order, which others change by dragging (CAP-6). Without a handler the page stays in place.
+   */
+  onMove?: (offset: -1 | 1) => void;
 };
 
-/** A page on the review screen with a button to remove it (CAP-5). */
-export function PageThumbnail({ uri, number, onRemove }: PageThumbnailProps) {
+/**
+ * A page on the review screen, filling its cell in the grid, with a button to remove it (CAP-5) and
+ * screen reader actions to move it (CAP-6).
+ */
+export function PageThumbnail({ uri, number, count, onRemove, onMove }: PageThumbnailProps) {
   const { t } = useTranslation();
   const theme = useTheme();
 
+  const actions = onMove
+    ? [
+        ...(number > 1 ? [{ name: 'moveEarlier', label: t('capture.movePageEarlier') }] : []),
+        ...(number < count ? [{ name: 'moveLater', label: t('capture.movePageLater') }] : []),
+      ]
+    : [];
+
+  function onAction(event: AccessibilityActionEvent) {
+    const offset = event.nativeEvent.actionName === 'moveEarlier' ? -1 : 1;
+    onMove?.(offset);
+    AccessibilityInfo.announceForAccessibility(t('capture.pageMoved', { number: number + offset }));
+  }
+
   return (
     <View style={styles.container}>
-      <Image
-        source={{ uri }}
+      <View
         accessible
-        alt={t('capture.pageLabel', { number })}
-        contentFit="cover"
-        style={styles.image}
-      />
+        role="img"
+        aria-label={t('capture.pageLabel', { number })}
+        accessibilityActions={actions}
+        onAccessibilityAction={onAction}
+        style={styles.page}>
+        <Image source={{ uri }} contentFit="cover" style={styles.image} />
+      </View>
       <Pressable
         role="button"
         aria-label={t('capture.removePage', { number })}
@@ -60,12 +91,14 @@ export function PageThumbnail({ uri, number, onRemove }: PageThumbnailProps) {
 
 const styles = StyleSheet.create({
   container: {
-    width: '31%',
+    width: '100%',
+    height: '100%',
+  },
+  page: {
+    flex: 1,
   },
   image: {
-    width: '100%',
-    // Close to A4, the most common page shape.
-    aspectRatio: 0.71,
+    flex: 1,
     borderRadius: Spacing.two,
   },
   remove: {

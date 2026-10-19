@@ -33,6 +33,12 @@ module.exports = defineConfig([
   {
     files: ['**/*.test.{ts,tsx}'],
     ...testingLibrary.configs['flat/react'],
+    rules: {
+      ...testingLibrary.configs['flat/react'].rules,
+      // React Native Testing Library v14: fireEvent returns a promise like userEvent; await both.
+      'testing-library/no-await-sync-events': 'off',
+      'testing-library/await-async-events': ['error', { eventModule: ['fireEvent', 'userEvent'] }],
+    },
   },
   {
     // App code may not reach into server code.
