@@ -43,6 +43,8 @@ coverage/
 scripts/eval/.venv/
 scripts/eval/out/
 
+# device smoke test: database backups and seeded copies
+scripts/smoke/out/
 
 # generated native folders
 /ios

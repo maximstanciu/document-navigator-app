@@ -496,6 +496,17 @@ describe('DocumentDetailScreen', () => {
       expect(screen.queryByRole('button', { name: 'Analyze again' })).not.toBeOnTheScreen();
     });
 
+    it('offers no new analysis when the page files are gone (STO-8)', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      fakeFileSystem.reset();
+      await renderDocumentWithHeader();
+      await screen.findByText(/The original isn't available/);
+      await openActions();
+
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Analyze again' })).not.toBeOnTheScreen();
+    });
+
     it('deletes the document with its files once asked, and goes back (STO-6)', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
       new Directory(Paths.document, 'documents', 'doc-1').create({ intermediates: true });

@@ -47,6 +47,8 @@ export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const { data, error, isPending, refetch } = useQuery(documentQueries.detail(id));
+  // The same query as the «Original» block: no second read.
+  const pages = useQuery(documentQueries.pages(id));
   const [actionsOpen, setActionsOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
   const scroll = useRef<ScrollViewInstance>(null);
@@ -70,6 +72,12 @@ export function DocumentDetailScreen({ id }: { id: string }) {
   const title = displayTitle(data.title, t);
   const meta = documentMeta(data, t, i18n.language);
 
+  // Without its page files a new analysis can only fail, and the document would read as failed
+  // although its analysis is fine (STO-8).
+  const hasAllPages =
+    pages.data !== undefined &&
+    pages.data.length > 0 &&
+    pages.data.every((page) => page.uri !== null);
   const reanalyze = () => {
     analyze.mutate(id);
     // The progress shows at the top.
@@ -86,7 +94,9 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       ref={scroll}
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={styles.content}
-      contentInsetAdjustmentBehavior="automatic">
+      contentInsetAdjustmentBehavior="automatic"
+      // With the keyboard up for «Rename», the first tap on «Save» saves instead of closing it.
+      keyboardShouldPersistTaps="handled">
       <Stack.Screen
         options={{
           title,
@@ -97,7 +107,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
         visible={actionsOpen}
         onClose={() => setActionsOpen(false)}
         title={title}
-        canReanalyze={data.status === 'ready'}
+        canReanalyze={data.status === 'ready' && hasAllPages}
         onRename={startRenaming}
         onReanalyze={reanalyze}
         onDelete={() => remove.mutate(id, { onSuccess: leave })}

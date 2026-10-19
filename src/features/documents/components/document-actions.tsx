@@ -38,7 +38,10 @@ type DocumentActionsSheetProps = {
   onClose: () => void;
   /** The document's title, so it's clear what the actions apply to. */
   title: string;
-  /** Only a ready document is analyzed again; a draft or a failed one has its own button. */
+  /**
+   * Only a ready document with all its page files is analyzed again; a draft or a failed one has
+   * its own button.
+   */
   canReanalyze: boolean;
   onRename: () => void;
   onReanalyze: () => void;
