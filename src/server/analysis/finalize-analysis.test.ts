@@ -1,9 +1,9 @@
-import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
+import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 
 import { finalizeAnalysis } from './finalize-analysis';
 
 const CONTEXT = { today: '2026-10-18', pageCount: 5 };
-const { schemaVersion: _version, ...fromModel } = ANALYSIS_FIXTURES.invoice;
+const fromModel = llmOutputFixture('invoice');
 
 describe('finalizeAnalysis', () => {
   it('adds the schema version to a valid answer', () => {
@@ -18,6 +18,16 @@ describe('finalizeAnalysis', () => {
     expect(result.ok).toBe(true);
   });
 
+  it('counts computed dates and returns no rules (SPEC §7.4, rule 3)', () => {
+    const contract = llmOutputFixture('contract');
+    const [cancellation, renewal] = contract.deadlines;
+    const result = finalizeAnalysis(
+      { ...contract, deadlines: [{ ...cancellation, date: '2027-01-31' }, renewal] },
+      CONTEXT
+    );
+    expect(result).toEqual({ ok: true, analysis: ANALYSIS_FIXTURES.contract });
+  });
+
   it('ignores fields the schema does not know', () => {
     const result = finalizeAnalysis({ ...fromModel, confidence: 0.9 }, CONTEXT);
     expect(result).toEqual({ ok: true, analysis: ANALYSIS_FIXTURES.invoice });
@@ -25,6 +35,11 @@ describe('finalizeAnalysis', () => {
 
   it.each([
     ['a missing field', { ...fromModel, quality: undefined }, 'quality'],
+    [
+      'a deadline without a rule',
+      { ...fromModel, deadlines: [{ ...fromModel.deadlines[0], rule: undefined }] },
+      'deadlines[0].rule',
+    ],
     ['an unknown enum value', { ...fromModel, documentType: 'receipt' }, 'documentType'],
     ['a wrong type', { ...fromModel, summary: 42 }, 'summary'],
     [

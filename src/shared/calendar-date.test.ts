@@ -1,7 +1,9 @@
 import {
   addDays,
+  addMonths,
   addYears,
   daysBetween,
+  endOfPeriod,
   isCalendarDate,
   isClockTime,
   localCalendarDate,
@@ -50,6 +52,39 @@ describe('addYears', () => {
     ['2026-01-31', 1, '2027-01-31'],
   ])('%s %+d years is %s', (date, years, expected) => {
     expect(addYears(date, years)).toBe(expected);
+  });
+});
+
+describe('addMonths', () => {
+  it.each([
+    ['2026-10-09', 1, '2026-11-09'],
+    ['2026-10-09', -1, '2026-09-09'],
+    ['2026-01-31', 1, '2026-02-28'],
+    ['2028-01-31', 1, '2028-02-29'],
+    ['2026-03-31', 1, '2026-04-30'],
+    ['2026-03-31', -1, '2026-02-28'],
+    ['2027-01-31', -3, '2026-10-31'],
+    ['2026-11-30', 3, '2027-02-28'],
+    ['2026-12-15', 1, '2027-01-15'],
+    ['2027-01-15', -1, '2026-12-15'],
+    ['2026-05-15', 24, '2028-05-15'],
+  ])('%s %+d months is %s', (date, months, expected) => {
+    expect(addMonths(date, months)).toBe(expected);
+  });
+});
+
+describe('endOfPeriod', () => {
+  it.each([
+    ['2026-11-09', 'month', '2026-11-30'],
+    ['2028-02-03', 'month', '2028-02-29'],
+    ['2026-02-28', 'month', '2026-02-28'],
+    ['2026-01-01', 'quarter', '2026-03-31'],
+    ['2026-05-20', 'quarter', '2026-06-30'],
+    ['2026-09-30', 'quarter', '2026-09-30'],
+    ['2026-11-09', 'quarter', '2026-12-31'],
+    ['2026-03-04', 'year', '2026-12-31'],
+  ] as const)('%s, end of its %s: %s', (date, period, expected) => {
+    expect(endOfPeriod(date, period)).toBe(expected);
   });
 });
 

@@ -1,9 +1,9 @@
-import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
+import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 import {
   ANALYSIS_BOUNDS as B,
-  llmAnalysisSchema,
+  ANALYSIS_SCHEMA_VERSION,
+  analysisResultSchema,
   type AnalysisResult,
-  type LlmAnalysis,
   type LlmAnalysisShape,
 } from '@/shared/analysis/schema';
 
@@ -11,34 +11,56 @@ import { clip, postProcessAnalysis, type PostProcessContext } from './post-proce
 
 const CONTEXT: PostProcessContext = { today: '2026-10-18', pageCount: 30 };
 
-function fromModel({ schemaVersion: _version, ...analysis }: AnalysisResult): LlmAnalysisShape {
-  return structuredClone(analysis);
-}
+type Processed = Omit<AnalysisResult, 'schemaVersion'>;
 
 /** The official notice (dated 2026-10-09, two actions on deadline d1) with changes. */
 function notice(changes: Partial<LlmAnalysisShape> = {}): LlmAnalysisShape {
-  return { ...fromModel(ANALYSIS_FIXTURES.officialNotice), ...changes };
+  return { ...llmOutputFixture('officialNotice'), ...changes };
 }
 
 type ShapeDeadline = LlmAnalysisShape['deadlines'][number];
+type Rule = NonNullable<ShapeDeadline['rule']>;
 
+/** The notice's explicit deadline (2026-11-06) with changes. */
 function deadline(changes: Partial<ShapeDeadline> = {}): ShapeDeadline {
   return { ...notice().deadlines[0], ...changes };
 }
 
-function run(analysis: LlmAnalysisShape, context: Partial<PostProcessContext> = {}): LlmAnalysis {
+/** A computed deadline: two weeks from receipt, which the server counts from the document date. */
+function computed(rule: Partial<Rule> | null = {}, changes: Partial<ShapeDeadline> = {}) {
+  return deadline({
+    dateSource: 'computed',
+    rule:
+      rule === null
+        ? null
+        : {
+            from: 'receipt',
+            fromDate: null,
+            direction: 'after',
+            amount: 2,
+            unit: 'week',
+            endOf: null,
+            ...rule,
+          },
+    confidence: 'medium',
+    ...changes,
+  });
+}
+
+function run(analysis: LlmAnalysisShape, context: Partial<PostProcessContext> = {}): Processed {
   const result = postProcessAnalysis(analysis, { ...CONTEXT, ...context });
-  // Whatever goes in, what comes out passes the strict schema.
-  expect(llmAnalysisSchema.safeParse(result).success).toBe(true);
+  // Whatever goes in, what comes out passes the strict schema, with nothing it would strip.
+  const withVersion = { schemaVersion: ANALYSIS_SCHEMA_VERSION, ...result };
+  expect(analysisResultSchema.parse(withVersion)).toEqual(withVersion);
   return result;
 }
 
-const datesOf = (analysis: LlmAnalysis) => analysis.deadlines.map(({ date }) => date);
+const datesOf = (analysis: Processed) => analysis.deadlines.map(({ date }) => date);
 
 describe('postProcessAnalysis', () => {
-  it.each(Object.entries(ANALYSIS_FIXTURES))('leaves the %s fixture as it is', (_name, fixture) => {
+  it.each(Object.entries(ANALYSIS_FIXTURES))('leaves the %s fixture as it is', (name, fixture) => {
     const { schemaVersion: _version, ...expected } = fixture;
-    expect(run(fromModel(fixture))).toEqual(expected);
+    expect(run(llmOutputFixture(name as keyof typeof ANALYSIS_FIXTURES))).toEqual(expected);
   });
 
   describe('dates', () => {
@@ -106,8 +128,8 @@ describe('postProcessAnalysis', () => {
 
     it('never gives a computed date high confidence (SPEC §7.4, rule 3)', () => {
       const deadlines = [
-        deadline({ dateSource: 'computed', confidence: 'high' }),
-        deadline({ dateSource: 'computed', confidence: 'low' }),
+        computed({}, { confidence: 'high' }),
+        computed({}, { confidence: 'low' }),
         deadline({ dateSource: 'explicit', confidence: 'high' }),
       ];
       expect(run(notice({ deadlines })).deadlines.map((d) => d.confidence)).toEqual([
@@ -115,6 +137,81 @@ describe('postProcessAnalysis', () => {
         'low',
         'high',
       ]);
+    });
+  });
+
+  describe('computed dates (SPEC §7.4, rule 3)', () => {
+    it('counts the date by the rule instead of taking the model date', () => {
+      const result = run(notice({ deadlines: [computed({}, { date: '2026-12-24' })] }));
+      expect(result.deadlines[0]).toMatchObject({ date: '2026-10-23', confidence: 'medium' });
+    });
+
+    it('takes the rule out of every deadline', () => {
+      const result = run(notice({ deadlines: [computed(), deadline({ rule: computed().rule })] }));
+      for (const counted of result.deadlines) expect(counted).not.toHaveProperty('rule');
+    });
+
+    it('ignores the rule of an explicit deadline', () => {
+      const result = run(notice({ deadlines: [deadline({ rule: computed().rule })] }));
+      expect(result.deadlines[0]).toMatchObject({ date: '2026-11-06', confidence: 'high' });
+    });
+
+    it('counts from today with low confidence when the document has no date', () => {
+      const result = run(notice({ documentDate: null, deadlines: [computed()] }));
+      expect(result.deadlines[0]).toMatchObject({ date: '2026-11-01', confidence: 'low' });
+    });
+
+    it('counts from today when the document date is dropped', () => {
+      const result = run(notice({ documentDate: '09.10.2026', deadlines: [computed()] }));
+      expect(result.deadlines[0]).toMatchObject({ date: '2026-11-01', confidence: 'low' });
+    });
+
+    it('keeps the model date with low confidence when the rule is incomplete', () => {
+      const deadlines = [
+        computed(null, { date: '2026-12-24' }),
+        computed({ from: 'date_in_text', fromDate: null }, { date: '2026-12-25' }),
+        computed({ amount: 0 }, { date: '2026-12-26', confidence: 'high' }),
+      ];
+      const result = run(notice({ deadlines }));
+      expect(result.deadlines.map(({ date, confidence }) => [date, confidence])).toEqual([
+        ['2026-12-24', 'low'],
+        ['2026-12-25', 'low'],
+        ['2026-12-26', 'low'],
+      ]);
+    });
+
+    it('drops a counted date out of range and unlinks its action', () => {
+      const result = run(
+        notice({
+          deadlines: [
+            // 2039-10-31: more than ten years after today.
+            computed(
+              {
+                from: 'date_in_text',
+                fromDate: '2040-01-31',
+                direction: 'before',
+                amount: 3,
+                unit: 'month',
+              },
+              { id: 'late', date: '2026-11-01' }
+            ),
+            // 2024-10-09: more than a year before the document date.
+            computed({ direction: 'before', amount: 2, unit: 'year' }, { id: 'early' }),
+            computed({}, { id: 'kept', date: '2001-01-01' }),
+          ],
+          actions: [
+            { ...notice().actions[0], deadlineId: 'late' },
+            { ...notice().actions[0], deadlineId: 'kept' },
+          ],
+        })
+      );
+      expect(datesOf(result)).toEqual(['2026-10-23']);
+      expect(result.actions.map((a) => a.deadlineId)).toEqual([null, 'd1']);
+    });
+
+    it('drops an incomplete rule whose model date is out of range', () => {
+      const result = run(notice({ deadlines: [computed(null, { date: '2001-01-01' })] }));
+      expect(result.deadlines).toEqual([]);
     });
   });
 

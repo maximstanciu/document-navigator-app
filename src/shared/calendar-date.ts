@@ -31,11 +31,29 @@ export function isClockTime(value: unknown): value is string {
   return typeof value === 'string' && CLOCK_TIME.test(value);
 }
 
+/**
+ * The same day `months` later (or earlier), or the last day of the month that has no such day:
+ * January 31 + 1 month is February 28 (29 in a leap year).
+ */
+export function addMonths(date: string, months: number): string {
+  const [year, month, day] = date.split('-').map(Number);
+  const index = year * 12 + month - 1 + months;
+  const targetYear = Math.floor(index / 12);
+  const targetMonth = index - targetYear * 12 + 1;
+  return format(targetYear, targetMonth, Math.min(day, daysInMonth(targetYear, targetMonth)));
+}
+
 /** The same day `years` later (or earlier); February 29 becomes the 28th in a common year. */
 export function addYears(date: string, years: number): string {
-  const [year, month, day] = date.split('-').map(Number);
-  const target = year + years;
-  return format(target, month, Math.min(day, daysInMonth(target, month)));
+  return addMonths(date, years * 12);
+}
+
+/** The last day of the month, quarter or year that `date` is in. */
+export function endOfPeriod(date: string, period: 'month' | 'quarter' | 'year'): string {
+  const [year, month] = date.split('-').map(Number);
+  const lastMonth =
+    period === 'month' ? month : period === 'quarter' ? Math.ceil(month / 3) * 3 : 12;
+  return format(year, lastMonth, daysInMonth(year, lastMonth));
 }
 
 /** Midnight UTC of `date`: a calendar day as an instant, for day arithmetic without time zones. */

@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
+import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 
 import { createAnalyzeDeps } from './analyze-deps';
 import { MockLlmProvider } from './providers/mock-llm-provider';
@@ -35,7 +35,7 @@ describe('MockLlmProvider', () => {
   beforeEach(() => jest.useFakeTimers());
   afterEach(() => jest.useRealTimers());
 
-  it('answers after the delay without schemaVersion, like a model', async () => {
+  it('answers after the delay without schemaVersion and with deadline rules, like a model', async () => {
     const provider = new MockLlmProvider({ fixture: 'fraudulentInvoice', delayMs: 5000 });
     let settled = false;
     const call = provider.analyze({ ...input, files: [] }).finally(() => (settled = true));
@@ -45,8 +45,9 @@ describe('MockLlmProvider', () => {
     await jest.advanceTimersByTimeAsync(1);
 
     const { result } = await call;
-    const { schemaVersion: _schemaVersion, ...expected } = ANALYSIS_FIXTURES.fraudulentInvoice;
-    expect(result).toEqual(expected);
+    expect(result).toEqual(llmOutputFixture('fraudulentInvoice'));
+    expect(result).not.toHaveProperty('schemaVersion');
+    expect(result).toMatchObject({ deadlines: [{ rule: { from: 'receipt', amount: 1 } }] });
   });
 
   it('stops waiting when the request is aborted', async () => {

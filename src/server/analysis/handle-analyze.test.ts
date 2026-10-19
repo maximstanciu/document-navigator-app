@@ -1,6 +1,6 @@
 /** @jest-environment node */
 import { ANALYZE_FIELDS, analyzeResponseSchema } from '@/shared/analysis/contract';
-import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
+import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 import { API_HEADERS } from '@/shared/api-headers';
 import { MAX_DOCUMENT_BYTES } from '@/shared/limits';
 
@@ -42,8 +42,7 @@ function recordingProvider(answer: () => Promise<unknown> = async () => validRes
 }
 
 function validResult() {
-  const { schemaVersion: _schemaVersion, ...result } = ANALYSIS_FIXTURES.contract;
-  return result;
+  return llmOutputFixture('contract');
 }
 
 async function expectError(response: Response, status: number, code: string) {
@@ -117,19 +116,27 @@ describe('handleAnalyze', () => {
 
     it('post-processes the answer with the request date and the page count (SPEC §7.4)', async () => {
       const { contract } = ANALYSIS_FIXTURES;
-      const { provider } = recordingProvider(async () => ({
-        ...validResult(),
-        summary: `  ${contract.summary}  `,
-        deadlines: [{ ...contract.deadlines[0], date: '2040-01-01' }, contract.deadlines[1]],
-      }));
+      const { provider } = recordingProvider(async () => {
+        const model = validResult();
+        const [cancellation, renewal] = model.deadlines;
+        return {
+          ...model,
+          summary: `  ${contract.summary}  `,
+          deadlines: [
+            { ...cancellation, rule: { ...cancellation.rule!, fromDate: '2040-01-31' } },
+            renewal,
+          ],
+        };
+      });
 
       const response = await handleAnalyze(analyzeRequest(), deps({ provider }));
 
       expect(response.status).toBe(200);
       const { analysis } = await response.json();
       expect(analysis.summary).toBe(contract.summary);
-      // More than 10 years after `today`: dropped, and its action loses the link. The other
-      // deadline becomes d1, and its page 3 isn't in a one-page upload.
+      // Counted by its rule, three months before 2040-01-31 is more than 10 years after `today`:
+      // dropped, and its action loses the link. The other deadline becomes d1, and its page 3 isn't
+      // in a one-page upload.
       expect(analysis.deadlines).toEqual([{ ...contract.deadlines[1], id: 'd1', page: null }]);
       expect(analysis.actions).toEqual([{ ...contract.actions[0], deadlineId: null }]);
     });

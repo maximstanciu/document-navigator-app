@@ -1,8 +1,9 @@
-import { ANALYSIS_FIXTURES } from './fixtures';
+import { ANALYSIS_FIXTURES, llmOutputFixture, type AnalysisFixtureName } from './fixtures';
 import {
   ANALYSIS_BOUNDS,
   analysisResultSchema,
   llmAnalysisSchema,
+  llmAnalysisShapeSchema,
   type AnalysisResult,
 } from './schema';
 
@@ -82,11 +83,60 @@ describe('analysisResultSchema', () => {
 });
 
 describe('llmAnalysisSchema', () => {
-  it('is the analysis without the schema version the server adds', () => {
-    const { schemaVersion: _version, ...fromModel } = invoice;
-    expect(llmAnalysisSchema.parse(fromModel)).toEqual(fromModel);
+  const names = Object.keys(ANALYSIS_FIXTURES) as AnalysisFixtureName[];
+  const contract = llmOutputFixture('contract');
 
-    const result: AnalysisResult = { schemaVersion: 1, ...llmAnalysisSchema.parse(fromModel) };
-    expect(analysisResultSchema.parse(result)).toEqual(invoice);
+  function withRule(changes: Record<string, unknown>): unknown {
+    const [first, ...rest] = contract.deadlines;
+    return { ...contract, deadlines: [{ ...first, rule: { ...first.rule, ...changes } }, ...rest] };
+  }
+
+  it.each(names)('accepts the %s fixture as the model returns it', (name) => {
+    expect(llmAnalysisSchema.parse(llmOutputFixture(name))).toEqual(llmOutputFixture(name));
+  });
+
+  it('is the analysis without the schema version the server adds, with deadline rules', () => {
+    const { deadlines, ...fromModel } = llmAnalysisSchema.parse(llmOutputFixture('contract'));
+    const result: AnalysisResult = {
+      schemaVersion: 1,
+      ...fromModel,
+      deadlines: deadlines.map(({ rule: _rule, ...deadline }) => deadline),
+    };
+    expect(analysisResultSchema.parse(result)).toEqual(ANALYSIS_FIXTURES.contract);
+  });
+
+  it('keeps the rule out of the analysis the client gets and stores (SPEC §7.3)', () => {
+    expect(analysisResultSchema.shape.deadlines.element.shape).not.toHaveProperty('rule');
+    // A rule the server failed to take out would be stripped, not stored.
+    const stored = analysisResultSchema.parse({
+      ...ANALYSIS_FIXTURES.contract,
+      deadlines: contract.deadlines,
+    });
+    expect(stored).toEqual(ANALYSIS_FIXTURES.contract);
+  });
+
+  it('requires a rule, null for an explicit deadline', () => {
+    const { rule: _rule, ...withoutRule } = contract.deadlines[1];
+    const missing = { ...contract, deadlines: [contract.deadlines[0], withoutRule] };
+    expect(llmAnalysisSchema.safeParse(missing).success).toBe(false);
+    expect(llmAnalysisShapeSchema.safeParse(missing).success).toBe(false);
+  });
+
+  it.each([
+    ['an unknown start', { from: 'invoice_date' }],
+    ['an unknown unit', { unit: 'hour' }],
+    ['an unknown period', { endOf: 'week' }],
+  ])('rejects %s in both schemas', (_case, changes) => {
+    expect(llmAnalysisSchema.safeParse(withRule(changes)).success).toBe(false);
+    expect(llmAnalysisShapeSchema.safeParse(withRule(changes)).success).toBe(false);
+  });
+
+  it.each([
+    ['a fractional amount', { amount: 1.5 }],
+    ['a zero amount', { amount: 0 }],
+    ['a date that is not in the calendar', { fromDate: '2027-02-30' }],
+  ])('leaves %s to post-processing', (_case, changes) => {
+    expect(llmAnalysisSchema.safeParse(withRule(changes)).success).toBe(false);
+    expect(llmAnalysisShapeSchema.safeParse(withRule(changes)).success).toBe(true);
   });
 });

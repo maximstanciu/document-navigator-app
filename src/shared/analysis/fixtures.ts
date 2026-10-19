@@ -1,4 +1,4 @@
-import type { AnalysisResult } from './schema';
+import type { AnalysisResult, DeadlineRule, LlmAnalysis } from './schema';
 
 // Synthetic analysis results for tests and `MockLlmProvider` (SPEC §7.5). Senders, numbers and
 // quotes are made up; never put real documents here (AGENTS.md). Explanations are in Russian,
@@ -313,3 +313,60 @@ export const ANALYSIS_FIXTURES = {
   fraudulentInvoice,
   unreadable,
 };
+
+export type AnalysisFixtureName = keyof typeof ANALYSIS_FIXTURES;
+
+/**
+ * The rules of the computed deadlines by fixture and deadline id (SPEC §7.3). The server counts
+ * from them the dates the fixtures show; explicit deadlines have no rule.
+ */
+const DEADLINE_RULES: Partial<Record<AnalysisFixtureName, Record<string, DeadlineRule>>> = {
+  // "Innerhalb eines Monats nach Bekanntgabe", counted from the date of the letter.
+  officialNotice: {
+    d2: {
+      from: 'receipt',
+      fromDate: null,
+      direction: 'after',
+      amount: 1,
+      unit: 'month',
+      endOf: null,
+    },
+  },
+  // "Three months before the end of the minimum term", which ends on 31 January 2027.
+  contract: {
+    d1: {
+      from: 'date_in_text',
+      fromDate: '2027-01-31',
+      direction: 'before',
+      amount: 3,
+      unit: 'month',
+      endOf: null,
+    },
+  },
+  // "Innerhalb von 24 Stunden", counted from the date of the letter.
+  fraudulentInvoice: {
+    d1: {
+      from: 'receipt',
+      fromDate: null,
+      direction: 'after',
+      amount: 1,
+      unit: 'day',
+      endOf: null,
+    },
+  },
+};
+
+/**
+ * A fixture as the model returns it: without `schemaVersion`, which the server adds, and with the
+ * `rule` of each deadline, which the server takes out.
+ */
+export function llmOutputFixture(name: AnalysisFixtureName): LlmAnalysis {
+  const { schemaVersion: _schemaVersion, ...analysis } = structuredClone(ANALYSIS_FIXTURES[name]);
+  return {
+    ...analysis,
+    deadlines: analysis.deadlines.map((deadline) => ({
+      ...deadline,
+      rule: DEADLINE_RULES[name]?.[deadline.id] ?? null,
+    })),
+  };
+}

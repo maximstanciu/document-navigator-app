@@ -1,11 +1,13 @@
 import {
   ANALYSIS_BOUNDS as B,
   LANGUAGE_TAG,
+  type AnalysisResult,
   type Level,
-  type LlmAnalysis,
   type LlmAnalysisShape,
 } from '@/shared/analysis/schema';
 import { addYears, isCalendarDate, isClockTime } from '@/shared/calendar-date';
+
+import { deadlineDate } from './deadline-date';
 
 export type PostProcessContext = {
   /** YYYY-MM-DD on the device (the request's `today`). */
@@ -15,13 +17,14 @@ export type PostProcessContext = {
 };
 
 /**
- * Repairs what the model got wrong within the right shape, so the result passes
- * `llmAnalysisSchema` (SPEC §7.4). Nothing here is a reason to ask the model again.
+ * Repairs what the model got wrong within the right shape, so the result with `schemaVersion`
+ * passes `analysisResultSchema` (SPEC §7.4). Nothing here is a reason to ask the model again.
  *
  * - Dates: `documentDate` that isn't a calendar date or is more than 10 years ahead becomes `null`.
- *   Deadlines outside `(documentDate ?? today) − 1 year … today + 10 years` are dropped; a document
- *   date in the future anchors the range on `today`. A time that isn't `HH:mm` becomes `null`.
- * - A computed date is never `high` confidence (rule 3).
+ *   A computed deadline is counted by its `rule` and is never `high` confidence (rule 3,
+ *   `deadlineDate()`); the rule itself doesn't reach the client. Then deadlines outside
+ *   `(documentDate ?? today) − 1 year … today + 10 years` are dropped; a document date in the
+ *   future anchors the range on `today`. A time that isn't `HH:mm` becomes `null`.
  * - Ids are renumbered `d1…`, `a1…`; an action whose deadline was dropped or never existed loses
  *   the link and stays as an action without a date.
  * - Page numbers that aren't a page of the document become `null`.
@@ -32,7 +35,7 @@ export type PostProcessContext = {
 export function postProcessAnalysis(
   analysis: LlmAnalysisShape,
   { today, pageCount }: PostProcessContext
-): LlmAnalysis {
+): Omit<AnalysisResult, 'schemaVersion'> {
   const latest = addYears(today, 10);
   const documentDate =
     isCalendarDate(analysis.documentDate) && analysis.documentDate <= latest
@@ -47,6 +50,7 @@ export function postProcessAnalysis(
 
   const deadlineIds = new Map<string, string>();
   const deadlines = analysis.deadlines
+    .map((deadline) => ({ ...deadline, ...deadlineDate(deadline, { documentDate, today }) }))
     .filter(({ date }) => isCalendarDate(date) && date >= earliest && date <= latest)
     .slice(0, B.deadlines)
     .map((deadline, index) => {
@@ -62,10 +66,7 @@ export function postProcessAnalysis(
         computation: clipOrNull(deadline.computation, B.computation),
         sourceQuote: clip(deadline.sourceQuote, B.quote),
         page: toPage(deadline.page),
-        confidence:
-          deadline.dateSource === 'computed' && deadline.confidence === 'high'
-            ? ('medium' as const)
-            : deadline.confidence,
+        confidence: deadline.confidence,
       };
     });
 

@@ -71,4 +71,32 @@ describe('toLlmJsonSchema', () => {
     );
     expect(properties.deadlines.description).toBe(`At most ${ANALYSIS_BOUNDS.deadlines} items.`);
   });
+
+  it('gives each deadline a nullable rule the server counts computed dates by (SPEC §7.3)', () => {
+    const properties = schema.properties as Record<string, JsonSchema>;
+    const deadline = (properties.deadlines.items as JsonSchema).properties as Record<
+      string,
+      JsonSchema
+    >;
+    const [rule, empty] = deadline.rule.anyOf as JsonSchema[];
+    expect(empty).toEqual({ type: 'null' });
+    expect(Object.keys(rule.properties as object)).toEqual([
+      'from',
+      'fromDate',
+      'direction',
+      'amount',
+      'unit',
+      'endOf',
+    ]);
+
+    const fields = rule.properties as Record<string, JsonSchema>;
+    expect(fields.from.enum).toEqual(['document_date', 'receipt', 'date_in_text']);
+    expect(fields.direction.enum).toEqual(['after', 'before']);
+    expect(fields.unit.enum).toEqual(['day', 'week', 'month', 'year']);
+    expect(fields.amount).toEqual({
+      type: 'integer',
+      description: 'Whole number greater than zero.',
+    });
+    expect((fields.endOf.anyOf as JsonSchema[])[0].enum).toEqual(['month', 'quarter', 'year']);
+  });
 });
