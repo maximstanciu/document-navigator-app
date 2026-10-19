@@ -267,6 +267,21 @@ export const en = {
     },
   },
   reminders: {
+    channel: {
+      name: 'Deadlines',
+      description: 'Reminders about document deadlines',
+    },
+    deadline: {
+      scheduled: 'Reminders: {{times}}',
+      turnOff: "Don't remind",
+      turnOffLabel: "Don't remind about the deadline on {{date}}",
+      turnOn: 'Remind me',
+      turnOnLabel: 'Remind me about the deadline on {{date}}',
+      denied:
+        "Notifications are off for this app. To get reminders, allow them in your phone's settings.",
+      openSettings: 'Open settings',
+      failed: "Couldn't change the reminders. Try again.",
+    },
     notification: {
       neutral: {
         today: 'A document deadline is today',

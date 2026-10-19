@@ -5,11 +5,13 @@ import { renderRouter } from 'expo-router/testing-library';
 import DocumentRoute from '@/app/documents/[id]';
 import { analysisRecords } from '@/features/analysis/analysis-records';
 import * as analysisApi from '@/features/analysis/api';
+import { syncReminders } from '@/features/reminders/sync-reminders';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import type { AnalysisResult } from '@/shared/analysis/schema';
 import { Directory, fakeFileSystem, Paths } from '@/test/fake-file-system';
+import { fakeNotifications } from '@/test/fake-notifications';
 import { createTestProviders } from '@/test/render';
 import { installTestRepositories } from '@/test/sqlite';
 
@@ -560,6 +562,131 @@ describe('DocumentDetailScreen', () => {
       expect(screen.getByText('Below is the result of the previous analysis.')).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
       expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
+    });
+  });
+
+  describe('reminders follow the changes (REM-7, REM-9, STO-6)', () => {
+    // Only `Date` is faked, so the fixtures' deadlines stay in the future.
+    beforeEach(() => {
+      jest.useFakeTimers({
+        now: new Date('2026-10-18T10:00:00+02:00'),
+        doNotFake: [
+          'hrtime',
+          'nextTick',
+          'performance',
+          'queueMicrotask',
+          'requestAnimationFrame',
+          'cancelAnimationFrame',
+          'requestIdleCallback',
+          'cancelIdleCallback',
+          'setImmediate',
+          'clearImmediate',
+          'setInterval',
+          'clearInterval',
+          'setTimeout',
+          'clearTimeout',
+        ],
+      });
+      fakeNotifications.permission = 'granted';
+    });
+
+    afterEach(() => jest.useRealTimers());
+
+    /** Pending reminders per due date of their deadline. */
+    async function remindersByDueDate() {
+      const deadlines = await repositories.deadlines.list({ documentId: 'doc-1' });
+      const dueDate = new Map(deadlines.map((deadline) => [deadline.id, deadline.dueDate]));
+      const counts: Record<string, number> = {};
+      for (const notification of fakeNotifications.pending()) {
+        const date = dueDate.get(notification.data.deadlineId) ?? 'gone';
+        counts[date] = (counts[date] ?? 0) + 1;
+      }
+      return counts;
+    }
+
+    it('schedules the reminders of a new analysis', async () => {
+      const user = userEvent.setup();
+      await seedDocument();
+      let next = 0;
+      jest.spyOn(analysisApi, 'analyzeDocument').mockImplementation(async (id) => {
+        await repositories.documents.startAnalysis(id);
+        await repositories.documents.saveAnalysis(id, {
+          analysis: ANALYSIS_FIXTURES.officialNotice,
+          pageCount: 2,
+          analysisLocale: 'ru',
+          ...analysisRecords(id, ANALYSIS_FIXTURES.officialNotice, () => `rec-${++next}`),
+        });
+      });
+      await renderDocument();
+
+      await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
+
+      await waitFor(async () =>
+        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3, '2026-11-09': 3 })
+      );
+      expect(await screen.findByText(/^Reminders: Nov 2, /)).toBeOnTheScreen();
+    });
+
+    it('cancels them for «Not relevant» and «Done», and brings them back on «Restore»', async () => {
+      const user = userEvent.setup();
+      await seedAnalyzed(ANALYSIS_FIXTURES.officialNotice);
+      await syncReminders();
+      await renderDocument();
+
+      await user.press(
+        await screen.findByRole('button', {
+          name: 'Mark the deadline of Nov 9, 2026 as not relevant',
+        })
+      );
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3 }));
+
+      await user.press(
+        await screen.findByRole('button', { name: 'Restore the deadline of Nov 9, 2026' })
+      );
+      await waitFor(async () =>
+        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3, '2026-11-09': 3 })
+      );
+
+      await user.press(
+        await screen.findByRole('checkbox', {
+          name: 'Последний день, чтобы обжаловать решение (Einspruch)',
+        })
+      );
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3 }));
+    });
+
+    it('moves them with a changed date (US-8)', async () => {
+      const user = userEvent.setup();
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await syncReminders();
+      await renderDocument();
+
+      await user.press(
+        await screen.findByRole('button', {
+          name: 'Change the date of the deadline of Oct 31, 2026',
+        })
+      );
+      const field = screen.getByLabelText(/^New date: /);
+      await user.clear(field);
+      await user.type(field, '2026-11-14');
+      await user.press(screen.getByRole('button', { name: 'Save' }));
+
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-14': 3 }));
+    });
+
+    it('cancels them all when the document is deleted (STO-6)', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.officialNotice);
+      await syncReminders();
+      expect(fakeNotifications.scheduled.size).toBe(6);
+      const user = userEvent.setup();
+      await renderDocumentWithHeader();
+
+      await user.press(await screen.findByRole('button', { name: 'Document actions' }));
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+      await user.press(screen.getByRole('button', { name: 'Delete' }));
+
+      await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(0));
+      expect(await repositories.scheduledNotifications.list()).toEqual([]);
     });
   });
 

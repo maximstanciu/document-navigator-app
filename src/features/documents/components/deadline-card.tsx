@@ -15,6 +15,7 @@ import {
   useSetActionDone,
   useSetDeadlineDone,
 } from '@/features/deadlines/queries';
+import { DeadlineReminders } from '@/features/reminders/components/deadline-reminders';
 import { useTheme } from '@/hooks/use-theme';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
 import { formatCalendarDate } from '@/lib/i18n/format';
@@ -84,7 +85,7 @@ type DeadlineCardProps = {
 
 /**
  * A deadline with the actions due by it, or on its own (DET-3, DET-4): «Done» on each action or on
- * the deadline, «Change date» (US-8) and «Not relevant».
+ * the deadline, its reminders (REM-3), «Change date» (US-8) and «Not relevant».
  */
 export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
   const { t } = useTranslation();
@@ -113,6 +114,7 @@ export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
           onChange={(done) => setActionDone.mutate({ id: action.id, done })}
         />
       ))}
+      <DeadlineReminders deadline={deadline} />
       {changingDate ? (
         <DatePicker
           value={deadline.dueDate}

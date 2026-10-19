@@ -67,8 +67,7 @@ export async function renameDocument(id: string, title: string): Promise<void> {
 
 /**
  * «Delete» (DET-9, STO-6): the content is wiped in the database at once and the page files go with
- * the document's folder. Cancelling its reminders in the OS arrives with the notifications adapter
- * (task 5.1); before it nothing is scheduled.
+ * the document's folder. `useDeleteDocument()` then syncs reminders, which cancels the document's.
  */
 export async function deleteDocument(id: string): Promise<void> {
   const removed = await getRepositories().documents.remove(id);

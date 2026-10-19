@@ -1,5 +1,6 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 
 import {
@@ -85,12 +86,15 @@ export function useRenameDocument() {
 
 /**
  * «Delete» on the document screen (DET-9, STO-6). Every local query is refreshed: the document's
- * pages, deadlines and actions are gone too.
+ * pages, deadlines and actions are gone too. So are its reminders: the sync cancels them in the OS.
  */
 export function useDeleteDocument() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: deleteDocument,
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.all() }),
+    onSuccess: () => {
+      syncRemindersInBackground();
+      return queryClient.invalidateQueries({ queryKey: dbKeys.all() });
+    },
   });
 }

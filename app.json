@@ -77,6 +77,14 @@
       "expo-sqlite",
       "expo-secure-store",
       [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/android-icon-monochrome.png",
+          "color": "#208AEF",
+          "enableRemoteNotifications": false
+        }
+      ],
+      [
         "expo-localization",
         {
           "supportedLocales": ["ru", "en"],

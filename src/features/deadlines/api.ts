@@ -20,10 +20,7 @@ export async function dismissDeadline(id: string): Promise<void> {
   await getRepositories().deadlines.update(id, { status: 'dismissed' });
 }
 
-/**
- * «Change date» (US-8, DET-4): the person's date, kept through a re-analysis (ANL-8). Reminders
- * follow it once `syncReminders()` exists (task 5.1).
- */
+/** «Change date» (US-8, DET-4): the person's date, kept through a re-analysis (ANL-8). */
 export function changeDeadlineDate(id: string, dueDate: string): Promise<void> {
   return getRepositories().deadlines.changeDate(id, dueDate);
 }

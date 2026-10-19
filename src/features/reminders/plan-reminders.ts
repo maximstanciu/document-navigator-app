@@ -5,14 +5,8 @@ import { isCalendarDate } from '@/shared/calendar-date';
 
 /**
  * Which reminders should be scheduled, and how that differs from what is (REM-2, REM-3, REM-7,
- * REM-8, REM-9, REM-12). Pure: no OS, no database.
- *
- * `syncReminders()` (task 5.2, needs `expo-notifications` from task 5.1) plugs in here: it reads
- * the deadlines and settings through the repositories, calls `planReminders()`, then
- * `diffReminders()` against `scheduled_notifications`; it cancels `cancel`, schedules each of
- * `schedule` with a `DATE` trigger at `fireAt` (not an exact alarm, REM-11) and
- * `identifier: reminder.id`, and records it with `toScheduledRecord()`. Run again, it finds nothing
- * to do.
+ * REM-8, REM-9, REM-12). Pure: no OS, no database. `syncReminders()` (`./sync-reminders.ts`)
+ * applies the result to the OS.
  */
 
 /** iOS keeps at most 64 pending notifications: the nearest 60 go first, the rest on a later sync (REM-8). */
@@ -33,7 +27,10 @@ export type ReminderDeadline = Pick<
 export type ReminderSettings = Pick<
   Settings,
   'reminderOffsetsDays' | 'reminderTime' | 'notificationDetails'
->;
+> & {
+  /** The interface language the text is shown in (SET-1). */
+  language: string;
+};
 
 type When = 'today' | 'tomorrow' | 'inDays';
 
@@ -115,17 +112,17 @@ export function reminderMessage(text: ReminderText, t: TFunction): string {
 
 /**
  * Everything the notification shows is in its id, so a changed text gets a new id and replaces the
- * old notification: the neutral text depends only on the days left, the detailed one on the
- * deadline too.
+ * old notification: the neutral text depends only on the days left and the language, the detailed
+ * one on the deadline too.
  */
 function reminderId(
   deadline: ReminderDeadline,
   fireAt: string,
   daysBefore: number,
-  detailed: boolean
+  settings: ReminderSettings
 ) {
-  const content = detailed ? `detailed@${deadline.updatedAt}` : 'neutral';
-  return `${deadline.id}/${fireAt}/${daysBefore}d/${content}`;
+  const content = settings.notificationDetails ? `detailed@${deadline.updatedAt}` : 'neutral';
+  return `${deadline.id}/${fireAt}/${daysBefore}d/${settings.language}/${content}`;
 }
 
 // Plain comparison, not localeCompare: the order must not depend on the device's language.
@@ -153,14 +150,13 @@ export function planReminders(
       // Negated so that an invalid time (NaN) is skipped too.
       if (!(fireTime > now.getTime())) continue;
       const fireAt = new Date(fireTime).toISOString();
-      const detailed = settings.notificationDetails;
       planned.push({
-        id: reminderId(deadline, fireAt, daysBefore, detailed),
+        id: reminderId(deadline, fireAt, daysBefore, settings),
         deadlineId: deadline.id,
         documentId: deadline.documentId,
         fireAt,
         daysBefore,
-        text: reminderText(deadline, daysBefore, detailed),
+        text: reminderText(deadline, daysBefore, settings.notificationDetails),
       });
     }
   }

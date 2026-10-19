@@ -1,3 +1,5 @@
+import { resetFakeNotifications } from './fake-notifications';
+
 // Native libraries that ship no Jest mock. Tests of features replace our adapter instead
 // (`jest.mock('@/features/capture/scanner')`); this only lets modules that import the library load.
 jest.mock('react-native-document-scanner-plugin', () => ({
@@ -13,3 +15,11 @@ jest.mock('react-native-document-scanner-plugin', () => ({
 // microtask.
 jest.mock('react-native-worklets', () => jest.requireActual('react-native-worklets/src/mock'));
 jest.mock('react-native-reanimated', () => jest.requireActual('react-native-reanimated/mock'));
+
+// Every test runs without notifications, as on web, so that screens with deadlines and the
+// reminder sync after their changes behave the same everywhere. Reminder tests turn them on through
+// `fakeNotifications` from `@/test/fake-notifications`.
+jest.mock('@/features/reminders/notifications', () =>
+  jest.requireActual('@/test/fake-notifications')
+);
+beforeEach(() => resetFakeNotifications());

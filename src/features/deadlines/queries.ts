@@ -1,5 +1,6 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
+import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
 
 import {
@@ -12,17 +13,19 @@ import {
 
 /**
  * A change to deadlines or actions refreshes both tables: a deadline's status follows its actions
- * (REM-9). Reminders follow these changes once `syncReminders()` exists (task 5.2).
+ * (REM-9). Reminders follow too: a closed or dismissed deadline loses them, a new date moves them.
  */
 function useDeadlinesMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<void>) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSuccess: () =>
-      Promise.all([
+    onSuccess: () => {
+      syncRemindersInBackground();
+      return Promise.all([
         queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() }),
         queryClient.invalidateQueries({ queryKey: dbKeys.actions.all() }),
-      ]),
+      ]);
+    },
   });
 }
 

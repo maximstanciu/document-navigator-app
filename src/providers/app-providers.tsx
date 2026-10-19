@@ -5,6 +5,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { useState, type PropsWithChildren } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { ReminderSync } from '@/features/reminders/components/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createQueryClient, useAppStateFocusManager } from '@/lib/query-client';
 
@@ -24,6 +25,7 @@ export function AppProviders({ children }: PropsWithChildren) {
         <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
           <DatabaseGate>
             <LanguageSync />
+            <ReminderSync />
             {children}
           </DatabaseGate>
         </ThemeProvider>

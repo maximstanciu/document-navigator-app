@@ -22,7 +22,7 @@ beforeEach(() => {
   setTimeZone('Europe/Berlin');
 });
 
-const SETTINGS: ReminderSettings = DEFAULT_SETTINGS;
+const SETTINGS: ReminderSettings = { ...DEFAULT_SETTINGS, language: 'en' };
 
 function deadline(overrides: Partial<ReminderDeadline> = {}): ReminderDeadline {
   return {
@@ -376,6 +376,18 @@ describe('diffReminders (REM-7)', () => {
       schedule: [],
       cancel: [],
     });
+  });
+
+  it('replaces the text when the interface language changes (SET-1)', () => {
+    const scheduled = synced(planReminders([deadline()], SETTINGS, OCT_18));
+
+    const diff = diffReminders(
+      planReminders([deadline()], { ...SETTINGS, language: 'ru' }, OCT_18),
+      scheduled
+    );
+
+    expect(diff.schedule).toHaveLength(3);
+    expect(diff.cancel).toEqual(scheduled.map((record) => record.notificationId));
   });
 
   it('replaces the text when «Details in notifications» is switched or the deadline changes', () => {

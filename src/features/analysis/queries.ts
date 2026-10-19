@@ -1,5 +1,6 @@
 import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 
+import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
 
 import { analyzeDocument } from './api';
@@ -24,12 +25,15 @@ export function useAnalyzeDocument() {
     mutationFn: (documentId: string) => analyzeDocument(documentId, refreshDocuments),
     retry: false,
     networkMode: 'always',
-    onSettled: () =>
-      Promise.all([
+    // New deadlines get their reminders; a re-analysis may have replaced some (ANL-8).
+    onSettled: () => {
+      syncRemindersInBackground();
+      return Promise.all([
         refreshDocuments(),
         queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() }),
         queryClient.invalidateQueries({ queryKey: dbKeys.actions.all() }),
-      ]),
+      ]);
+    },
   });
 }
 
