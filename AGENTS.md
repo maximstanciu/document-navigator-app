@@ -59,7 +59,8 @@ src/
                        #   analysis/ (zod schema, API contract, LLM JSON Schema, synthetic fixtures)
   server/              # server-only code for API routes: server-deps.ts (shared deps from env),
                        #   http/ (errors, client headers and IP, multipart), analysis/ (handler,
-                       #   LlmProvider, providers/, post-processing), limits/ (daily limits, budget),
+                       #   prompt and the legal memo for Germany, LlmProvider, providers/,
+                       #   post-processing), limits/ (daily limits, budget),
                        #   metrics/ (beta report), store/ (counters: memory, Upstash), logs/, privacy/
                        #   (pseudonyms), testing/ (request, PDF and deps helpers)
   providers/           # AppProviders (React Query, navigation theme)
