@@ -219,6 +219,22 @@ describe('actions repository', () => {
     ]);
   });
 
+  it('lists the actions due by a deadline, of every document', async () => {
+    await repos.deadlines.insertMany([deadline('d2', 'doc-2', '2026-11-02')]);
+    await repos.actions.insertMany([
+      {
+        id: 'a3',
+        documentId: 'doc-2',
+        deadlineId: 'd2',
+        description: 'Третье',
+        priority: 'medium',
+      },
+    ]);
+    await repos.actions.remove('a1');
+
+    expect((await repos.actions.listDated()).map((action) => action.id)).toEqual(['a3']);
+  });
+
   it('marks an action done and lists actions of a deadline (REM-9)', async () => {
     await repos.actions.update('a1', { done: true });
 

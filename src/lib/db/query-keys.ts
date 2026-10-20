@@ -11,6 +11,7 @@ export const dbKeys = {
     all: () => ['db', 'documents'] as const,
     list: () => [...dbKeys.documents.all(), 'list'] as const,
     search: (query: string) => [...dbKeys.documents.all(), 'search', query] as const,
+    titles: () => [...dbKeys.documents.all(), 'titles'] as const,
     detail: (id: string) => [...dbKeys.documents.all(), 'detail', id] as const,
   },
   pages: {
@@ -25,6 +26,7 @@ export const dbKeys = {
   actions: {
     all: () => ['db', 'actions'] as const,
     byDocument: (documentId: string) => [...dbKeys.actions.all(), 'document', documentId] as const,
+    dated: () => [...dbKeys.actions.all(), 'dated'] as const,
   },
   settings: {
     all: () => ['db', 'settings'] as const,

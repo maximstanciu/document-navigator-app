@@ -203,6 +203,13 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
       return rows.map(toRecord);
     },
 
+    /** The titles of active documents, without reading their analyses: for the Deadlines tab (REM-1). */
+    async listTitles(): Promise<{ id: string; title: string }[]> {
+      return db.getAllAsync<{ id: string; title: string }>(
+        'SELECT id, title FROM documents WHERE deleted_at IS NULL ORDER BY created_at DESC, id'
+      );
+    },
+
     /** Case-insensitive search over title, sender, summary and key facts, Cyrillic included (HOME-3). */
     async search(query: string): Promise<DocumentRecord[]> {
       const normalized = normalizeForSearch(query);

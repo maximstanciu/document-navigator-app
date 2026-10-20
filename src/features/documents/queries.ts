@@ -11,7 +11,6 @@ import {
   listDocumentActions,
   listDocumentDeadlines,
   listDocuments,
-  listOpenDeadlines,
   renameDocument,
   searchDocuments,
 } from './api';
@@ -31,13 +30,6 @@ export const documentQueries = {
     queryOptions({
       queryKey: dbKeys.documents.search(query),
       queryFn: () => searchDocuments(query),
-      ...localQueryDefaults,
-    }),
-  /** Under the deadlines key: «Done» and «Not relevant» on any screen refresh the home screen. */
-  openDeadlines: () =>
-    queryOptions({
-      queryKey: dbKeys.deadlines.list({ statuses: ['open'] }),
-      queryFn: listOpenDeadlines,
       ...localQueryDefaults,
     }),
   detail: (id: string) =>

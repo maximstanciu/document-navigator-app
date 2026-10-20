@@ -90,6 +90,18 @@ export function createActionsRepository(db: SqlDatabase, now: Clock) {
       return rows.map(toRecord);
     },
 
+    /**
+     * Active actions due by a deadline, of every document (DET-3): the Deadlines tab shows them with
+     * their deadline. In insertion order.
+     */
+    async listDated(): Promise<ActionRecord[]> {
+      const rows = await db.getAllAsync<ActionRow>(
+        `SELECT ${COLUMNS} FROM actions WHERE deadline_id IS NOT NULL AND deleted_at IS NULL
+         ORDER BY created_at, rowid`
+      );
+      return rows.map(toRecord);
+    },
+
     async listByDeadline(deadlineId: string): Promise<ActionRecord[]> {
       const rows = await db.getAllAsync<ActionRow>(
         `SELECT ${COLUMNS} FROM actions WHERE deadline_id = ? AND deleted_at IS NULL

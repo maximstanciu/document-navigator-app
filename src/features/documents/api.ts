@@ -3,7 +3,7 @@ import type { DocumentRecord } from '@/lib/db/types';
 import { deleteDocumentFiles, pageFileExists, pageFileUri } from '@/lib/files/page-files';
 import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 
-import type { DeadlineSummary, DocumentDetail, DocumentPage, DocumentSummary } from './types';
+import type { DocumentDetail, DocumentPage, DocumentSummary } from './types';
 
 /**
  * Data access for the documents feature: reads local documents through the repositories in
@@ -39,18 +39,6 @@ export async function listDocuments(): Promise<DocumentSummary[]> {
 export async function searchDocuments(query: string): Promise<DocumentSummary[]> {
   const documents = await getRepositories().documents.search(query);
   return documents.map(toSummary);
-}
-
-/** Open deadlines of all documents, soonest first: for the cards and «Needs attention» (HOME-1, HOME-2). */
-export async function listOpenDeadlines(): Promise<DeadlineSummary[]> {
-  const deadlines = await getRepositories().deadlines.list({ statuses: ['open'] });
-  return deadlines.map(({ id, documentId, description, dueDate, dueTime }) => ({
-    id,
-    documentId,
-    description,
-    dueDate,
-    dueTime,
-  }));
 }
 
 /** «Got it» in «Needs attention»: the document's fraud signs or high risk are seen (HOME-1). */

@@ -21,6 +21,7 @@ export const ru = {
   },
   tabs: {
     documents: 'Документы',
+    deadlines: 'Сроки',
     settings: 'Настройки',
   },
   notFound: {
@@ -77,12 +78,6 @@ export const ru = {
     },
     attention: {
       title: 'Требует внимания',
-      today: 'Сегодня',
-      tomorrow: 'Завтра',
-      inDays_one: 'Через {{count}} день',
-      inDays_few: 'Через {{count}} дня',
-      inDays_many: 'Через {{count}} дней',
-      inDays_other: 'Через {{count}} дня',
       moreDeadlines_one: 'И ещё {{count}} срок',
       moreDeadlines_few: 'И ещё {{count}} срока',
       moreDeadlines_many: 'И ещё {{count}} сроков',
@@ -197,6 +192,36 @@ export const ru = {
         'Оригинал недоступен: его файлов больше нет на устройстве. Анализ и сроки работают.',
       page: 'Страница {{number}}',
       pageMissing: 'Страница {{number}} недоступна',
+    },
+  },
+  deadlines: {
+    title: 'Сроки',
+    loading: 'Загружаем сроки',
+    emptyTitle: 'Открытых сроков нет',
+    emptyMessage: 'Здесь появятся сроки из ваших документов, ближайшие сверху.',
+    group: {
+      overdue: 'Просрочено',
+      thisWeek: 'На этой неделе',
+      later: 'Позже',
+    },
+    dueIn: {
+      overdue: 'Просрочено',
+      today: 'Сегодня',
+      tomorrow: 'Завтра',
+      inDays_one: 'Через {{count}} день',
+      inDays_few: 'Через {{count}} дня',
+      inDays_many: 'Через {{count}} дней',
+      inDays_other: 'Через {{count}} дня',
+    },
+    document: 'Документ: {{title}}',
+    openDocument: 'Открыть документ «{{title}}»',
+    notRelevantLabel: 'Отметить срок «{{description}}» как неактуальный',
+    changeFailed: 'Не удалось сохранить изменение. Попробуйте ещё раз.',
+    undo: {
+      done: 'Сделано: «{{description}}»',
+      dismissed: 'Не актуально: «{{description}}»',
+      action: 'Отменить',
+      label: 'Отменить: «{{description}}»',
     },
   },
   capture: {

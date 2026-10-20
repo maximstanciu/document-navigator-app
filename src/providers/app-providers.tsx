@@ -5,6 +5,7 @@ import { DarkTheme, DefaultTheme, ThemeProvider } from 'expo-router';
 import { useState, type PropsWithChildren } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
+import { ReminderOpener } from '@/features/reminders/components/reminder-opener';
 import { ReminderSync } from '@/features/reminders/components/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createQueryClient, useAppStateFocusManager } from '@/lib/query-client';
@@ -27,6 +28,8 @@ export function AppProviders({ children }: PropsWithChildren) {
             <LanguageSync />
             <ReminderSync />
             {children}
+            {/* After the navigator, so its effect runs once the root stack is mounted (REM-6). */}
+            <ReminderOpener />
           </DatabaseGate>
         </ThemeProvider>
       </QueryClientProvider>

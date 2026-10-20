@@ -25,6 +25,9 @@ export default function AppTabs() {
           <TabTrigger name="index" href="/" asChild>
             <TabButton>{t('tabs.documents')}</TabButton>
           </TabTrigger>
+          <TabTrigger name="deadlines" href="/deadlines" asChild>
+            <TabButton>{t('tabs.deadlines')}</TabButton>
+          </TabTrigger>
           <TabTrigger name="settings" href="/settings" asChild>
             <TabButton>{t('tabs.settings')}</TabButton>
           </TabTrigger>
@@ -56,7 +59,8 @@ export function CustomTabList(props: TabListProps) {
   return (
     <View {...props} style={styles.tabListContainer}>
       <ThemedView type="backgroundElement" style={styles.innerContainer}>
-        <ThemedText type="smallBold" style={styles.brandText}>
+        {/* Gives way to the tabs on a narrow window instead of pushing the bar off the screen. */}
+        <ThemedText type="smallBold" numberOfLines={1} style={styles.brandText}>
           DocNavigator
         </ThemedText>
 
@@ -77,16 +81,20 @@ const styles = StyleSheet.create({
   },
   innerContainer: {
     paddingVertical: Spacing.two,
-    paddingHorizontal: Spacing.five,
+    paddingHorizontal: Spacing.three,
     borderRadius: Spacing.five,
     flexDirection: 'row',
     alignItems: 'center',
     flexGrow: 1,
+    flexShrink: 1,
+    minWidth: 0,
     gap: Spacing.two,
     maxWidth: MaxContentWidth,
   },
   brandText: {
     marginRight: 'auto',
+    flexShrink: 1,
+    minWidth: 0,
   },
   pressed: {
     opacity: 0.7,

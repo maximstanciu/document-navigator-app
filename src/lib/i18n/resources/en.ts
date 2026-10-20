@@ -21,6 +21,7 @@ export const en = {
   },
   tabs: {
     documents: 'Documents',
+    deadlines: 'Deadlines',
     settings: 'Settings',
   },
   notFound: {
@@ -76,10 +77,6 @@ export const en = {
     },
     attention: {
       title: 'Needs attention',
-      today: 'Today',
-      tomorrow: 'Tomorrow',
-      inDays_one: 'In {{count}} day',
-      inDays_other: 'In {{count}} days',
       moreDeadlines_one: 'And {{count}} more deadline',
       moreDeadlines_other: 'And {{count}} more deadlines',
       fraud: 'Signs of fraud',
@@ -189,6 +186,34 @@ export const en = {
         "The original isn't available: its files are no longer on this device. The analysis and deadlines still work.",
       page: 'Page {{number}}',
       pageMissing: 'Page {{number}} is not available',
+    },
+  },
+  deadlines: {
+    title: 'Deadlines',
+    loading: 'Loading deadlines',
+    emptyTitle: 'No open deadlines',
+    emptyMessage: 'Deadlines from your documents appear here, soonest first.',
+    group: {
+      overdue: 'Overdue',
+      thisWeek: 'This week',
+      later: 'Later',
+    },
+    dueIn: {
+      overdue: 'Overdue',
+      today: 'Today',
+      tomorrow: 'Tomorrow',
+      inDays_one: 'In {{count}} day',
+      inDays_other: 'In {{count}} days',
+    },
+    document: 'Document: {{title}}',
+    openDocument: 'Open the document “{{title}}”',
+    notRelevantLabel: 'Mark “{{description}}” as not relevant',
+    changeFailed: "Couldn't save the change. Try again.",
+    undo: {
+      done: 'Done: “{{description}}”',
+      dismissed: 'Not relevant: “{{description}}”',
+      action: 'Undo',
+      label: 'Undo: “{{description}}”',
     },
   },
   capture: {

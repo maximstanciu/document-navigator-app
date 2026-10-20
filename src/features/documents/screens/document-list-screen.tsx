@@ -8,6 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { deadlineQueries } from '@/features/deadlines/queries';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { localCalendarDate } from '@/shared/calendar-date';
@@ -38,7 +39,7 @@ export function DocumentListScreen() {
   const searching = search !== '';
 
   const documents = useQuery(documentQueries.list());
-  const deadlines = useQuery(documentQueries.openDeadlines());
+  const deadlines = useQuery(deadlineQueries.open());
   const results = useQuery({
     ...documentQueries.search(search),
     enabled: searching,

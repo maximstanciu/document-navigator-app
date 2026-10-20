@@ -1,7 +1,11 @@
 import {
+  addNotificationResponseReceivedListener,
   AndroidImportance,
   cancelScheduledNotificationAsync,
+  clearLastNotificationResponse,
+  DEFAULT_ACTION_IDENTIFIER,
   getAllScheduledNotificationsAsync,
+  getLastNotificationResponse,
   getPermissionsAsync,
   IosAuthorizationStatus,
   requestPermissionsAsync,
@@ -10,6 +14,7 @@ import {
   setNotificationChannelAsync,
   setNotificationHandler,
   type NotificationPermissionsStatus,
+  type NotificationResponse,
 } from 'expo-notifications';
 import { Linking } from 'react-native';
 
@@ -34,6 +39,14 @@ export type ReminderNotification = {
   body: string;
   /** Ids only, for opening the document from the notification (REM-6, task 5.3). */
   data: { documentId: string; deadlineId: string };
+};
+
+/** A tap on a reminder: what its notification carries (REM-6, REM-12). */
+export type OpenedReminder = {
+  /** The notification's identifier, our reminder id. */
+  notificationId: string;
+  documentId: string;
+  deadlineId: string;
 };
 
 function toPermission(response: NotificationPermissionsStatus): NotificationPermission {
@@ -108,6 +121,42 @@ export async function scheduleNotification(notification: ReminderNotification): 
 
 export async function cancelNotification(id: string): Promise<void> {
   await cancelScheduledNotificationAsync(id);
+}
+
+/**
+ * The reminder behind a tap on its notification. Anything else is `null`: another action than the
+ * tap itself (a dismiss action on iOS), or a notification without our ids.
+ */
+export function toOpenedReminder(response: NotificationResponse): OpenedReminder | null {
+  if (response.actionIdentifier !== DEFAULT_ACTION_IDENTIFIER) return null;
+  const { identifier, content } = response.notification.request;
+  const documentId = content.data?.documentId;
+  const deadlineId = content.data?.deadlineId;
+  if (typeof documentId !== 'string' || typeof deadlineId !== 'string') return null;
+  return { notificationId: identifier, documentId, deadlineId };
+}
+
+/**
+ * The last tap on a reminder, kept by the OS until cleared: the one that launched the app at a cold
+ * start too, when no listener was there yet (REM-6).
+ */
+export function getLastOpenedReminder(): OpenedReminder | null {
+  const response = getLastNotificationResponse();
+  return response ? toOpenedReminder(response) : null;
+}
+
+/** Forgets the last tap, so that a later start or remount does not open its document again. */
+export function clearLastOpenedReminder(): void {
+  clearLastNotificationResponse();
+}
+
+/** Calls `listener` on every tap on a reminder while the app runs; returns the unsubscribe. */
+export function addReminderOpenedListener(listener: (reminder: OpenedReminder) => void) {
+  const subscription = addNotificationResponseReceivedListener((response) => {
+    const reminder = toOpenedReminder(response);
+    if (reminder) listener(reminder);
+  });
+  return () => subscription.remove();
 }
 
 /** The app's page in system settings, where notifications are turned back on (REM-5). */

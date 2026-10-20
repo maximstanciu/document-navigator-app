@@ -73,6 +73,19 @@ describe('documents repository', () => {
     expect(list.map((document) => document.id)).toEqual(['newer', 'older']);
   });
 
+  it('lists the titles of active documents newest first', async () => {
+    await repos.documents.create(newDocument('older', 'Old'));
+    clock.advance(1000);
+    await repos.documents.create(newDocument('newer', 'New'));
+    await repos.documents.create(newDocument('gone', 'Deleted'));
+    await repos.documents.remove('gone');
+
+    expect(await repos.documents.listTitles()).toEqual([
+      { id: 'newer', title: 'New' },
+      { id: 'older', title: 'Old' },
+    ]);
+  });
+
   it('stores the analysis as JSON and rebuilds the search text on update', async () => {
     await repos.documents.create(newDocument('doc-1', 'Письмо'));
     clock.advance(1000);

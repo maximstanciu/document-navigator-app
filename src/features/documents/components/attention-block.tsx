@@ -8,11 +8,12 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Spacing, type ThemeColor } from '@/constants/theme';
+import { formatDueIn } from '@/features/deadlines/format';
 import { useTheme } from '@/hooks/use-theme';
 import { formatCalendarDate } from '@/lib/i18n/format';
 
 import type { AttentionItem } from '../attention';
-import { displayTitle, formatDueIn } from '../format';
+import { displayTitle } from '../format';
 import { useDismissAttention } from '../queries';
 import type { DeadlineSummary } from '../types';
 

@@ -3,10 +3,13 @@
 // a test that needs them sets `fakeNotifications.permission`.
 import type {
   NotificationPermission,
+  OpenedReminder,
   ReminderNotification,
 } from '@/features/reminders/notifications';
 
-export type { NotificationPermission, ReminderNotification };
+export type { NotificationPermission, OpenedReminder, ReminderNotification };
+
+const openedListeners = new Set<(reminder: OpenedReminder) => void>();
 
 export const DEADLINES_CHANNEL_ID = 'deadlines';
 
@@ -18,9 +21,18 @@ export const fakeNotifications = {
   /** Pending notifications by identifier, as the OS holds them. */
   scheduled: new Map<string, ReminderNotification>(),
 
+  /** The last tap on a reminder, kept until cleared: set it before rendering for a cold start. */
+  lastOpened: null as OpenedReminder | null,
+
   /** The pending notifications, soonest first. */
   pending(): ReminderNotification[] {
     return [...this.scheduled.values()].sort((a, b) => (a.fireAt < b.fireAt ? -1 : 1));
+  },
+
+  /** The person taps a reminder while the app runs: the OS keeps it and tells the listeners. */
+  tap(reminder: OpenedReminder) {
+    this.lastOpened = reminder;
+    for (const listener of openedListeners) listener(reminder);
   },
 };
 
@@ -49,6 +61,19 @@ export const cancelNotification = jest.fn(async (id: string) => {
   fakeNotifications.scheduled.delete(id);
 });
 
+export const getLastOpenedReminder = jest.fn(() => fakeNotifications.lastOpened);
+
+export const clearLastOpenedReminder = jest.fn(() => {
+  fakeNotifications.lastOpened = null;
+});
+
+export const addReminderOpenedListener = jest.fn((listener: (reminder: OpenedReminder) => void) => {
+  openedListeners.add(listener);
+  return () => {
+    openedListeners.delete(listener);
+  };
+});
+
 export const openNotificationSettings = jest.fn(async () => {});
 
 /** A fresh OS without notifications and clean call records; runs before every test. */
@@ -56,6 +81,8 @@ export function resetFakeNotifications() {
   fakeNotifications.permission = 'unavailable';
   fakeNotifications.answer = 'granted';
   fakeNotifications.scheduled.clear();
+  fakeNotifications.lastOpened = null;
+  openedListeners.clear();
   for (const fn of [
     setUpNotifications,
     getNotificationPermission,
@@ -63,6 +90,9 @@ export function resetFakeNotifications() {
     listScheduledNotificationIds,
     scheduleNotification,
     cancelNotification,
+    getLastOpenedReminder,
+    clearLastOpenedReminder,
+    addReminderOpenedListener,
     openNotificationSettings,
   ]) {
     fn.mockClear();
