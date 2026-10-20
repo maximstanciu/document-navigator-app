@@ -209,6 +209,15 @@ export const en = {
     openDocument: 'Open the document “{{title}}”',
     notRelevantLabel: 'Mark “{{description}}” as not relevant',
     changeFailed: "Couldn't save the change. Try again.",
+    calendar: {
+      add: 'Add to calendar',
+      addLabel: 'Add the deadline “{{description}}”, {{date}}, to your calendar',
+      noApp: 'There is no calendar app on this phone. Install one to add deadlines to a calendar.',
+      denied:
+        "Calendar access is off for this app. To add deadlines to your calendar, allow it in your phone's settings.",
+      openSettings: 'Open settings',
+      failed: "Couldn't open the calendar. Try again.",
+    },
     undo: {
       done: 'Done: “{{description}}”',
       dismissed: 'Not relevant: “{{description}}”',

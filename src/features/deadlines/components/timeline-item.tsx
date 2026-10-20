@@ -13,6 +13,7 @@ import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
 import { formatCalendarDate } from '@/lib/i18n/format';
 
 import { formatDueIn } from '../format';
+import { AddToCalendarButton } from './add-to-calendar-button';
 
 type TimelineItemProps = {
   deadline: DeadlineRecord;
@@ -30,8 +31,8 @@ type TimelineItemProps = {
 
 /**
  * An open deadline on the Deadlines tab (REM-1): how soon and when, «Done» on the deadline or on
- * each of its actions as on the document screen (REM-9, US-9), its document, and «Not relevant»
- * (US-12). Overdue is said in words, the color only repeats it.
+ * each of its actions as on the document screen (REM-9, US-9), «Add to calendar» (REM-10), its
+ * document, and «Not relevant» (US-12). Overdue is said in words, the color only repeats it.
  */
 export function TimelineItem({
   deadline,
@@ -82,6 +83,7 @@ export function TimelineItem({
           ))}
         </>
       )}
+      <AddToCalendarButton deadline={deadline} actions={actions} documentTitle={documentTitle} />
       <View style={styles.footer}>
         {/* Layout around and inside the link: `Link asChild` does not keep the Pressable's style. */}
         <View style={styles.document}>

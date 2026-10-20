@@ -136,7 +136,9 @@ export function DocumentDetailScreen({ id }: { id: string }) {
         </ThemedText>
       )}
       <AnalysisStatusPanel document={data} />
-      {data.analysis && <DocumentResult documentId={data.id} analysis={data.analysis} />}
+      {data.analysis && (
+        <DocumentResult documentId={data.id} documentTitle={title} analysis={data.analysis} />
+      )}
       <OriginalBlock document={data} />
       {data.analysis && (
         <ThemedText type="small" themeColor="textSecondary">

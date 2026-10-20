@@ -24,7 +24,11 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "blockedPermissions": ["android.permission.CAMERA"]
+      "blockedPermissions": [
+        "android.permission.CAMERA",
+        "android.permission.READ_CALENDAR",
+        "android.permission.WRITE_CALENDAR"
+      ]
     },
     "web": {
       "output": "server",
@@ -76,6 +80,15 @@
       ],
       "expo-sqlite",
       "expo-secure-store",
+      [
+        "expo-calendar",
+        {
+          "calendarPermission": "DocNavigator adds the deadlines you choose to your calendar.",
+          "writeOnlyCalendarPermission": "DocNavigator adds the deadlines you choose to your calendar.",
+          "remindersPermission": false,
+          "writeOnlyAccess": true
+        }
+      ],
       [
         "expo-notifications",
         {

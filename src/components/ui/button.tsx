@@ -43,7 +43,14 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
         disabled && styles.disabled,
       ]}
       {...rest}>
-      <ThemedText type="smallBold" style={{ color }}>
+      {/* A plain label stays on one line: on Android a label that exactly fills its shrink-wrapped
+          width could still wrap its last word out of sight («Add to calendar» on the document
+          screen, task 5.5). Plain labels are short; a longer one ends in «…» instead of losing a
+          word unseen. */}
+      <ThemedText
+        type="smallBold"
+        style={{ color }}
+        numberOfLines={variant === 'plain' ? 1 : undefined}>
         {label}
       </ThemedText>
     </Pressable>

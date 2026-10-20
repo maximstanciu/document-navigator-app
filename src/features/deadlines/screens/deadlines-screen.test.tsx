@@ -6,8 +6,10 @@ import { Text } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { syncReminders } from '@/features/reminders/sync-reminders';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
+import { formatCalendarDate } from '@/lib/i18n/format';
 import { i18n } from '@/lib/i18n/i18n';
 import { addDays, localCalendarDate } from '@/shared/calendar-date';
+import { fakeCalendar } from '@/test/fake-calendar';
 import { fakeNotifications } from '@/test/fake-notifications';
 import { createTestProviders } from '@/test/render';
 import { installTestRepositories } from '@/test/sqlite';
@@ -226,6 +228,47 @@ describe('DeadlinesScreen', () => {
 
     expect(await screen.findByRole('checkbox', { name: 'Pay the bill' })).toBeOnTheScreen();
     expect(await repositories.deadlines.get('pay')).toMatchObject({ status: 'open' });
+  });
+
+  it('opens the system calendar form for a deadline ahead, not for an overdue one (REM-10)', async () => {
+    fakeCalendar.available = true;
+    await addDeadline('overdue', 'letter', inDays(-2), 'Answer the tax office');
+    await addDeadline('pay', 'bill', inDays(3), 'Payment due');
+    await repositories.actions.insertMany([
+      {
+        id: 'transfer',
+        documentId: 'bill',
+        deadlineId: 'pay',
+        description: 'Transfer the money',
+        priority: 'high',
+      },
+    ]);
+    await renderTab();
+
+    const date = formatCalendarDate(inDays(3), 'en');
+    await user().press(
+      await screen.findByRole('button', {
+        name: `Add the deadline “Payment due”, ${date}, to your calendar`,
+      })
+    );
+
+    expect(fakeCalendar.opened).toEqual([
+      {
+        title: 'Payment due',
+        date: inDays(3),
+        time: null,
+        notes: '• Transfer the money\nDocument: Electricity bill',
+      },
+    ]);
+    expect(screen.getAllByRole('button', { name: /calendar/ })).toHaveLength(1);
+  });
+
+  it('offers no calendar without one (web)', async () => {
+    await addDeadline('pay', 'bill', inDays(3), 'Pay the bill');
+    await renderTab();
+
+    expect(await screen.findByRole('checkbox', { name: 'Pay the bill' })).toBeOnTheScreen();
+    expect(screen.queryByRole('button', { name: /calendar/ })).not.toBeOnTheScreen();
   });
 
   it('cancels the reminders of a deadline marked done or not relevant (REM-9)', async () => {

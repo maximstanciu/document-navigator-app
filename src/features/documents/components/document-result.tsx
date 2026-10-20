@@ -18,7 +18,15 @@ import { QualityNotice } from './quality-notice';
 import { RiskItem } from './risk-item';
 
 /** «What to do» and «Deadlines» (DET-3, DET-4): each deadline in exactly one of them. */
-function TasksBlocks({ documentId, readable }: { documentId: string; readable: boolean }) {
+function TasksBlocks({
+  documentId,
+  documentTitle,
+  readable,
+}: {
+  documentId: string;
+  documentTitle: string;
+  readable: boolean;
+}) {
   const theme = useTheme();
   const { t } = useTranslation();
   const deadlines = useQuery(documentQueries.deadlines(documentId));
@@ -57,6 +65,7 @@ function TasksBlocks({ documentId, readable }: { documentId: string; readable: b
                 key={group.deadline.id}
                 deadline={group.deadline}
                 actions={group.actions}
+                documentTitle={documentTitle}
               />
             ) : (
               <UndatedActions key="undated" actions={group.actions} />
@@ -73,7 +82,7 @@ function TasksBlocks({ documentId, readable }: { documentId: string; readable: b
       {hasDeadlines && (
         <DetailSection title={t('documents.section.deadlines')}>
           {layout.deadlines.map((deadline) => (
-            <DeadlineCard key={deadline.id} deadline={deadline} />
+            <DeadlineCard key={deadline.id} deadline={deadline} documentTitle={documentTitle} />
           ))}
           {layout.dismissedDeadlines.map((deadline) => (
             <DismissedDeadline key={deadline.id} deadline={deadline} />
@@ -90,9 +99,12 @@ function TasksBlocks({ documentId, readable }: { documentId: string; readable: b
  */
 export function DocumentResult({
   documentId,
+  documentTitle,
   analysis,
 }: {
   documentId: string;
+  /** As the screen shows it, for the calendar events of its deadlines (REM-10). */
+  documentTitle: string;
   analysis: AnalysisResult;
 }) {
   const { t } = useTranslation();
@@ -107,7 +119,7 @@ export function DocumentResult({
           <ThemedText>{analysis.summary}</ThemedText>
         </DetailSection>
       )}
-      <TasksBlocks documentId={documentId} readable={readable} />
+      <TasksBlocks documentId={documentId} documentTitle={documentTitle} readable={readable} />
       {analysis.risks.length > 0 && (
         <DetailSection title={t('documents.section.risks')}>
           {sortRisks(analysis.risks).map((risk, index) => (

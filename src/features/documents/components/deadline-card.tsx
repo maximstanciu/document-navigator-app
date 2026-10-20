@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { DatePicker } from '@/components/ui/date-picker';
 import { Spacing } from '@/constants/theme';
+import { AddToCalendarButton } from '@/features/deadlines/components/add-to-calendar-button';
 import {
   useChangeDeadlineDate,
   useDismissDeadline,
@@ -81,13 +82,16 @@ type DeadlineCardProps = {
   deadline: DeadlineRecord;
   /** The deadline's actions (DET-3). Without them the deadline itself gets «Done» (REM-9). */
   actions?: readonly ActionRecord[];
+  /** For the calendar event's notes (REM-10). */
+  documentTitle: string;
 };
 
 /**
  * A deadline with the actions due by it, or on its own (DET-3, DET-4): «Done» on each action or on
- * the deadline, its reminders (REM-3), «Change date» (US-8) and «Not relevant».
+ * the deadline, its reminders (REM-3), «Add to calendar» (REM-10), «Change date» (US-8) and «Not
+ * relevant».
  */
-export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
+export function DeadlineCard({ deadline, actions = [], documentTitle }: DeadlineCardProps) {
   const { t } = useTranslation();
   const date = useDueDate(deadline);
   const [changingDate, setChangingDate] = useState(false);
@@ -127,6 +131,11 @@ export function DeadlineCard({ deadline, actions = [] }: DeadlineCardProps) {
         />
       ) : (
         <View style={styles.buttons}>
+          <AddToCalendarButton
+            deadline={deadline}
+            actions={actions}
+            documentTitle={documentTitle}
+          />
           <Button
             label={t('documents.deadline.changeDate')}
             aria-label={t('documents.deadline.changeDateLabel', { date })}

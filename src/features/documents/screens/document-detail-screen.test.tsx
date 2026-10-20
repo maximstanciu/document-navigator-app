@@ -10,6 +10,7 @@ import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import type { AnalysisResult } from '@/shared/analysis/schema';
+import { fakeCalendar } from '@/test/fake-calendar';
 import { Directory, fakeFileSystem, Paths } from '@/test/fake-file-system';
 import { fakeNotifications } from '@/test/fake-notifications';
 import { createTestProviders } from '@/test/render';
@@ -323,6 +324,57 @@ describe('DocumentDetailScreen', () => {
       expect(await repositories.deadlines.list({ documentId: 'doc-1' })).toMatchObject([
         { dueDate: '2026-10-31', dateSource: 'explicit' },
       ]);
+    });
+
+    it('opens the system calendar form for a deadline, filled in (REM-10)', async () => {
+      fakeCalendar.available = true;
+      const user = userEvent.setup();
+      const invoice = ANALYSIS_FIXTURES.invoice;
+      // Far enough ahead that the deadline never becomes overdue.
+      await seedAnalyzed({
+        ...invoice,
+        deadlines: invoice.deadlines.map((deadline) => ({ ...deadline, date: '2099-10-31' })),
+      });
+      await renderDocument();
+
+      await user.press(
+        await screen.findByRole('button', {
+          name: 'Add the deadline “Оплатить счёт за электричество”, Oct 31, 2099, to your calendar',
+        })
+      );
+
+      expect(fakeCalendar.opened).toEqual([
+        {
+          title: 'Оплатить счёт за электричество',
+          date: '2099-10-31',
+          time: null,
+          notes: [
+            '• Оплатить 84,20 € переводом, указав номер клиента в назначении платежа',
+            'Document: Счёт за электричество, сентябрь 2026',
+          ].join('\n'),
+        },
+      ]);
+    });
+
+    it('offers no calendar while a new date is being chosen, or without a calendar (web)', async () => {
+      const user = userEvent.setup();
+      const invoice = ANALYSIS_FIXTURES.invoice;
+      await seedAnalyzed({
+        ...invoice,
+        deadlines: invoice.deadlines.map((deadline) => ({ ...deadline, date: '2099-10-31' })),
+      });
+      await renderDocument();
+
+      const changeDate = await screen.findByRole('button', {
+        name: 'Change the date of the deadline of Oct 31, 2099',
+      });
+      expect(screen.queryByRole('button', { name: /calendar/ })).not.toBeOnTheScreen();
+
+      fakeCalendar.available = true;
+      await user.press(changeDate);
+      expect(screen.queryByRole('button', { name: /calendar/ })).not.toBeOnTheScreen();
+      await user.press(screen.getByRole('button', { name: 'Cancel' }));
+      expect(screen.getByRole('button', { name: /calendar/ })).toBeOnTheScreen();
     });
 
     it('says when an open deadline has passed', async () => {

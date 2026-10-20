@@ -1,3 +1,4 @@
+import { resetFakeCalendar } from './fake-calendar';
 import { resetFakeNotifications } from './fake-notifications';
 
 // Native libraries that ship no Jest mock. Tests of features replace our adapter instead
@@ -23,3 +24,8 @@ jest.mock('@/features/reminders/notifications', () =>
   jest.requireActual('@/test/fake-notifications')
 );
 beforeEach(() => resetFakeNotifications());
+
+// Likewise without a calendar, so that «Add to calendar» shows only where a test turns it on
+// through `fakeCalendar` from `@/test/fake-calendar`.
+jest.mock('@/features/deadlines/calendar', () => jest.requireActual('@/test/fake-calendar'));
+beforeEach(() => resetFakeCalendar());
