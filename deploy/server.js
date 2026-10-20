@@ -5,8 +5,16 @@
 const { createServer } = require('node:http');
 const path = require('node:path');
 const { createRequestHandler } = require('expo-server/adapter/http');
+// From deploy/package.json, installed into the image only.
+// eslint-disable-next-line import/no-unresolved
+const { Agent, setGlobalDispatcher } = require('undici');
 
 process.env.NODE_ENV = 'production';
+
+// A model on a CPU can think for many minutes before it sends a byte, and Node's fetch gives up
+// on a response after 300 s. Calls that need a limit set their own (AbortSignal.timeout); the
+// model call ends when the client goes away.
+setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }));
 
 const PORT = Number(process.env.PORT || 3000);
 // Relative to the working directory, /app in the image.

@@ -2,7 +2,7 @@ import type { UploadMimeType } from '@/shared/analysis/contract';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
 
 // The model behind the analysis (SPEC §7.5). `MockLlmProvider` serves tests and development
-// without a key; the real provider comes with task 3.2.
+// without a key; `OpenAiCompatibleProvider` talks to a model behind an OpenAI-compatible API.
 
 export type LlmFile = { mimeType: UploadMimeType; bytes: Uint8Array };
 
@@ -19,6 +19,11 @@ export type LlmAnalyzeInput = {
   /** IANA time zone of the device. */
   timezone: string;
   signal?: AbortSignal;
+  /**
+   * Checks the shape of an answer: `null` if it fits, else what is wrong with it. A provider that
+   * gets one asks the model once more with the error (SPEC §7.4); the mock ignores it.
+   */
+  checkShape?: (result: unknown) => string | null;
 };
 
 export type LlmAnalyzeOutput = {
@@ -33,4 +38,18 @@ export interface LlmProvider {
   /** 'mock' or '<provider>-<model>'. */
   readonly id: string;
   analyze(input: LlmAnalyzeInput): Promise<LlmAnalyzeOutput>;
+}
+
+/**
+ * A provider call that failed, with the SPEC §7.2 code the client gets. The message is for
+ * developers and never quotes the document or the model's answer.
+ */
+export class LlmProviderError extends Error {
+  constructor(
+    readonly code: 'unavailable' | 'analysis_failed' | 'invalid_pdf',
+    message: string
+  ) {
+    super(message);
+    this.name = 'LlmProviderError';
+  }
 }

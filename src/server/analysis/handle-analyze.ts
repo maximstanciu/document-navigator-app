@@ -11,7 +11,7 @@ import { hashClientIp, hashDeviceId } from '../privacy/pseudonyms';
 import type { ServerDeps } from '../server-deps';
 import { finalizeAnalysis } from './finalize-analysis';
 import { inspectPdf } from './inspect-pdf';
-import type { LlmProvider } from './llm-provider';
+import { LlmProviderError, type LlmProvider } from './llm-provider';
 import { readAnalyzeUpload, type AnalyzeUpload } from './read-analyze-upload';
 
 export type AnalyzeDeps = ServerDeps & { provider: LlmProvider };
@@ -144,15 +144,24 @@ async function analyze(
   const pageCount = await countPages(upload);
   facts.pages = pageCount;
 
+  const context = { today: upload.today, pageCount };
   const modelStartedAt = deps.now();
-  const { result, usage, costUsd } = await callProvider(deps.provider, upload, request.signal);
+  const { result, usage, costUsd } = await callProvider(
+    deps.provider,
+    upload,
+    request.signal,
+    (output) => {
+      const checked = finalizeAnalysis(output, context);
+      return checked.ok ? null : checked.error;
+    }
+  );
   facts.modelMs = deps.now() - modelStartedAt;
   facts.inputTokens = usage.inputTokens;
   facts.outputTokens = usage.outputTokens;
   facts.costUsd = costUsd;
 
-  // A retry with the error for the model comes with the real provider (task 3.2).
-  const finalized = finalizeAnalysis(result, { today: upload.today, pageCount });
+  // The provider has already asked once more with the error (`checkShape`, SPEC §7.4).
+  const finalized = finalizeAnalysis(result, context);
   if (!finalized.ok) {
     throw new ApiFailure('analysis_failed', 'The model returned an invalid analysis.');
   }
@@ -185,7 +194,12 @@ async function countPages(upload: AnalyzeUpload): Promise<number> {
  * Hands the files over to the provider. `upload` is emptied first, so the handler holds no
  * reference to the bytes while the model works (SPEC §7.1).
  */
-async function callProvider(provider: LlmProvider, upload: AnalyzeUpload, signal: AbortSignal) {
+async function callProvider(
+  provider: LlmProvider,
+  upload: AnalyzeUpload,
+  signal: AbortSignal,
+  checkShape: (result: unknown) => string | null
+) {
   const files = upload.files.splice(0);
   try {
     return await provider.analyze({
@@ -194,10 +208,11 @@ async function callProvider(provider: LlmProvider, upload: AnalyzeUpload, signal
       today: upload.today,
       timezone: upload.timezone,
       signal,
+      checkShape,
     });
   } catch (error) {
     if (signal.aborted) throw error;
-    // Provider errors get their own codes with the real provider (task 3.2).
+    if (error instanceof LlmProviderError) throw new ApiFailure(error.code, error.message);
     throw new ApiFailure('unavailable', 'The analysis service is unavailable.');
   }
 }

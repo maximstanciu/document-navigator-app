@@ -3,8 +3,16 @@ import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures'
 
 import { createAnalyzeDeps } from './analyze-deps';
 import { MockLlmProvider } from './providers/mock-llm-provider';
+import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider';
 
 const input = { files: [], locale: 'ru', today: '2026-10-18', timezone: 'Europe/Berlin' } as const;
+
+const OPENAI_COMPATIBLE = {
+  LLM_PROVIDER: 'openai-compatible',
+  LLM_BASE_URL: 'http://llm:11434/v1',
+  LLM_MODEL: 'qwen3.6:35b',
+  PDF_RENDER_URL: 'http://pdf-render:8080',
+};
 
 describe('createAnalyzeDeps', () => {
   it('uses the mock provider and serves every version by default', () => {
@@ -22,10 +30,21 @@ describe('createAnalyzeDeps', () => {
     expect(result).toMatchObject({ title: ANALYSIS_FIXTURES.unreadable.title });
   });
 
+  it('builds the OpenAI-compatible provider for a self-hosted model', () => {
+    const deps = createAnalyzeDeps(OPENAI_COMPATIBLE);
+
+    expect(deps.provider).toBeInstanceOf(OpenAiCompatibleProvider);
+    expect(deps.provider.id).toBe('openai-compatible-qwen3.6:35b');
+  });
+
   it.each([
     [{ LLM_PROVIDER: 'gpt-0' }, 'LLM_PROVIDER'],
     [{ LLM_MOCK_FIXTURE: 'receipt' }, 'LLM_MOCK_FIXTURE'],
     [{ LLM_MOCK_DELAY_MS: '1.5s' }, 'LLM_MOCK_DELAY_MS'],
+    [{ ...OPENAI_COMPATIBLE, LLM_BASE_URL: '' }, 'LLM_BASE_URL'],
+    [{ ...OPENAI_COMPATIBLE, LLM_BASE_URL: 'llm:11434' }, 'LLM_BASE_URL'],
+    [{ ...OPENAI_COMPATIBLE, LLM_MODEL: undefined }, 'LLM_MODEL'],
+    [{ ...OPENAI_COMPATIBLE, PDF_RENDER_URL: 'ftp://pdf-render' }, 'PDF_RENDER_URL'],
   ])('fails on a misconfigured %o', (env, name) => {
     expect(() => createAnalyzeDeps(env)).toThrow(name);
   });

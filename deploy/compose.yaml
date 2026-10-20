@@ -1,4 +1,5 @@
-# Self-hosted backend: API server, counter store for limits and beta metrics, HTTPS proxy.
+# Self-hosted backend: API server, the model (Ollama on the CPU) and a PDF renderer for it, counter
+# store for limits and beta metrics, HTTPS proxy.
 # Run from deploy/ with `docker compose up -d --build`; settings come from deploy/.env (see
 # .env.example and README.md in this folder).
 name: docnavigator
@@ -25,13 +26,24 @@ services:
       # The Upstash REST API, served by redis-http over the local Redis (SPEC §8.3).
       UPSTASH_REDIS_REST_URL: http://redis-http
       UPSTASH_REDIS_REST_TOKEN: ${COUNTER_STORE_TOKEN:?Set COUNTER_STORE_TOKEN in deploy/.env}
+      # The model of this compose file; deploy/.env can point elsewhere (SPEC D-6) or set `mock`.
+      LLM_PROVIDER: ${LLM_PROVIDER:-openai-compatible}
+      LLM_BASE_URL: ${LLM_BASE_URL:-http://llm:11434/v1}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b}
+      LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-none}
+      PDF_RENDER_URL: ${PDF_RENDER_URL:-http://pdf-render:8080}
     depends_on:
       redis-http:
         condition: service_started
+      llm-pull:
+        condition: service_completed_successfully
+      pdf-render:
+        condition: service_healthy
     read_only: true
     tmpfs: /tmp
     security_opt: ['no-new-privileges:true']
-    # An analysis waits up to 90 s for the model; let it finish when the container is replaced.
+    # Analyses in flight get 90 s to finish when the container is replaced; a longer one on the CPU
+    # is cut off, and the app shows an error without charging the limit.
     stop_grace_period: 95s
     logging: *logging
 
@@ -65,6 +77,50 @@ services:
     security_opt: ['no-new-privileges:true']
     logging: *logging
 
+  # The model, on the CPU (SPEC D-6, until the public release). Loaded once and kept in memory,
+  # one analysis at a time; the context fits a few pages of images and the prompt.
+  llm:
+    image: ollama/ollama:0.32.5
+    restart: unless-stopped
+    environment:
+      OLLAMA_KEEP_ALIVE: '-1'
+      OLLAMA_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-32768}
+      OLLAMA_NUM_PARALLEL: '1'
+      OLLAMA_MAX_LOADED_MODELS: '1'
+    volumes:
+      - ollama-models:/root/.ollama
+    healthcheck:
+      test: ['CMD', 'ollama', 'list']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    security_opt: ['no-new-privileges:true']
+    logging: *logging
+
+  # Downloads the model on the first start (24 GB for qwen3.6:35b); later starts find it and exit.
+  llm-pull:
+    image: ollama/ollama:0.32.5
+    environment:
+      OLLAMA_HOST: http://llm:11434
+      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b}
+    entrypoint:
+      ['sh', '-c', 'ollama show "$$LLM_MODEL" > /dev/null 2>&1 || ollama pull "$$LLM_MODEL"']
+    depends_on:
+      llm:
+        condition: service_healthy
+    restart: 'no'
+    logging: *logging
+
+  # PDF pages as JPEG for the model, which reads only images. Keeps nothing.
+  pdf-render:
+    build: ./pdf-render
+    image: docnavigator-pdf-render
+    restart: unless-stopped
+    read_only: true
+    tmpfs: /tmp
+    security_opt: ['no-new-privileges:true']
+    logging: *logging
+
   caddy:
     image: caddy:2.11-alpine
     restart: unless-stopped
@@ -84,6 +140,7 @@ services:
     logging: *logging
 
 volumes:
+  ollama-models:
   redis-data:
   caddy-data:
   caddy-config:

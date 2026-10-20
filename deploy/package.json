@@ -1,0 +1,9 @@
+{
+  "name": "docnavigator-api-runtime",
+  "private": true,
+  "description": "Packages the self-hosted API image needs besides the exported routes (deploy/Dockerfile).",
+  "license": "MIT",
+  "dependencies": {
+    "undici": "7.30.1"
+  }
+}

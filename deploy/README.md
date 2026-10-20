@@ -1,17 +1,21 @@
 # Свой сервер: бэкенд в Docker Compose
 
-Альтернатива EAS Hosting для API routes (`/api/v1/*`): тот же код из `src/app/api` и `src/server`, собранный `expo export --platform web --api-only` и запущенный на Node. Подходит для домашнего сервера (HP MicroServer и подобные, amd64 или arm64).
+Альтернатива EAS Hosting для API routes (`/api/v1/*`): тот же код из `src/app/api` и `src/server`, собранный `expo export --platform web --api-only` и запущенный на Node. Подходит для домашнего сервера (HP MicroServer и подобные, amd64 или arm64). До публичного релиза в том же compose работает и модель — на CPU, без GPU (SPEC D-6, промежуточное решение).
 
-| Сервис       | Образ                                | Что делает                                                                                                               |
-| ------------ | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------ |
-| `api`        | собирается из `deploy/Dockerfile`    | API routes на Node (`server.js` + адаптер `expo-server`). Наружу не открыт.                                              |
-| `redis`      | `redis:8.10-alpine`                  | Счётчики лимитов и метрик беты (SPEC §8.3, §8.7), том `redis-data`. Документов и результатов анализа в нём нет.          |
-| `redis-http` | `hiett/serverless-redis-http:0.0.10` | REST API в формате Upstash поверх этого Redis: сервер работает с ним тем же `UpstashCounterStore`, что и на EAS Hosting. |
-| `caddy`      | `caddy:2.11-alpine`                  | HTTPS с сертификатом Let's Encrypt, `X-Real-IP` из адреса соединения (на нём держится лимит по IP). Журнала доступа нет. |
+| Сервис       | Образ                                | Что делает                                                                                                                    |
+| ------------ | ------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------- |
+| `api`        | собирается из `deploy/Dockerfile`    | API routes на Node (`server.js` + адаптер `expo-server`). Наружу не открыт.                                                   |
+| `llm`        | `ollama/ollama:0.32.5`               | Модель (`LLM_MODEL`, по умолчанию `qwen3.6:35b`) на CPU: всегда в памяти, один анализ за раз, контекст 32K. Наружу не открыт. |
+| `llm-pull`   | `ollama/ollama:0.32.5`               | При первом запуске скачивает модель в том `ollama-models` и завершается; `api` ждёт его.                                      |
+| `pdf-render` | собирается из `deploy/pdf-render`    | Страницы PDF в JPEG для модели, которая читает только картинки (`pypdfium2`). Ничего не хранит, наружу не открыт.             |
+| `redis`      | `redis:8.10-alpine`                  | Счётчики лимитов и метрик беты (SPEC §8.3, §8.7), том `redis-data`. Документов и результатов анализа в нём нет.               |
+| `redis-http` | `hiett/serverless-redis-http:0.0.10` | REST API в формате Upstash поверх этого Redis: сервер работает с ним тем же `UpstashCounterStore`, что и на EAS Hosting.      |
+| `caddy`      | `caddy:2.11-alpine`                  | HTTPS с сертификатом Let's Encrypt, `X-Real-IP` из адреса соединения (на нём держится лимит по IP). Журнала доступа нет.      |
 
 ## Что нужно
 
-- Docker Engine с Compose v2 (`docker compose version`), около 2 ГБ свободной памяти на время сборки.
+- Docker Engine с Compose v2 (`docker compose version`).
+- Память: модель `qwen3.6:35b` занимает около 24 ГБ и ещё несколько гигабайт на контекст, всё остальное — меньше 1 ГБ. Нужно 32 ГБ, из них около 28 ГБ свободных. Диск: около 35 ГБ (модель, образ Ollama и сборка).
 - Доменное имя, A/AAAA-запись которого указывает на внешний адрес сервера, и порты 80 и 443 с роутера на сервер. Без HTTPS приложение работать с сервером не будет: release-сборки iOS и Android не ходят по открытому HTTP.
 
 ## Первый запуск
@@ -28,6 +32,8 @@ docker compose up -d --build
 docker compose ps
 ```
 
+Первый запуск скачивает модель (24 ГБ): `up` ждёт, пока `llm-pull` закончит, прогресс — `docker compose logs -f llm-pull`. Последующие запуски находят модель в томе и не качают её снова.
+
 Проверка снаружи (сертификат Caddy получает за несколько секунд после первого запроса):
 
 ```bash
@@ -35,13 +41,13 @@ curl https://api.example.com/healthz
 curl https://api.example.com/api/v1/limits -H 'X-App-Version: 1.0.0' -H 'X-Platform: android' -H 'X-Device-Id: 6f1c2a9e-3b7d-4c8e-9f0a-1b2c3d4e5f60'
 ```
 
-Приложение направляется на сервер переменной `EXPO_PUBLIC_API_URL=https://api.example.com` (в `.env.local` для dev-сервера, в EAS environment variables для сборок).
+Приложение направляется на сервер переменной `EXPO_PUBLIC_API_URL=https://api.example.com` (в `.env.local` для dev-сервера, в EAS environment variables для сборок). Модель на CPU отвечает минуты, поэтому сборкам для этого сервера нужен ещё `EXPO_PUBLIC_ANALYZE_TIMEOUT_MS=1800000` (30 минут), иначе приложение сдаётся через 90 с.
 
 ## Обновление и обслуживание
 
 ```bash
-git pull && docker compose up -d --build   # пересобрать и заменить api; анализы в работе успевают закончиться (до 95 с)
-docker compose logs -f api                 # события analyze.start / analyze.end, одна строка JSON
+git pull && docker compose up -d --build   # пересобрать и заменить api; анализу в работе даётся 95 с, более долгий обрывается
+docker compose logs -f api                 # события analyze.start / analyze.end, одна строка JSON (modelMs — сколько думала модель)
 curl -H "Authorization: Bearer $METRICS_TOKEN" https://api.example.com/api/v1/metrics   # отчёт беты, если задан METRICS_TOKEN
 ```
 
@@ -52,7 +58,14 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" https://api.example.com/api/v1/me
 - Нет предела памяти изолята в 250 МБ и лимита CPU: ограничение одно — память сервера.
 - `requestId` в логах — UUID, который сервер создаёт сам, а не `Cf-Ray`. Логи — в `docker compose logs`, а не на странице Logs деплоя.
 - Счётчики — в локальном Redis, а не в Upstash. Резервная копия нужна только если важны метрики беты: том `docnavigator_redis-data`.
-- Сервер работает на `MockLlmProvider`, пока нет настоящего провайдера (задача 3.2, решение D-6). Ключ провайдера потом добавляется в `deploy/.env`: контейнер `api` получает из него все переменные.
+- Модель своя (`OpenAiCompatibleProvider` → Ollama): документы не уходят AI-провайдеру, анализ бесплатный (`costUsd: 0`), но медленный.
+
+## Модель
+
+- **Скорость.** На CPU документ из нескольких страниц разбирается за минуты, длинный PDF — дольше. Запросы идут по одному: следующий ждёт, пока модель закончит предыдущий. Рассуждения выключены (`LLM_REASONING_EFFORT=none`), с ними было бы в разы дольше.
+- **Контекст.** 32K токенов хватает на промпт и около 15–20 страниц: страница — около тысячи токенов картинки, длинная сторона до 1600 px. Больше страниц — поднимите `LLM_CONTEXT_LENGTH`, это стоит памяти.
+- **Другая модель:** `LLM_MODEL` в `.env`, например `gemma4:12b` (8 ГБ) при нехватке памяти; `llm-pull` скачает её при следующем `up`. Модель снаружи (SPEC D-6, варианты B и C): `LLM_BASE_URL` и `LLM_API_KEY`; сервисы `llm` и `llm-pull` тогда можно убрать.
+- **Без модели:** `LLM_PROVIDER=mock` отвечает синтетическими фикстурами.
 
 ## Если на сервере уже есть обратный прокси
 
@@ -60,4 +73,4 @@ curl -H "Authorization: Bearer $METRICS_TOKEN" https://api.example.com/api/v1/me
 
 ## Проверка на своей машине
 
-`API_DOMAIN=:80`, `HTTP_PORT=8088`: Caddy отдаёт API по HTTP на `http://localhost:8088`.
+`API_DOMAIN=:80`, `HTTP_PORT=8088`: Caddy отдаёт API по HTTP на `http://localhost:8088`. Если памяти меньше 32 ГБ, `LLM_MODEL=gemma4:e2b` (около 5 ГБ) проверит связку, но не качество.

@@ -18,7 +18,7 @@ import { StoreUnavailableError } from '../store/counter-store';
 import { testServerDeps, type TestServerDeps } from '../testing/server-deps';
 import { handleAnalyze, type AnalyzeDeps } from './handle-analyze';
 import * as inspectPdfModule from './inspect-pdf';
-import type { LlmAnalyzeInput, LlmProvider } from './llm-provider';
+import { LlmProviderError, type LlmAnalyzeInput, type LlmProvider } from './llm-provider';
 import { MockLlmProvider } from './providers/mock-llm-provider';
 
 let server: TestServerDeps;
@@ -305,6 +305,31 @@ describe('handleAnalyze', () => {
       503,
       'unavailable'
     );
+  });
+
+  it.each([
+    ['analysis_failed', 502],
+    ['invalid_pdf', 422],
+    ['unavailable', 503],
+  ] as const)('answers a provider failure %s with its own status', async (code, status) => {
+    const { provider } = recordingProvider(async () => {
+      throw new LlmProviderError(code, 'The model failed.');
+    });
+
+    await expectError(await handleAnalyze(analyzeRequest(), deps({ provider })), status, code);
+  });
+
+  it('lets the provider check the shape of an answer for its retry (SPEC §7.4)', async () => {
+    const { provider, calls } = recordingProvider();
+
+    await handleAnalyze(
+      analyzeRequest({ files: Array.from({ length: 4 }, () => jpeg()) }),
+      deps({ provider })
+    );
+
+    const { checkShape } = calls[0];
+    expect(checkShape?.(validResult())).toBeNull();
+    expect(checkShape?.({ ...validResult(), summary: 42 })).toContain('summary');
   });
 
   it('rethrows when the client is gone, instead of answering', async () => {

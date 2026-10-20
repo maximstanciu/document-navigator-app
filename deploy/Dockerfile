@@ -14,7 +14,10 @@ RUN npx expo export --platform web --api-only --output-dir dist
 FROM node:24-trixie-slim
 WORKDIR /app
 ENV NODE_ENV=production PORT=3000
-# The route bundles are self-contained; the adapter is the only package they need at runtime.
+# The server's own packages (undici, for fetch without its 300 s limit), then the adapter: the
+# route bundles are self-contained and need nothing else.
+COPY deploy/package.json deploy/package-lock.json ./
+RUN npm ci --omit=dev --no-audit --no-fund
 COPY --from=build /app/node_modules/expo-server ./node_modules/expo-server
 COPY --from=build /app/dist/server ./dist/server
 COPY deploy/server.js ./server.js

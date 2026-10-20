@@ -3,6 +3,7 @@ import { getCalendars } from 'expo-localization';
 
 import { apiClient } from '@/lib/api/client';
 import { getRepositories } from '@/lib/db/repositories';
+import { env } from '@/lib/env';
 import type { DocumentMimeType } from '@/lib/db/types';
 import { pageFileExists, pageFileUri } from '@/lib/files/page-files';
 import { currentLanguage } from '@/lib/i18n/i18n';
@@ -27,8 +28,11 @@ import { appendUploadFile, type UploadFile } from './upload-file';
 
 const ANALYZE_PATH = '/api/v1/analyze';
 
-/** The analysis is one synchronous request (D-1); the client gives up after 90 s (SPEC §7.2). */
-export const ANALYZE_TIMEOUT_MS = 90_000;
+/**
+ * The analysis is one synchronous request (D-1); the client gives up after 90 s (SPEC §7.2), or
+ * after `EXPO_PUBLIC_ANALYZE_TIMEOUT_MS` in builds for a model on a CPU.
+ */
+export const ANALYZE_TIMEOUT_MS = env.analyzeTimeoutMs;
 
 export type AnalyzeRequest = {
   files: readonly UploadFile[];
