@@ -4,6 +4,7 @@ import {
   cancelScheduledNotificationAsync,
   clearLastNotificationResponse,
   DEFAULT_ACTION_IDENTIFIER,
+  dismissAllNotificationsAsync,
   getAllScheduledNotificationsAsync,
   getLastNotificationResponse,
   getPermissionsAsync,
@@ -121,6 +122,14 @@ export async function scheduleNotification(notification: ReminderNotification): 
 
 export async function cancelNotification(id: string): Promise<void> {
   await cancelScheduledNotificationAsync(id);
+}
+
+/**
+ * Removes the reminders already shown from the notification center: all of them are ours. With
+ * «Details in notifications» (SET-5) they carry what a deadline is about.
+ */
+export async function dismissShownNotifications(): Promise<void> {
+  await dismissAllNotificationsAsync();
 }
 
 /**

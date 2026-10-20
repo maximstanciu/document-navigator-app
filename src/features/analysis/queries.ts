@@ -1,14 +1,26 @@
-import { useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
+import { queryOptions, useMutation, useMutationState, useQueryClient } from '@tanstack/react-query';
 
 import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
 
-import { analyzeDocument } from './api';
+import { analyzeDocument, fetchLimits } from './api';
 import { AnalysisError } from './errors';
 
 export const analysisKeys = {
   analyze: () => ['analysis', 'analyze'] as const,
+  limits: () => ['analysis', 'limits'] as const,
 };
+
+/**
+ * What is left of today's analyses, from the server (SET-4). Not local data: it changes with every
+ * analysis (refreshed after each one) and at midnight UTC (refetched when the app comes back).
+ */
+export function limitsQuery() {
+  return queryOptions({
+    queryKey: analysisKeys.limits(),
+    queryFn: fetchLimits,
+  });
+}
 
 /**
  * Starts the analysis of a document (ANL-1). Runs to the end even if the screen that started it
@@ -25,13 +37,15 @@ export function useAnalyzeDocument() {
     mutationFn: (documentId: string) => analyzeDocument(documentId, refreshDocuments),
     retry: false,
     networkMode: 'always',
-    // New deadlines get their reminders; a re-analysis may have replaced some (ANL-8).
+    // New deadlines get their reminders; a re-analysis may have replaced some (ANL-8). The
+    // analysis may have used up one of today's.
     onSettled: () => {
       syncRemindersInBackground();
       return Promise.all([
         refreshDocuments(),
         queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() }),
         queryClient.invalidateQueries({ queryKey: dbKeys.actions.all() }),
+        queryClient.invalidateQueries({ queryKey: analysisKeys.limits() }),
       ]);
     },
   });

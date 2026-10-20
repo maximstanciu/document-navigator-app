@@ -1,4 +1,4 @@
-import { formatCalendarDate, formatFileSize, formatTimestampDate } from './format';
+import { formatCalendarDate, formatClockTime, formatFileSize, formatTimestampDate } from './format';
 
 describe('date formatting', () => {
   it('formats in the interface language', () => {
@@ -9,6 +9,11 @@ describe('date formatting', () => {
   it('keeps calendar dates on their day in any time zone', () => {
     expect(formatCalendarDate('2026-10-31', 'ru')).toMatch(/^31 /);
     expect(formatCalendarDate('2026-01-01', 'en')).toMatch(/Jan 1, 2026/);
+  });
+
+  it('shows a time of day as it is, whatever the time zone', () => {
+    expect(formatClockTime('09:05', 'ru')).toBe('09:05');
+    expect(formatClockTime('18:30', 'en')).toMatch(/^06:30\sPM$/);
   });
 });
 

@@ -1,3 +1,4 @@
+import { isClockTime } from '@/shared/calendar-date';
 import { isExplanationLocale } from '@/shared/explanation-locales';
 
 import type { SqlDatabase } from './database';
@@ -25,7 +26,7 @@ function isValid<K extends keyof Settings>(key: K, value: unknown): value is Set
     case 'reminderOffsetsDays':
       return Array.isArray(value) && value.every((item) => Number.isInteger(item) && item >= 0);
     case 'reminderTime':
-      return typeof value === 'string' && /^([01]\d|2[0-3]):[0-5]\d$/.test(value);
+      return isClockTime(value);
     case 'notificationDetails':
     case 'onboardingCompleted':
       return typeof value === 'boolean';

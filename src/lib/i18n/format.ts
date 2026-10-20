@@ -19,6 +19,16 @@ export function formatTimestampDateTime(isoTimestamp: string, language: string):
   }).format(new Date(isoTimestamp));
 }
 
+/** A time of day (`HH:mm`, local), e.g. when reminders come (SET-2): «09:00» or «09:00 AM». */
+export function formatClockTime(time: string, language: string): string {
+  const [hours, minutes] = time.split(':').map(Number);
+  return new Intl.DateTimeFormat(language, {
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'UTC',
+  }).format(new Date(Date.UTC(2000, 0, 1, hours, minutes)));
+}
+
 /**
  * A calendar date (YYYY-MM-DD, no time zone), e.g. a document date or a deadline. Formatted in UTC so
  * it never shifts by a day in time zones west of UTC.

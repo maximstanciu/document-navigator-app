@@ -92,3 +92,19 @@ export function localNoon(date: string): Date {
 export function localCalendarDate(moment: Date): string {
   return format(moment.getFullYear(), moment.getMonth() + 1, moment.getDate());
 }
+
+/**
+ * `time` (`HH:mm`) today in the runtime's time zone, for pickers that take a `Date`. Only the time
+ * of day is read back (`clockTime()`), so the day doesn't matter.
+ */
+export function todayAt(time: string): Date {
+  const [hours, minutes] = time.split(':').map(Number);
+  const moment = new Date();
+  moment.setHours(hours, minutes, 0, 0);
+  return moment;
+}
+
+/** The time of day of `moment` in the runtime's time zone, `HH:mm`. */
+export function clockTime(moment: Date): string {
+  return `${String(moment.getHours()).padStart(2, '0')}:${String(moment.getMinutes()).padStart(2, '0')}`;
+}

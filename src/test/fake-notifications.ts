@@ -61,6 +61,8 @@ export const cancelNotification = jest.fn(async (id: string) => {
   fakeNotifications.scheduled.delete(id);
 });
 
+export const dismissShownNotifications = jest.fn(async () => {});
+
 export const getLastOpenedReminder = jest.fn(() => fakeNotifications.lastOpened);
 
 export const clearLastOpenedReminder = jest.fn(() => {
@@ -90,6 +92,7 @@ export function resetFakeNotifications() {
     listScheduledNotificationIds,
     scheduleNotification,
     cancelNotification,
+    dismissShownNotifications,
     getLastOpenedReminder,
     clearLastOpenedReminder,
     addReminderOpenedListener,

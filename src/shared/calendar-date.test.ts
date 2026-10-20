@@ -2,12 +2,14 @@ import {
   addDays,
   addMonths,
   addYears,
+  clockTime,
   daysBetween,
   endOfPeriod,
   isCalendarDate,
   isClockTime,
   localCalendarDate,
   localNoon,
+  todayAt,
 } from './calendar-date';
 
 describe('isCalendarDate', () => {
@@ -123,6 +125,17 @@ describe('localNoon', () => {
       const moment = localNoon(date);
       expect(moment.getHours()).toBe(12);
       expect(localCalendarDate(moment)).toBe(date);
+    }
+  );
+});
+
+describe('todayAt and clockTime', () => {
+  it.each(['00:00', '09:00', '09:05', '12:30', '23:59'])(
+    'turn %s into a moment and back',
+    (time) => {
+      const moment = todayAt(time);
+      expect(localCalendarDate(moment)).toBe(localCalendarDate(new Date()));
+      expect(clockTime(moment)).toBe(time);
     }
   );
 });

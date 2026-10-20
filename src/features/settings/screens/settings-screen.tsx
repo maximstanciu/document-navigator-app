@@ -1,15 +1,21 @@
+import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useTranslation } from 'react-i18next';
-import { Platform, ScrollView, StyleSheet } from 'react-native';
+import { ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
-import { useColorScheme } from '@/hooks/use-color-scheme';
+import { RemainingAnalyses } from '@/features/analysis/components/remaining-analyses';
+import { settingsQuery } from '@/lib/db/settings-query';
 import { env } from '@/lib/env';
 
-import { LanguagePicker } from '../components/language-picker';
+import { DeleteAllData } from '../components/delete-all-data';
+import { ExplanationLanguagePicker, LanguagePicker } from '../components/language-picker';
+import { ReminderSettings } from '../components/reminder-settings';
+import { SettingsSection } from '../components/settings-section';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -22,34 +28,57 @@ function InfoRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+/**
+ * Settings (SET-1…SET-5): languages, default reminders, what is left of today's analyses, «Delete
+ * all data», and the disclaimer with the version. The privacy policy link comes with the policy
+ * itself (task 6.4).
+ */
 export function SettingsScreen() {
   const { t } = useTranslation();
-  const colorScheme = useColorScheme();
+  const { isPending, error, refetch } = useQuery(settingsQuery());
 
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        <ScrollView contentContainerStyle={styles.content}>
-          <ThemedText type="subtitle" role="heading" style={styles.heading}>
-            {t('settings.title')}
-          </ThemedText>
+  let content;
+  if (isPending) {
+    content = <LoadingState />;
+  } else if (error) {
+    content = <ErrorState error={error} onRetry={() => refetch()} />;
+  } else {
+    content = (
+      <ScrollView contentContainerStyle={styles.content}>
+        <ThemedText type="subtitle" role="heading" style={styles.heading}>
+          {t('settings.title')}
+        </ThemedText>
+        <SettingsSection title={t('settings.sections.language')}>
           <LanguagePicker />
+          <ExplanationLanguagePicker />
+        </SettingsSection>
+        <SettingsSection title={t('settings.sections.reminders')}>
+          <ReminderSettings />
+        </SettingsSection>
+        <SettingsSection title={t('settings.sections.analysis')}>
+          <RemainingAnalyses />
+        </SettingsSection>
+        <SettingsSection title={t('settings.sections.data')}>
+          <DeleteAllData />
+        </SettingsSection>
+        <SettingsSection title={t('settings.sections.about')}>
+          <ThemedText type="small" themeColor="textSecondary">
+            {t('documents.disclaimer')}
+          </ThemedText>
           <InfoRow
             label={t('settings.version')}
             value={Constants.expoConfig?.version ?? t('settings.unknown')}
           />
-          <InfoRow
-            label={t('settings.platform')}
-            value={Platform.OS === 'web' ? 'web' : `${Platform.OS} ${Platform.Version}`}
-          />
-          <InfoRow
-            label={t('settings.appearance')}
-            value={t(
-              `settings.appearanceValue.${colorScheme === 'light' || colorScheme === 'dark' ? colorScheme : 'unspecified'}`
-            )}
-          />
           <InfoRow label={t('settings.api')} value={env.apiUrl || t('settings.apiNotConfigured')} />
-        </ScrollView>
+        </SettingsSection>
+      </ScrollView>
+    );
+  }
+
+  return (
+    <ThemedView style={styles.container}>
+      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
+        {content}
       </SafeAreaView>
     </ThemedView>
   );
@@ -67,10 +96,9 @@ const styles = StyleSheet.create({
   },
   heading: {
     paddingTop: TopTabInset + Spacing.three,
-    paddingBottom: Spacing.two,
   },
   content: {
-    gap: Spacing.two,
+    gap: Spacing.five,
     paddingHorizontal: Spacing.three,
     paddingBottom: BottomTabInset + Spacing.three,
   },

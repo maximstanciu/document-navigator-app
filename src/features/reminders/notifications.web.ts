@@ -25,6 +25,8 @@ export async function scheduleNotification(_notification: ReminderNotification):
 
 export async function cancelNotification(_id: string): Promise<void> {}
 
+export async function dismissShownNotifications(): Promise<void> {}
+
 export function getLastOpenedReminder(): OpenedReminder | null {
   return null;
 }

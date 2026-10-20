@@ -15,6 +15,8 @@ export function createRepositories(db: SqlDatabase, now: Clock = systemClock) {
     actions: createActionsRepository(db, now),
     scheduledNotifications: createScheduledNotificationsRepository(db),
     settings: createSettingsRepository(db),
+    /** «Delete all data» (STO-7, SET-3): see `wipeAllData()`. */
+    wipeAll: () => wipeAllData(db),
   };
 }
 
@@ -50,4 +52,28 @@ export async function purgeTombstones(db: SqlDatabase, cutoff: Date): Promise<vo
       before,
     ]);
   });
+}
+
+/** Children first, though `DELETE` of a parent would cascade anyway. */
+const ALL_TABLES = [
+  'scheduled_notifications',
+  'actions',
+  'deadlines',
+  'pages',
+  'documents',
+  'settings',
+] as const;
+
+/**
+ * «Delete all data» (STO-7, SET-3): every row of every table, tombstones and settings included, as
+ * on a fresh install; nothing is kept for sync. `VACUUM` then rebuilds the file without the freed
+ * pages and the checkpoint empties the WAL, so the deleted content can't be read from either (or
+ * from a backup taken later). Page files and the reminders in the OS are the caller's.
+ */
+export async function wipeAllData(db: SqlDatabase): Promise<void> {
+  await db.transaction(async (tx) => {
+    for (const table of ALL_TABLES) await tx.runAsync(`DELETE FROM ${table}`);
+  });
+  await db.execAsync('VACUUM');
+  await db.execAsync('PRAGMA wal_checkpoint(TRUNCATE)');
 }

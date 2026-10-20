@@ -1,65 +1,85 @@
-import { useQuery } from '@tanstack/react-query';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
-import { settingsQuery } from '@/lib/db/settings-query';
+import { Spacing } from '@/constants/theme';
 import type { InterfaceLocale } from '@/lib/db/types';
+import { EXPLANATION_LOCALES, type ExplanationLocale } from '@/shared/explanation-locales';
 
-import { useUpdateSettings } from '../queries';
+import { useSettings } from '../queries';
+import { RadioGroup } from './radio-group';
 
-const OPTIONS: InterfaceLocale[] = ['system', 'ru', 'en'];
+const INTERFACE_OPTIONS: InterfaceLocale[] = ['system', 'ru', 'en'];
 
 /** Interface language: system, Russian or English (SET-1). */
 export function LanguagePicker() {
   const { t } = useTranslation();
-  const { data: settings } = useQuery(settingsQuery());
-  const updateSettings = useUpdateSettings();
-  const selected = updateSettings.variables?.locale ?? settings?.locale ?? 'system';
+  const { settings, update } = useSettings();
 
   return (
-    <View style={styles.group} role="radiogroup" aria-label={t('settings.language')}>
-      <ThemedText type="smallBold">{t('settings.language')}</ThemedText>
-      {OPTIONS.map((option) => {
-        const checked = option === selected;
-        const label = t(`settings.languageOption.${option}`);
-        return (
-          <Pressable
-            key={option}
-            role="radio"
-            aria-label={label}
-            aria-checked={checked}
-            disabled={updateSettings.isPending || !settings}
-            onPress={() => updateSettings.mutate({ locale: option })}>
-            {({ pressed }) => (
-              <ThemedView
-                type={checked || pressed ? 'backgroundSelected' : 'backgroundElement'}
-                style={styles.option}>
-                <ThemedText type="small">{label}</ThemedText>
-                <ThemedText type="smallBold" aria-hidden>
-                  {checked ? '✓' : ''}
-                </ThemedText>
-              </ThemedView>
-            )}
-          </Pressable>
-        );
-      })}
+    <View style={styles.container}>
+      <RadioGroup
+        label={t('settings.language')}
+        options={INTERFACE_OPTIONS.map((value) => ({
+          value,
+          label: t(`settings.languageOption.${value}`),
+        }))}
+        selected={settings?.locale ?? 'system'}
+        disabled={update.isPending || !settings}
+        onSelect={(locale) => update.mutate({ locale })}
+      />
+      {update.isError && (
+        <ThemedText type="small" role="alert">
+          {t('settings.saveFailed')}
+        </ThemedText>
+      )}
+    </View>
+  );
+}
+
+type ExplanationChoice = 'interface' | ExplanationLocale;
+
+const EXPLANATION_OPTIONS: ExplanationChoice[] = ['interface', ...EXPLANATION_LOCALES];
+
+/**
+ * «Explanation language» (SET-1, D-5): the language analyses are explained in, by default the
+ * interface language (`null` in settings). Applies to the next analysis.
+ */
+export function ExplanationLanguagePicker() {
+  const { t } = useTranslation();
+  const { settings, update } = useSettings();
+
+  return (
+    <View style={styles.container}>
+      <RadioGroup
+        label={t('settings.explanationLanguage')}
+        hint={t('settings.explanationLanguageHint')}
+        options={EXPLANATION_OPTIONS.map((value) => {
+          const label = t(`settings.explanationLanguageOption.${value}`);
+          // «Русский» and «English» are in the interface language group above too.
+          return {
+            value,
+            label,
+            name: t('settings.explanationLanguageOptionName', { option: label }),
+          };
+        })}
+        selected={settings?.explanationLocale ?? 'interface'}
+        disabled={update.isPending || !settings}
+        onSelect={(choice) =>
+          update.mutate({ explanationLocale: choice === 'interface' ? null : choice })
+        }
+      />
+      {update.isError && (
+        <ThemedText type="small" role="alert">
+          {t('settings.saveFailed')}
+        </ThemedText>
+      )}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
-  group: {
+  container: {
     gap: Spacing.two,
-  },
-  option: {
-    minHeight: MinTouchTarget,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
   },
 });

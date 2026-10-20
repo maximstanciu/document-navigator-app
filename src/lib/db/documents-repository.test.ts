@@ -3,6 +3,7 @@ import { createFakeClock, createTestDatabase } from '@/test/sqlite';
 
 import type { SqlDatabase } from './database';
 import { createRepositories, purgeTombstones, type Repositories } from './repositories';
+import { DEFAULT_SETTINGS } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -535,6 +536,29 @@ describe('documents repository', () => {
       await repos.documents.remove('doc-1');
 
       await expect(repos.documents.remove('doc-1')).resolves.toBeNull();
+    });
+
+    it('goes with everything else on «Delete all data», tombstones and settings too (STO-7)', async () => {
+      await repos.documents.create(newDocument('doc-2'));
+      await repos.documents.remove('doc-2');
+      await repos.settings.update({ locale: 'ru', reminderTime: '08:30' });
+
+      await repos.wipeAll();
+
+      for (const table of [
+        'documents',
+        'pages',
+        'deadlines',
+        'actions',
+        'scheduled_notifications',
+        'settings',
+      ]) {
+        expect(await db.getAllAsync(`SELECT * FROM ${table}`)).toEqual([]);
+      }
+      expect(await repos.settings.get()).toEqual(DEFAULT_SETTINGS);
+      // The database still works as on a fresh install.
+      await repos.documents.create(newDocument('doc-3'));
+      expect(await repos.documents.list()).toHaveLength(1);
     });
 
     it('purges tombstones after the retention period, children included', async () => {

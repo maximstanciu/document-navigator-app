@@ -3,6 +3,8 @@ import { currentLanguage, i18n } from '@/lib/i18n/i18n';
 
 import {
   cancelNotification,
+  clearLastOpenedReminder,
+  dismissShownNotifications,
   getNotificationPermission,
   listScheduledNotificationIds,
   scheduleNotification,
@@ -81,4 +83,15 @@ export function syncRemindersInBackground(): void {
     // Development builds only: an error may carry notification text (AGENTS.md → Privacy).
     if (__DEV__) console.warn('Reminder sync failed', error);
   });
+}
+
+/**
+ * After «Delete all data» wiped the deadlines (STO-7): the sync cancels every scheduled reminder, the
+ * ones already shown leave the notification center, and a tap the OS still keeps no longer opens a
+ * document that is gone.
+ */
+export async function clearAllReminders(): Promise<void> {
+  await syncReminders();
+  await dismissShownNotifications();
+  clearLastOpenedReminder();
 }

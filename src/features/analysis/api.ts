@@ -15,6 +15,7 @@ import {
 } from '@/shared/analysis/contract';
 import { localCalendarDate } from '@/shared/calendar-date';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import { limitsResponseSchema, type LimitsResponse } from '@/shared/limits-contract';
 
 import { analysisRecords } from './analysis-records';
 import { AnalysisError, toAnalysisError } from './errors';
@@ -27,6 +28,7 @@ import { appendUploadFile, type UploadFile } from './upload-file';
  */
 
 const ANALYZE_PATH = '/api/v1/analyze';
+const LIMITS_PATH = '/api/v1/limits';
 
 /**
  * The analysis is one synchronous request (D-1); the client gives up after 90 s (SPEC §7.2), or
@@ -61,6 +63,14 @@ export async function requestAnalysis(request: AnalyzeRequest): Promise<AnalyzeR
   const parsed = analyzeResponseSchema.safeParse(body);
   if (!parsed.success) throw new AnalysisError('analysis_failed');
   return parsed.data;
+}
+
+/**
+ * What is left of the device's daily limit (`GET /api/v1/limits`, SET-4). Fails as `apiClient` does,
+ * or with a zod error when the body isn't what the contract says.
+ */
+export async function fetchLimits(): Promise<LimitsResponse> {
+  return limitsResponseSchema.parse(await apiClient.get<unknown>(LIMITS_PATH));
 }
 
 /** The page files in order, under neutral names. Pages missing on the device fail the analysis (STO-8). */

@@ -12,6 +12,10 @@ export const en = {
     placeholder: 'YYYY-MM-DD',
     invalid: 'Enter the date as YYYY-MM-DD, for example 2026-10-31.',
   },
+  timePicker: {
+    placeholder: 'HH:MM',
+    invalid: 'Enter the time as HH:MM, for example 09:00.',
+  },
   fileSize: {
     kb: '{{value}} KB',
     mb: '{{value}} MB',
@@ -268,6 +272,12 @@ export const en = {
     saveFailed: "Couldn't save the document. Try again.",
   },
   analysis: {
+    limits: {
+      remaining: 'Analyses left today: {{remaining}} of {{limit}}',
+      resetsAt: 'The limit resets {{time}}',
+      loading: 'Checking how many analyses are left',
+      failed: "Couldn't check how many analyses are left.",
+    },
     draft: "This document hasn't been analyzed yet.",
     start: 'Analyze the document',
     progress: 'Reading the document…',
@@ -333,20 +343,54 @@ export const en = {
   },
   settings: {
     title: 'Settings',
-    language: 'Language',
+    sections: {
+      language: 'Language',
+      reminders: 'Reminders',
+      analysis: 'Analysis',
+      data: 'Data',
+      about: 'About',
+    },
+    language: 'App language',
     languageOption: {
       system: 'System default',
       ru: 'Русский',
       en: 'English',
     },
-    version: 'Version',
-    platform: 'Platform',
-    appearance: 'Appearance',
-    appearanceValue: {
-      light: 'Light',
-      dark: 'Dark',
-      unspecified: 'System default',
+    explanationLanguage: 'Explanation language',
+    explanationLanguageHint:
+      'The app explains documents in this language. The document itself can be in any language.',
+    explanationLanguageOptionName: 'Explanation language: {{option}}',
+    explanationLanguageOption: {
+      interface: 'Same as the app',
+      ru: 'Русский',
+      en: 'English',
     },
+    reminders: {
+      offsets: 'When to remind about a deadline',
+      offset_one: '{{count}} day before',
+      offset_other: '{{count}} days before',
+      offsetSameDay: 'On the day',
+      offsetsHint:
+        'Applies to every deadline. To turn off reminders for one deadline, use its card.',
+      lastOffset: 'At least one reminder stays on.',
+      time: 'Reminder time',
+      changeTime: 'Change',
+      changeTimeLabel: 'Change reminder time, now {{time}}',
+      details: 'Details in notifications',
+      detailsHint:
+        'Show what to do in the notification, for example “Pay €84.20”. Notifications can be seen on the lock screen.',
+    },
+    deleteAll: {
+      button: 'Delete all data',
+      title: 'Delete all data?',
+      message:
+        'All documents and their pages, deadlines, reminders and settings will be deleted from this phone. This can’t be undone.',
+      confirm: 'Delete everything',
+      done: 'All data deleted.',
+      failed: "Couldn't delete all data. Try again.",
+    },
+    saveFailed: "Couldn't save the setting. Try again.",
+    version: 'Version',
     api: 'Analysis server',
     apiNotConfigured: 'Not configured',
     unknown: 'unknown',

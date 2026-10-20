@@ -12,6 +12,10 @@ export const ru = {
     placeholder: 'ГГГГ-ММ-ДД',
     invalid: 'Введите дату в виде ГГГГ-ММ-ДД, например 2026-10-31.',
   },
+  timePicker: {
+    placeholder: 'ЧЧ:ММ',
+    invalid: 'Введите время в виде ЧЧ:ММ, например 09:00.',
+  },
   fileSize: {
     kb: '{{value}} КБ',
     mb: '{{value}} МБ',
@@ -284,6 +288,12 @@ export const ru = {
     saveFailed: 'Не удалось сохранить документ. Попробуйте ещё раз.',
   },
   analysis: {
+    limits: {
+      remaining: 'Осталось анализов сегодня: {{remaining}} из {{limit}}',
+      resetsAt: 'Лимит обновится {{time}}',
+      loading: 'Узнаём, сколько анализов осталось',
+      failed: 'Не удалось узнать, сколько анализов осталось.',
+    },
     draft: 'Документ ещё не разобран.',
     start: 'Разобрать документ',
     progress: 'Читаем документ…',
@@ -359,20 +369,56 @@ export const ru = {
   },
   settings: {
     title: 'Настройки',
+    sections: {
+      language: 'Язык',
+      reminders: 'Напоминания',
+      analysis: 'Анализ',
+      data: 'Данные',
+      about: 'О приложении',
+    },
     language: 'Язык интерфейса',
     languageOption: {
       system: 'Как в системе',
       ru: 'Русский',
       en: 'English',
     },
-    version: 'Версия',
-    platform: 'Платформа',
-    appearance: 'Оформление',
-    appearanceValue: {
-      light: 'Светлое',
-      dark: 'Тёмное',
-      unspecified: 'Как в системе',
+    explanationLanguage: 'Язык объяснений',
+    explanationLanguageHint:
+      'На этом языке приложение объясняет документы. Сам документ может быть на любом языке.',
+    explanationLanguageOptionName: 'Язык объяснений: {{option}}',
+    explanationLanguageOption: {
+      interface: 'Как в интерфейсе',
+      ru: 'Русский',
+      en: 'English',
     },
+    reminders: {
+      offsets: 'Когда напоминать о сроке',
+      offset_one: 'За {{count}} день',
+      offset_few: 'За {{count}} дня',
+      offset_many: 'За {{count}} дней',
+      offset_other: 'За {{count}} дня',
+      offsetSameDay: 'В день срока',
+      offsetsHint:
+        'Действует для всех сроков. Выключить напоминания об одном сроке можно в его карточке.',
+      lastOffset: 'Хотя бы одно напоминание остаётся.',
+      time: 'Время напоминаний',
+      changeTime: 'Изменить',
+      changeTimeLabel: 'Изменить время напоминаний, сейчас {{time}}',
+      details: 'Подробности в уведомлениях',
+      detailsHint:
+        'Показывать в уведомлении, что нужно сделать, например «Оплатить 84,20 €». Уведомления видны на заблокированном экране.',
+    },
+    deleteAll: {
+      button: 'Удалить все данные',
+      title: 'Удалить все данные?',
+      message:
+        'С телефона будут удалены все документы и их страницы, сроки, напоминания и настройки. Отменить это нельзя.',
+      confirm: 'Удалить всё',
+      done: 'Все данные удалены.',
+      failed: 'Не удалось удалить все данные. Попробуйте ещё раз.',
+    },
+    saveFailed: 'Не удалось сохранить настройку. Попробуйте ещё раз.',
+    version: 'Версия',
     api: 'Сервер анализа',
     apiNotConfigured: 'Не настроен',
     unknown: 'неизвестно',
