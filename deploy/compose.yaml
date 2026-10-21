@@ -29,7 +29,7 @@ services:
       # The model of this compose file; deploy/.env can point elsewhere (SPEC D-6) or set `mock`.
       LLM_PROVIDER: ${LLM_PROVIDER:-openai-compatible}
       LLM_BASE_URL: ${LLM_BASE_URL:-http://llm:11434/v1}
-      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b-native}
       LLM_REASONING_EFFORT: ${LLM_REASONING_EFFORT:-none}
       PDF_RENDER_URL: ${PDF_RENDER_URL:-http://pdf-render:8080}
     depends_on:
@@ -98,13 +98,29 @@ services:
     logging: *logging
 
   # Downloads the model on the first start (24 GB for qwen3.6:35b); later starts find it and exit.
+  # A name ending in `-native` is the model without Ollama's own chat renderer: the same weights,
+  # created here from the model before the suffix, so llama-server applies the model's chat template
+  # itself, knows where the messages start, and keeps the system prompt read between analyses
+  # (hybrid models such as qwen3.6 can't reuse it otherwise; deploy/README.md, «Модель»).
   llm-pull:
     image: ollama/ollama:0.32.5
     environment:
       OLLAMA_HOST: http://llm:11434
-      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b}
+      LLM_MODEL: ${LLM_MODEL:-qwen3.6:35b-native}
+    # `ollama create` reads the weights from the files the server names, so the same volume.
+    volumes:
+      - ollama-models:/root/.ollama:ro
     entrypoint:
-      ['sh', '-c', 'ollama show "$$LLM_MODEL" > /dev/null 2>&1 || ollama pull "$$LLM_MODEL"']
+      - sh
+      - -c
+      - |
+        set -e
+        ollama show "$$LLM_MODEL" > /dev/null 2>&1 && exit 0
+        base="$${LLM_MODEL%-native}"
+        ollama show "$$base" > /dev/null 2>&1 || ollama pull "$$base"
+        [ "$$base" = "$$LLM_MODEL" ] && exit 0
+        ollama show --modelfile "$$base" | grep -E '^(FROM|PARAMETER) ' > /tmp/Modelfile
+        ollama create "$$LLM_MODEL" -f /tmp/Modelfile
     depends_on:
       llm:
         condition: service_healthy
