@@ -6,6 +6,11 @@ export function hashDeviceId(deviceId: string, key: string): Promise<string> {
   return pseudonym(`device:${deviceId.toLowerCase()}`, key);
 }
 
+/** The job in logs (SPEC §7.1): the app keeps the job id on the document, so it is hashed too. */
+export function hashJobId(jobId: string, key: string): Promise<string> {
+  return pseudonym(`job:${jobId.toLowerCase()}`, key);
+}
+
 export function hashClientIp(ip: string, key: string): Promise<string> {
   return pseudonym(`ip:${ip.toLowerCase()}`, key);
 }

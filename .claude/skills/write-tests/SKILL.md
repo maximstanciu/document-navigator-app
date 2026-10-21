@@ -105,17 +105,15 @@ expect(screen).toHavePathname('/documents/doc-1');
 **API handler** — no HTTP server, no real model:
 
 ```ts
-const response = await handleAnalyze(
-  new Request('http://test/api/v1/analyze', { method: 'POST', body: formData }),
-  { provider: new MockLlmProvider(), limits: fakeLimits, now: () => fixedNow }
-);
+const deps = testJobDeps({ provider: new MockLlmProvider() }); // src/server/testing/server-deps.ts
+const response = await handlePutAnalysis(uploadRequest({ files }), TEST_JOB_ID, deps);
 expect(response.status).toBe(413);
 expect(await response.json()).toEqual({
   error: { code: 'too_large', message: expect.any(String) },
 });
 ```
 
-One test per error code. If a Fetch API global is missing in the default Jest environment, add `/** @jest-environment node */` to the server test file.
+One test per error code. Analysis jobs run in the background: `await deps.worker.idle()` before reading the result, or use `gatedProvider()` (`src/server/testing/gated-provider.ts`) to look at a job while the model "works" and answer it when the test says. The clock (`deps.advance()`) is the one the limits and the job retention see. Server test files start with `/** @jest-environment node */`.
 
 **Native modules** — mock **our adapter** (`jest.mock('../scanner', ...)`), not the library: the adapter is the contract the feature relies on. `jest-expo` mocks most Expo modules for code that imports them indirectly. For a library without mocks, add `jest.mock('lib-name', () => ({ ... }))` in the test, or in `src/test/setup-native-modules.ts` (registered in `jest.config.js`) if many tests import it; the scanner plugin is mocked there. Example: `src/features/capture/screens/capture-source-screen.test.tsx` mocks `../scanner`, `../pickers` and `../normalize-image`; `scanner.test.ts` drives the mocked plugin, `pickers.test.ts` mocks `expo-image-picker` and `expo-document-picker` in the test file and `expo-file-system` with `@/test/fake-file-system`.
 

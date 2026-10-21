@@ -1,5 +1,5 @@
 /** @jest-environment node */
-import { hashClientIp, hashDeviceId } from './pseudonyms';
+import { hashClientIp, hashDeviceId, hashJobId } from './pseudonyms';
 
 const DEVICE_ID = '6f1c2a9e-3b7d-4c8e-9f0a-1b2c3d4e5f60';
 
@@ -35,5 +35,15 @@ describe('hashClientIp', () => {
     expect(ip).toMatch(/^[0-9a-f]{16}$/);
     await expect(hashClientIp('203.0.113.7', 'key-1')).resolves.toBe(ip);
     await expect(hashDeviceId('203.0.113.7', 'key-1')).resolves.not.toBe(ip);
+  });
+});
+
+describe('hashJobId', () => {
+  it('gives a pseudonym that differs from the same UUID hashed as a device id', async () => {
+    const job = await hashJobId(DEVICE_ID, 'key-1');
+
+    expect(job).toMatch(/^[0-9a-f]{16}$/);
+    await expect(hashJobId(DEVICE_ID.toUpperCase(), 'key-1')).resolves.toBe(job);
+    await expect(hashDeviceId(DEVICE_ID, 'key-1')).resolves.not.toBe(job);
   });
 });

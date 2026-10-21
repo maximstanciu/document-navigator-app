@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import { PDFDocument } from 'pdf-lib';
 
-import { minimalPdf } from '../testing/analyze-request';
+import { minimalPdf } from '../testing/analysis-request';
 import { inspectPdf } from './inspect-pdf';
 
 async function pdfLibDocument(pages: number) {

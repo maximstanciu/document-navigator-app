@@ -13,7 +13,7 @@ process.env.NODE_ENV = 'production';
 
 // A model on a CPU can think for many minutes before it sends a byte, and Node's fetch gives up
 // on a response after 300 s. Calls that need a limit set their own (AbortSignal.timeout); the
-// model call ends when the client goes away.
+// model call of an analysis job ends when the app cancels the job.
 setGlobalDispatcher(new Agent({ headersTimeout: 0, bodyTimeout: 0 }));
 
 const PORT = Number(process.env.PORT || 3000);
@@ -57,7 +57,8 @@ server.listen(PORT, () => {
 });
 
 // `docker compose up` replaces the container with SIGTERM: stop taking requests and let the ones
-// in flight (an analysis waits up to 90 s for the model) finish.
+// in flight (an upload of up to 20 MB) finish. Analysis jobs live in this process's memory and go
+// with it: the app gets 404 for them and offers to try again (SPEC §7.1).
 for (const signal of ['SIGTERM', 'SIGINT']) {
   process.once(signal, () => {
     console.info(JSON.stringify({ event: 'server.stop', signal }));

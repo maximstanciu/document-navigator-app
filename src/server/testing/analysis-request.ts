@@ -1,10 +1,17 @@
 import { ANALYZE_FIELDS, IMAGE_MIME_TYPE, PDF_MIME_TYPE } from '@/shared/analysis/contract';
 import { API_HEADERS } from '@/shared/api-headers';
 
-// Test helpers for the analyze route: requests the way the app sends them, and small synthetic
-// files. Server tests can't import `@/test` (ESLint keeps src/server to itself and src/shared).
+// Test helpers for the analysis jobs route: requests the way the app sends them, and small
+// synthetic files. Server tests can't import `@/test` (ESLint keeps src/server to itself and
+// src/shared).
 
-export const TEST_URL = 'https://docnavigator.test/api/v1/analyze';
+export const TEST_ORIGIN = 'https://docnavigator.test';
+
+export const TEST_JOB_ID = '3d0f6c1e-8a2b-4c5d-9e6f-7a8b9c0d1e2f';
+
+export function jobUrl(jobId: string = TEST_JOB_ID) {
+  return `${TEST_ORIGIN}/api/v1/analyses/${jobId}`;
+}
 
 export const CLIENT_HEADERS: Record<string, string> = {
   [API_HEADERS.deviceId]: '6f1c2a9e-3b7d-4c8e-9f0a-1b2c3d4e5f60',
@@ -16,7 +23,10 @@ export const REQUEST_FIELDS: Record<string, string> = {
   [ANALYZE_FIELDS.locale]: 'ru',
   [ANALYZE_FIELDS.today]: '2026-10-18',
   [ANALYZE_FIELDS.timezone]: 'Europe/Berlin',
+  [ANALYZE_FIELDS.uiLocale]: 'ru',
 };
+
+export const TEST_PUSH_TOKEN = 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]';
 
 export type TestFile = { bytes: Uint8Array; type: string; name?: string };
 
@@ -30,12 +40,17 @@ export function pdf(bytes: Uint8Array): TestFile {
   return { bytes, type: PDF_MIME_TYPE, name: 'document.pdf' };
 }
 
-/** A `POST /api/v1/analyze` request with the given files; fields and headers can be overridden. */
-export function analyzeRequest({
+/**
+ * A `PUT /api/v1/analyses/{jobId}` upload with the given files; fields and headers can be
+ * overridden.
+ */
+export function uploadRequest({
+  jobId = TEST_JOB_ID,
   files = [jpeg()],
   fields = {},
   headers = {},
 }: {
+  jobId?: string;
   files?: (TestFile | string)[];
   fields?: Record<string, string | undefined>;
   headers?: Record<string, string | undefined>;
@@ -52,9 +67,25 @@ export function analyzeRequest({
         : new File([file.bytes as BlobPart], file.name ?? 'file', { type: file.type })
     );
   }
-  return new Request(TEST_URL, {
-    method: 'POST',
+  return new Request(jobUrl(jobId), {
+    method: 'PUT',
     body: form,
+    headers: withoutUndefined({ ...CLIENT_HEADERS, ...headers }),
+  });
+}
+
+/** A GET, PATCH or DELETE of a job, from the test device unless `headers` say otherwise. */
+export function jobRequest(
+  method: 'GET' | 'PATCH' | 'DELETE',
+  {
+    jobId = TEST_JOB_ID,
+    headers = {},
+    body,
+  }: { jobId?: string; headers?: Record<string, string | undefined>; body?: BodyInit } = {}
+) {
+  return new Request(jobUrl(jobId), {
+    method,
+    body,
     headers: withoutUndefined({ ...CLIENT_HEADERS, ...headers }),
   });
 }

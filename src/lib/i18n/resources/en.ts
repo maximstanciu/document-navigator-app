@@ -306,6 +306,8 @@ export const en = {
         "The PDF is damaged and can't be read. Save it again or scan the paper document.",
       upgrade_required: 'This version of the app is too old to analyze documents. Update the app.',
       rate_limited: 'The analysis limit is reached. Try again later.',
+      too_many_jobs:
+        'Other documents are still being analyzed. Wait for them to finish, then try again.',
       analysis_failed: "The analysis didn't return a usable result. Try again.",
       unavailable: 'The analysis service is unavailable right now. Try again later.',
     },

@@ -1,7 +1,7 @@
 /** @jest-environment node */
 import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 
-import { createAnalyzeDeps } from './analyze-deps';
+import { createLlmProvider } from './create-llm-provider';
 import { MockLlmProvider } from './providers/mock-llm-provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider';
 
@@ -14,27 +14,23 @@ const OPENAI_COMPATIBLE = {
   PDF_RENDER_URL: 'http://pdf-render:8080',
 };
 
-describe('createAnalyzeDeps', () => {
-  it('uses the mock provider and serves every version by default', () => {
-    const deps = createAnalyzeDeps({});
-
-    expect(deps.provider).toBeInstanceOf(MockLlmProvider);
-    expect(deps.minAppVersion).toBeNull();
+describe('createLlmProvider', () => {
+  it('uses the mock provider by default', () => {
+    expect(createLlmProvider({})).toBeInstanceOf(MockLlmProvider);
   });
 
-  it('reads the mock fixture and the minimum app version', async () => {
-    const deps = createAnalyzeDeps({ LLM_MOCK_FIXTURE: 'unreadable', MIN_APP_VERSION: '1.4.2' });
+  it('reads the mock fixture', async () => {
+    const provider = createLlmProvider({ LLM_MOCK_FIXTURE: 'unreadable' });
 
-    expect(deps.minAppVersion).toEqual([1, 4, 2]);
-    const { result } = await deps.provider.analyze({ ...input, files: [] });
+    const { result } = await provider.analyze({ ...input, files: [] });
     expect(result).toMatchObject({ title: ANALYSIS_FIXTURES.unreadable.title });
   });
 
   it('builds the OpenAI-compatible provider for a self-hosted model', () => {
-    const deps = createAnalyzeDeps(OPENAI_COMPATIBLE);
+    const provider = createLlmProvider(OPENAI_COMPATIBLE);
 
-    expect(deps.provider).toBeInstanceOf(OpenAiCompatibleProvider);
-    expect(deps.provider.id).toBe('openai-compatible-qwen3.6:35b');
+    expect(provider).toBeInstanceOf(OpenAiCompatibleProvider);
+    expect(provider.id).toBe('openai-compatible-qwen3.6:35b');
   });
 
   it.each([
@@ -46,7 +42,7 @@ describe('createAnalyzeDeps', () => {
     [{ ...OPENAI_COMPATIBLE, LLM_MODEL: undefined }, 'LLM_MODEL'],
     [{ ...OPENAI_COMPATIBLE, PDF_RENDER_URL: 'ftp://pdf-render' }, 'PDF_RENDER_URL'],
   ])('fails on a misconfigured %o', (env, name) => {
-    expect(() => createAnalyzeDeps(env)).toThrow(name);
+    expect(() => createLlmProvider(env)).toThrow(name);
   });
 });
 

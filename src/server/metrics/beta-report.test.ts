@@ -1,6 +1,7 @@
 import type { ClientPlatform } from '@/shared/api-headers';
 
-import type { AnalysisOutcome } from '../limits/analysis-usage';
+import type { JobOutcome } from '../limits/analysis-usage';
+import type { UploadEndCode } from '../limits/usage-keys';
 import { testServerDeps } from '../testing/server-deps';
 import { readBetaReport } from './beta-report';
 
@@ -8,87 +9,107 @@ const DAY_MS = 24 * 60 * 60 * 1000;
 
 type Deps = ReturnType<typeof testServerDeps>;
 
+/**
+ * One upload and what came of it: `upload: null` broke off; an accepted job ends with `job`
+ * (`null`: lost on a restart) and its result is `fetched`, `expired` or neither.
+ */
 async function analysis(
   deps: Deps,
   {
     device = 'd1',
     platform = 'android' as ClientPlatform,
-    outcome,
+    upload = 'accepted',
+    job = null,
+    result = null,
   }: {
     device?: string;
     platform?: ClientPlatform;
-    outcome: AnalysisOutcome | null;
+    upload?: UploadEndCode | null;
+    job?: JobOutcome | null;
+    result?: 'fetched' | 'expired' | null;
   }
 ) {
   const { session } = await deps.usage.begin({ requestId: 'r', device, ip: 'ip', platform });
-  if (outcome) await deps.usage.end(session, outcome);
+  if (!upload) return;
+  await deps.usage.uploadEnded(session, upload);
+  if (job) await deps.usage.jobEnded(session, job);
+  if (result === 'fetched') await deps.usage.delivered(session);
+  if (result === 'expired') await deps.usage.expired(session);
 }
 
-const ok = (hasDeadline = true, costUsd = 0.02): AnalysisOutcome => ({
+const ok = (hasDeadline = true, costUsd = 0.02): JobOutcome => ({
   code: 'ok',
-  charged: true,
   costUsd,
   hasDeadline,
 });
-const failed = (code: AnalysisOutcome['code']): AnalysisOutcome => ({
+const failed = (code: JobOutcome['code']): JobOutcome => ({
   code,
-  charged: false,
   costUsd: null,
   hasDeadline: false,
 });
 
 describe('readBetaReport', () => {
-  it('reports a day of analyses with the SPEC §8.7 shares', async () => {
+  it('reports a day of uploads and jobs with the SPEC §8.7 shares', async () => {
     const deps = testServerDeps();
-    await analysis(deps, { outcome: ok(true) });
-    await analysis(deps, { outcome: ok(false) });
-    await analysis(deps, { device: 'd2', platform: 'ios', outcome: ok(true) });
-    await analysis(deps, { device: 'd2', platform: 'ios', outcome: null });
-    await analysis(deps, { device: 'd3', platform: 'ios', outcome: failed('rate_limited') });
-    await analysis(deps, { device: 'd3', outcome: failed('analysis_failed') });
+    await analysis(deps, { job: ok(true), result: 'fetched' });
+    await analysis(deps, { job: ok(false), result: 'expired' });
+    await analysis(deps, { device: 'd2', platform: 'ios', job: ok(true), result: 'fetched' });
+    await analysis(deps, { device: 'd2', platform: 'ios', upload: null });
+    await analysis(deps, { device: 'd3', platform: 'ios', upload: 'rate_limited' });
+    await analysis(deps, { device: 'd3', upload: 'too_many_jobs' });
+    await analysis(deps, { device: 'd3', job: failed('analysis_failed') });
+    await analysis(deps, { device: 'd3', job: failed('unavailable') });
+    await analysis(deps, { device: 'd3', job: failed('cancelled') });
+    await analysis(deps, { device: 'd3', job: null });
 
     const [today] = await readBetaReport(deps.store, deps.now(), 1);
 
     expect(today).toEqual({
       day: '2026-10-18',
-      started: 6,
-      ended: 5,
+      started: 10,
+      ended: 9,
       interrupted: 1,
       byPlatform: {
         ios: { started: 3, ended: 2, interrupted: 1 },
-        android: { started: 3, ended: 3, interrupted: 0 },
+        android: { started: 7, ended: 7, interrupted: 0 },
         web: { started: 0, ended: 0, interrupted: 0 },
       },
-      outcomes: expect.objectContaining({
-        ok: 3,
+      uploads: expect.objectContaining({
+        accepted: 7,
         rate_limited: 1,
-        analysis_failed: 1,
+        too_many_jobs: 1,
+        unavailable: 0,
         internal: 0,
       }),
+      jobs: { ok: 3, analysis_failed: 1, unavailable: 1, cancelled: 1, internal: 0 },
+      lost: 1,
+      delivered: 2,
+      expired: 1,
       withDeadline: 2,
       devices: 3,
       returningDevices: 0,
       costUsd: 0.06,
       shares: {
-        interrupted: 0.167,
+        interrupted: 0.1,
+        lost: 0.286,
         withDeadline: 0.667,
-        rateLimited: 0.2,
-        analysisFailed: 0.2,
-        unavailable: 0,
+        rateLimited: 0.222,
+        analysisFailed: 0.167,
+        unavailable: 0.111,
       },
     });
   });
 
   it('counts a device as returning when it was seen 7 or more days earlier', async () => {
     const deps = testServerDeps();
-    await analysis(deps, { device: 'week-ago', outcome: ok() });
-    await analysis(deps, { device: 'yesterday', outcome: ok() });
+    await analysis(deps, { device: 'week-ago', job: ok() });
+    await analysis(deps, { device: 'yesterday', job: ok() });
     deps.advance(6 * DAY_MS);
-    await analysis(deps, { device: 'yesterday', outcome: ok() });
+    await analysis(deps, { device: 'yesterday', job: ok() });
     deps.advance(1 * DAY_MS);
-    await analysis(deps, { device: 'week-ago', outcome: ok() });
-    await analysis(deps, { device: 'yesterday', outcome: ok() });
-    await analysis(deps, { device: 'new', outcome: ok() });
+    await analysis(deps, { device: 'week-ago', job: ok() });
+    await analysis(deps, { device: 'yesterday', job: ok() });
+    await analysis(deps, { device: 'new', job: ok() });
 
     const report = await readBetaReport(deps.store, deps.now(), 8);
 
@@ -106,5 +127,23 @@ describe('readBetaReport', () => {
     expect(report[0]).toMatchObject({ devices: 3, returningDevices: 2 });
     expect(report[1]).toMatchObject({ devices: 1, returningDevices: 0 });
     expect(report[2]).toMatchObject({ started: 0, devices: 0, shares: { interrupted: null } });
+  });
+
+  it('counts a job on the day of its upload, and its cost on the day the model answered', async () => {
+    const deps = testServerDeps();
+    const { session } = await deps.usage.begin({
+      requestId: 'r',
+      device: 'd',
+      ip: 'ip',
+      platform: 'android',
+    });
+    await deps.usage.uploadEnded(session, 'accepted');
+    deps.advance(DAY_MS);
+    await deps.usage.jobEnded(session, ok(true, 0.5));
+
+    const [today, yesterday] = await readBetaReport(deps.store, deps.now(), 2);
+
+    expect(yesterday).toMatchObject({ jobs: { ok: 1 }, lost: 0, withDeadline: 1, costUsd: 0 });
+    expect(today).toMatchObject({ started: 0, costUsd: 0.5 });
   });
 });

@@ -28,3 +28,11 @@ export function redactError(error: unknown): Error {
 function isStackFrame(line: string) {
   return /^\s+at\s/.test(line);
 }
+
+/**
+ * Reports an error no request can fail with, e.g. one of a job running in the background: its
+ * name and stack frames on stderr, without the message (`redactError()`).
+ */
+export function reportError(error: unknown) {
+  console.error(redactError(error).stack);
+}

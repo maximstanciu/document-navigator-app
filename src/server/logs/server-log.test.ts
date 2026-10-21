@@ -1,4 +1,4 @@
-import { consoleServerLog, redactError } from './server-log';
+import { consoleServerLog, redactError, reportError } from './server-log';
 
 describe('consoleServerLog', () => {
   afterEach(() => jest.restoreAllMocks());
@@ -6,10 +6,10 @@ describe('consoleServerLog', () => {
   it('writes one JSON line to console.info, which EAS Hosting keeps', () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
 
-    consoleServerLog({ event: 'analyze.end', status: 200, readable: true, pages: null });
+    consoleServerLog({ event: 'upload.end', status: 202, push: true, pages: null });
 
     expect(info).toHaveBeenCalledWith(
-      '{"event":"analyze.end","status":200,"readable":true,"pages":null}'
+      '{"event":"upload.end","status":202,"push":true,"pages":null}'
     );
   });
 });
@@ -34,5 +34,20 @@ describe('redactError', () => {
       name: 'string',
       message: '[message redacted]',
     });
+  });
+});
+
+describe('reportError', () => {
+  afterEach(() => jest.restoreAllMocks());
+
+  it('writes the name and stack frames to stderr, not the message', () => {
+    const error = jest.spyOn(console, 'error').mockImplementation(() => {});
+
+    reportError(new TypeError('Cannot read "Мария Иванова"'));
+
+    expect(error).toHaveBeenCalledTimes(1);
+    const [written] = error.mock.calls[0];
+    expect(written).toMatch(/^TypeError: \[message redacted\]\n\s+at /);
+    expect(written).not.toContain('Иванова');
   });
 });

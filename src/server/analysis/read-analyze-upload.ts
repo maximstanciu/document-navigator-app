@@ -1,15 +1,18 @@
 import {
   ANALYZE_FIELDS,
   IMAGE_MIME_TYPE,
+  isPushToken,
   PDF_MIME_TYPE,
   type UploadMimeType,
 } from '@/shared/analysis/contract';
 import { isCalendarDate } from '@/shared/calendar-date';
 import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
 import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { isUiLocale, type UiLocale } from '@/shared/ui-locales';
 
 import { ApiFailure } from '../http/api-failure';
 import { isFormFile, readMultipartForm, type FormFile } from '../http/multipart';
+import { inspectPdf } from './inspect-pdf';
 import type { LlmFile } from './llm-provider';
 
 /** Room for the text fields and part headers on top of the files themselves. */
@@ -21,12 +24,15 @@ export type AnalyzeUpload = {
   locale: ExplanationLocale;
   today: string;
   timezone: string;
+  uiLocale: UiLocale;
+  pushToken: string | null;
 };
 
 /**
- * Reads and checks the body of `POST /api/v1/analyze` (SPEC §7.2): one PDF or 1–30 JPEG pages
- * within `MAX_DOCUMENT_BYTES`, an explanation locale, the device's date and time zone. The number of
- * PDF pages is checked later, by `inspectPdf()`.
+ * Reads and checks the body of `PUT /api/v1/analyses/{jobId}` (SPEC §7.2): one PDF or 1–30 JPEG
+ * pages within `MAX_DOCUMENT_BYTES`, an explanation locale, the device's date and time zone, the
+ * interface language and an optional push token. The number of PDF pages is checked later, by
+ * `countPages()`.
  *
  * Only the bytes leave this function: the parsed form and its files are dropped one by one as they
  * are read, so at most about one extra copy of the upload exists at a time (SPEC §7.1).
@@ -46,6 +52,14 @@ export async function readAnalyzeUpload(request: Request): Promise<AnalyzeUpload
   if (!isTimeZone(timezone)) {
     throw invalid(`${ANALYZE_FIELDS.timezone} must be an IANA time zone.`);
   }
+  const uiLocale = form.get(ANALYZE_FIELDS.uiLocale);
+  if (!isUiLocale(uiLocale)) {
+    throw invalid(`${ANALYZE_FIELDS.uiLocale} is not an interface language.`);
+  }
+  const pushToken = form.get(ANALYZE_FIELDS.pushToken) ?? null;
+  if (pushToken !== null && !isPushToken(pushToken)) {
+    throw invalid(`${ANALYZE_FIELDS.pushToken} must be an Expo push token.`);
+  }
 
   const entries: (FormFile | null)[] = checkFiles(form.getAll(ANALYZE_FIELDS.files));
   form.delete(ANALYZE_FIELDS.files);
@@ -64,7 +78,26 @@ export async function readAnalyzeUpload(request: Request): Promise<AnalyzeUpload
     files.push({ mimeType, bytes });
   }
 
-  return { kind, files, locale, today, timezone };
+  return { kind, files, locale, today, timezone, uiLocale, pushToken };
+}
+
+/** Pages of the upload: of a PDF by its structure (D-4), else the images. 413 over 30, 422 for a bad PDF. */
+export async function countPages(upload: AnalyzeUpload): Promise<number> {
+  let pageCount = upload.files.length;
+  if (upload.kind === 'pdf') {
+    const pdf = await inspectPdf(upload.files[0].bytes);
+    if (pdf.kind === 'encrypted') {
+      throw new ApiFailure('encrypted_pdf', 'The PDF is protected with a password.');
+    }
+    if (pdf.kind === 'invalid') {
+      throw new ApiFailure('invalid_pdf', 'The PDF is damaged or not a PDF.');
+    }
+    pageCount = pdf.pageCount;
+  }
+  if (pageCount > MAX_DOCUMENT_PAGES) {
+    throw new ApiFailure('too_large', `More than ${MAX_DOCUMENT_PAGES} pages.`);
+  }
+  return pageCount;
 }
 
 /** Checks what can be checked without reading the files: their number, types and total size. */

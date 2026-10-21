@@ -1,19 +1,21 @@
-import type { AnalyzeErrorCode, ApiErrorBody } from '@/shared/analysis/contract';
+import type { ApiErrorBody, ApiErrorCode } from '@/shared/analysis/contract';
 
 /** HTTP status of every error code (SPEC §7.2). */
-const STATUS: Record<AnalyzeErrorCode, number> = {
+const STATUS: Record<ApiErrorCode, number> = {
   invalid_request: 400,
+  job_not_found: 404,
   too_large: 413,
   encrypted_pdf: 422,
   invalid_pdf: 422,
   upgrade_required: 426,
   rate_limited: 429,
+  too_many_jobs: 429,
   analysis_failed: 502,
   unavailable: 503,
 };
 
 /** The JSON error body of SPEC §7.2. `message` is for developers; the app shows text by `code`. */
-export function errorResponse(code: AnalyzeErrorCode, message: string, headers?: HeadersInit) {
+export function errorResponse(code: ApiErrorCode, message: string, headers?: HeadersInit) {
   const body: ApiErrorBody = { error: { code, message } };
   return Response.json(body, { status: STATUS[code], headers });
 }
@@ -21,7 +23,7 @@ export function errorResponse(code: AnalyzeErrorCode, message: string, headers?:
 /** Thrown while a request is checked; the handler turns it into `errorResponse()`. */
 export class ApiFailure extends Error {
   constructor(
-    readonly code: AnalyzeErrorCode,
+    readonly code: ApiErrorCode,
     message: string,
     readonly headers?: HeadersInit
   ) {

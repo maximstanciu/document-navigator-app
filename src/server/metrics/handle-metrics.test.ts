@@ -20,7 +20,8 @@ describe('handleMetrics', () => {
       ip: 'ip',
       platform: 'ios',
     });
-    await deps.usage.end(session, { code: 'ok', charged: true, costUsd: 0.5, hasDeadline: true });
+    await deps.usage.uploadEnded(session, 'accepted');
+    await deps.usage.jobEnded(session, { code: 'ok', costUsd: 0.5, hasDeadline: true });
 
     const response = await handleMetrics(metricsRequest(), deps);
 

@@ -1,8 +1,13 @@
 import {
+  analysisJobPatchSchema,
+  analysisJobStateSchema,
   ANALYZE_ERROR_CODES,
   analyzeResponseSchema,
+  API_ERROR_CODES,
   apiErrorBodySchema,
+  isAnalysisJobId,
   isAnalyzeErrorCode,
+  isPushToken,
 } from './contract';
 import { ANALYSIS_FIXTURES } from './fixtures';
 
@@ -23,6 +28,54 @@ describe('analyzeResponseSchema', () => {
   });
 });
 
+describe('analysisJobStateSchema', () => {
+  it.each([
+    ['queued', { status: 'queued', ahead: 2 }],
+    ['processing', { status: 'processing' }],
+    ['done', { status: 'done', analysis: invoice, pageCount: 2 }],
+    ['failed', { status: 'failed', error: { code: 'unavailable', message: 'Down.' } }],
+  ])('accepts a %s job', (_status, state) => {
+    expect(analysisJobStateSchema.parse(state)).toEqual(state);
+  });
+
+  it.each([
+    ['an unknown status', { status: 'lost' }],
+    ['a queued job without its place', { status: 'queued' }],
+    ['a negative place', { status: 'queued', ahead: -1 }],
+    ['a done job without the page count', { status: 'done', analysis: invoice }],
+    ['a done job with a broken analysis', { status: 'done', analysis: { title: 1 }, pageCount: 1 }],
+    [
+      'a failure with an upload code',
+      { status: 'failed', error: { code: 'too_large', message: '' } },
+    ],
+  ])('rejects %s', (_case, state) => {
+    expect(analysisJobStateSchema.safeParse(state).success).toBe(false);
+  });
+});
+
+describe('job ids and push tokens', () => {
+  it('takes a UUID v4 as a job id', () => {
+    expect(isAnalysisJobId('3d0f6c1e-8a2b-4c5d-9e6f-7a8b9c0d1e2f')).toBe(true);
+    expect(isAnalysisJobId('3D0F6C1E-8A2B-4C5D-9E6F-7A8B9C0D1E2F')).toBe(true);
+    expect(isAnalysisJobId('3d0f6c1e-8a2b-1c5d-9e6f-7a8b9c0d1e2f')).toBe(false);
+    expect(isAnalysisJobId('job-1')).toBe(false);
+    expect(isAnalysisJobId(undefined)).toBe(false);
+  });
+
+  it('takes an Expo push token, in the PATCH body too', () => {
+    expect(isPushToken('ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]')).toBe(true);
+    expect(isPushToken('ExpoPushToken[a-b_c]')).toBe(true);
+    expect(isPushToken('ExponentPushToken[]')).toBe(false);
+    expect(isPushToken('ExponentPushToken[x] ')).toBe(false);
+    expect(isPushToken(`ExponentPushToken[${'x'.repeat(201)}]`)).toBe(false);
+    expect(isPushToken('fcm-token')).toBe(false);
+
+    const body = { pushToken: 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]' };
+    expect(analysisJobPatchSchema.parse(body)).toEqual(body);
+    expect(analysisJobPatchSchema.safeParse({ pushToken: 'x' }).success).toBe(false);
+  });
+});
+
 describe('API errors', () => {
   it('lists the error codes of SPEC §7.2', () => {
     expect(ANALYZE_ERROR_CODES).toEqual([
@@ -32,10 +85,13 @@ describe('API errors', () => {
       'invalid_pdf',
       'upgrade_required',
       'rate_limited',
+      'too_many_jobs',
       'analysis_failed',
       'unavailable',
     ]);
-    expect(isAnalyzeErrorCode('too_large')).toBe(true);
+    expect(API_ERROR_CODES).toEqual([...ANALYZE_ERROR_CODES, 'job_not_found']);
+    expect(isAnalyzeErrorCode('too_many_jobs')).toBe(true);
+    expect(isAnalyzeErrorCode('job_not_found')).toBe(false);
     expect(isAnalyzeErrorCode('timeout')).toBe(false);
   });
 

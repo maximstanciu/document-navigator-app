@@ -1,10 +1,12 @@
 import { CLIENT_PLATFORMS, type ClientPlatform } from '@/shared/api-headers';
 
 import {
-  END_CODES,
+  JOB_END_CODES,
   METRICS_RETENTION_DAYS,
+  UPLOAD_END_CODES,
   USAGE_KEYS as K,
-  type EndCode,
+  type JobEndCode,
+  type UploadEndCode,
 } from '../limits/usage-keys';
 import { daysBefore, utcDay } from '../limits/utc-time';
 import type { CounterStore, StoreCommand } from '../store/counter-store';
@@ -14,13 +16,21 @@ type Counts = { started: number; ended: number; interrupted: number };
 /** Server-side beta metrics of one UTC day (SPEC §8.7): counts, and shares where they are defined. */
 export type DayMetrics = {
   day: string;
-  /** Requests that passed the client headers check, and those of them that reached an end. */
+  /** Uploads that passed the client headers check, and those of them that got an answer. */
   started: number;
   ended: number;
-  /** Started without an end: the client hung up (`network`, `interrupted` on the app's side). */
+  /** Started without an end: the upload broke off (`network` on the app's side). */
   interrupted: number;
   byPlatform: Record<ClientPlatform, Counts>;
-  outcomes: Record<EndCode, number>;
+  /** How the uploads ended: `accepted` into the queue, or refused with a SPEC §7.2 code. */
+  uploads: Record<UploadEndCode, number>;
+  /** How the jobs accepted that day ended. */
+  jobs: Record<JobEndCode, number>;
+  /** Accepted jobs without an end: lost when the server restarted (today: also still queued). */
+  lost: number;
+  /** Results the app got, and those nobody fetched in time. */
+  delivered: number;
+  expired: number;
   /** Successful analyses that found a deadline. */
   withDeadline: number;
   /** Devices that tried an analysis, and those of them seen 7 or more days earlier too. */
@@ -29,9 +39,14 @@ export type DayMetrics = {
   costUsd: number;
   shares: {
     interrupted: number | null;
+    /** Of the accepted jobs: lost on a restart or not fetched in time. */
+    lost: number | null;
     withDeadline: number | null;
+    /** Of the uploads that got an answer: `429` of either kind. */
     rateLimited: number | null;
+    /** Of the jobs that ended. */
     analysisFailed: number | null;
+    /** Of the uploads that got an answer: `503`, or a job that couldn't reach the model. */
     unavailable: number | null;
   };
 };
@@ -60,8 +75,11 @@ export async function readBetaReport(
   for (const day of reportDays) {
     for (const platform of CLIENT_PLATFORMS) {
       read(['GET', K.started(day, platform)]);
-      for (const code of END_CODES) read(['GET', K.ended(day, platform, code)]);
+      for (const code of UPLOAD_END_CODES) read(['GET', K.ended(day, platform, code)]);
     }
+    for (const code of JOB_END_CODES) read(['GET', K.job(day, code)]);
+    read(['GET', K.delivered(day)]);
+    read(['GET', K.expired(day)]);
     read(['GET', K.withDeadline(day)]);
     read(['GET', K.spend(day)]);
   }
@@ -75,22 +93,31 @@ export async function readBetaReport(
     const byPlatform = Object.fromEntries(
       CLIENT_PLATFORMS.map((platform) => {
         const started = count(K.started(day, platform));
-        const ended = END_CODES.reduce((sum, code) => sum + count(K.ended(day, platform, code)), 0);
+        const ended = UPLOAD_END_CODES.reduce(
+          (sum, code) => sum + count(K.ended(day, platform, code)),
+          0
+        );
         return [platform, { started, ended, interrupted: Math.max(0, started - ended) }];
       })
     ) as Record<ClientPlatform, Counts>;
-    const outcomes = Object.fromEntries(
-      END_CODES.map((code) => [
+    const uploads = Object.fromEntries(
+      UPLOAD_END_CODES.map((code) => [
         code,
         CLIENT_PLATFORMS.reduce((sum, platform) => sum + count(K.ended(day, platform, code)), 0),
       ])
-    ) as Record<EndCode, number>;
+    ) as Record<UploadEndCode, number>;
+    const jobs = Object.fromEntries(
+      JOB_END_CODES.map((code) => [code, count(K.job(day, code))])
+    ) as Record<JobEndCode, number>;
 
     const total = (field: keyof Counts) =>
       CLIENT_PLATFORMS.reduce((sum, platform) => sum + byPlatform[platform][field], 0);
     const started = total('started');
     const ended = total('ended');
     const interrupted = total('interrupted');
+    const jobsEnded = JOB_END_CODES.reduce((sum, code) => sum + jobs[code], 0);
+    const lost = Math.max(0, uploads.accepted - jobsEnded);
+    const expired = count(K.expired(day));
     const withDeadline = count(K.withDeadline(day));
 
     const devices = members(day);
@@ -106,17 +133,22 @@ export async function readBetaReport(
       ended,
       interrupted,
       byPlatform,
-      outcomes,
+      uploads,
+      jobs,
+      lost,
+      delivered: count(K.delivered(day)),
+      expired,
       withDeadline,
       devices: devices.size,
       returningDevices: [...devices].filter((device) => earlier.has(device)).length,
       costUsd: count(K.spend(day)) / 1_000_000,
       shares: {
         interrupted: share(interrupted, started),
-        withDeadline: share(withDeadline, outcomes.ok),
-        rateLimited: share(outcomes.rate_limited, ended),
-        analysisFailed: share(outcomes.analysis_failed, ended),
-        unavailable: share(outcomes.unavailable, ended),
+        lost: share(lost + expired, uploads.accepted),
+        withDeadline: share(withDeadline, jobs.ok),
+        rateLimited: share(uploads.rate_limited + uploads.too_many_jobs, ended),
+        analysisFailed: share(jobs.analysis_failed, jobsEnded),
+        unavailable: share(uploads.unavailable + jobs.unavailable, ended),
       },
     };
   });

@@ -42,8 +42,9 @@ services:
     read_only: true
     tmpfs: /tmp
     security_opt: ['no-new-privileges:true']
-    # Analyses in flight get 90 s to finish when the container is replaced; a longer one on the CPU
-    # is cut off, and the app shows an error without charging the limit.
+    # Uploads in flight get 90 s to finish when the container is replaced. Queued and running
+    # analysis jobs live only in the process's memory and are lost: the app gets 404 and offers to
+    # try again, without charging the limit (SPEC §7.1).
     stop_grace_period: 95s
     logging: *logging
 

@@ -1,5 +1,7 @@
 import { DAILY_ANALYSES_PER_DEVICE } from '@/shared/limits';
 
+import { onJobExpired } from './analysis/jobs/analysis-job';
+import { MemoryAnalysisJobStore, type AnalysisJobStore } from './analysis/jobs/job-store';
 import { parseAppVersion, type AppVersion } from './http/app-version';
 import { AnalysisUsage } from './limits/analysis-usage';
 import { consoleServerLog, type ServerLog } from './logs/server-log';
@@ -19,12 +21,16 @@ export type ServerDeps = {
   now: () => number;
   store: CounterStore;
   usage: AnalysisUsage;
+  /** The analysis jobs of this process: the queue and the results (SPEC §7.1). */
+  jobs: AnalysisJobStore;
   /** Bearer token of `GET /api/v1/metrics`; `null` turns the route off. */
   metricsToken: string | null;
 };
 
 const DEVELOPMENT_HASH_KEY = 'docnavigator-development';
 const DEFAULT_IP_ATTEMPTS_PER_HOUR = 60;
+const DEFAULT_RESULT_TTL_HOURS = 24;
+const HOUR_MS = 60 * 60 * 1000;
 const MIN_METRICS_TOKEN_LENGTH = 32;
 
 /**
@@ -39,6 +45,7 @@ const MIN_METRICS_TOKEN_LENGTH = 32;
  *   counters in this process's memory, fine for the dev server only.
  * - `IP_ATTEMPTS_PER_HOUR`: default 60. `DAILY_BUDGET_USD`: unset — no cap.
  * - `METRICS_TOKEN`: at least 32 characters; unset — `GET /api/v1/metrics` answers 404.
+ * - `ANALYSIS_RESULT_TTL_HOURS`: how long a finished job waits for the app, default 24.
  */
 export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
   const log = consoleServerLog;
@@ -49,20 +56,33 @@ export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
     ipPerHour: positiveNumber(env, 'IP_ATTEMPTS_PER_HOUR', true) ?? DEFAULT_IP_ATTEMPTS_PER_HOUR,
     dailyBudgetUsd: positiveNumber(env, 'DAILY_BUDGET_USD', false),
   };
+  const usage = new AnalysisUsage(store, limits, log, now);
+  const resultTtlHours =
+    positiveNumber(env, 'ANALYSIS_RESULT_TTL_HOURS', false) ?? DEFAULT_RESULT_TTL_HOURS;
+  shared.__docnavigatorAnalysisJobs ??= new MemoryAnalysisJobStore({
+    now,
+    resultTtlMs: resultTtlHours * HOUR_MS,
+    onExpired: onJobExpired({ log, usage }),
+  });
   return {
     minAppVersion: readMinAppVersion(env),
     deviceHashKey: env.DEVICE_ID_HASH_KEY || DEVELOPMENT_HASH_KEY,
     log,
     now,
     store,
-    usage: new AnalysisUsage(store, limits, log, now),
+    usage,
+    jobs: shared.__docnavigatorAnalysisJobs,
     metricsToken: readMetricsToken(env),
   };
 }
 
-// One per process, so the dev server keeps its counters between requests. On globalThis rather
-// than in this module: the dev server loads each route's bundle afresh, module state and all.
-const shared = globalThis as typeof globalThis & { __docnavigatorCounters?: MemoryCounterStore };
+// One per process: the dev server keeps its counters between requests, and every route sees the
+// same analysis jobs. On globalThis rather than in this module: the dev server and the Node
+// adapter load each route's bundle separately, module state and all.
+const shared = globalThis as typeof globalThis & {
+  __docnavigatorCounters?: MemoryCounterStore;
+  __docnavigatorAnalysisJobs?: AnalysisJobStore;
+};
 
 function createStore(env: ServerEnv): CounterStore {
   const url = env.UPSTASH_REDIS_REST_URL;
@@ -75,7 +95,7 @@ function createStore(env: ServerEnv): CounterStore {
   return shared.__docnavigatorCounters;
 }
 
-function positiveNumber(env: ServerEnv, name: string, whole: boolean): number | null {
+export function positiveNumber(env: ServerEnv, name: string, whole: boolean): number | null {
   const raw = env[name];
   if (!raw) return null;
   const value = Number(raw);

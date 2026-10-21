@@ -1,12 +1,12 @@
-import { createServerDeps, type ServerEnv } from '../server-deps';
-import type { AnalyzeDeps } from './handle-analyze';
+import type { ServerEnv } from '../server-deps';
 import type { LlmProvider } from './llm-provider';
 import { HttpPdfRenderer } from './pdf-renderer';
 import { isMockFixtureName, MockLlmProvider } from './providers/mock-llm-provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider';
 
 /**
- * The analyze handler's dependencies: the server's (`createServerDeps()`) and the model.
+ * The model that analyzes the jobs, from server environment variables. A misconfigured server
+ * fails loudly: the error names the variable, never a value.
  *
  * - `LLM_PROVIDER`: unset — `MockLlmProvider` (SPEC §7.5); `openai-compatible` — a model behind
  *   an OpenAI-compatible API (Ollama in deploy/compose.yaml, SPEC D-6).
@@ -14,11 +14,7 @@ import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider
  * - `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` (optional), `LLM_REASONING_EFFORT` (optional),
  *   `PDF_RENDER_URL`: the OpenAI-compatible model and the service that renders PDF pages for it.
  */
-export function createAnalyzeDeps(env: ServerEnv = process.env): AnalyzeDeps {
-  return { ...createServerDeps(env), provider: createLlmProvider(env) };
-}
-
-function createLlmProvider(env: ServerEnv): LlmProvider {
+export function createLlmProvider(env: ServerEnv = process.env): LlmProvider {
   const id = env.LLM_PROVIDER || 'mock';
   if (id === 'openai-compatible') {
     return new OpenAiCompatibleProvider({

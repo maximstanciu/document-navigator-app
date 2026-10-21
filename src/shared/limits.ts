@@ -11,3 +11,9 @@ export const MAX_DOCUMENT_BYTES = 20 * 1024 * 1024;
 
 /** Analyses a device gets per day, counted in UTC (SPEC §8.3); the server enforces it. */
 export const DAILY_ANALYSES_PER_DEVICE = 10;
+
+/**
+ * Unfinished analysis jobs a device may have at once: queued, running, or done with a result it
+ * hasn't fetched yet (SPEC §8.3). The next upload gets `429 too_many_jobs`.
+ */
+export const ACTIVE_JOBS_PER_DEVICE = 3;

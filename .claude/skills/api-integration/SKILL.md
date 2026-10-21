@@ -10,10 +10,10 @@ Read first: `AGENTS.md` (Conventions → Data is local-first, Server code, Share
 
 Data has two sources, and components never touch either directly:
 
-| Source                                                      | Lives in                                         | Reached through                                       |
-| ----------------------------------------------------------- | ------------------------------------------------ | ----------------------------------------------------- |
-| Local data (documents, pages, deadlines, actions, settings) | SQLite on the device                             | `getRepositories()` from `src/lib/db/repositories.ts` |
-| Analysis and limits                                         | this app's API routes `/api/v1/*` on EAS Hosting | `apiClient` (`src/lib/api/client.ts`)                 |
+| Source                                                      | Lives in                                                      | Reached through                                       |
+| ----------------------------------------------------------- | ------------------------------------------------------------- | ----------------------------------------------------- |
+| Local data (documents, pages, deadlines, actions, settings) | SQLite on the device                                          | `getRepositories()` from `src/lib/db/repositories.ts` |
+| Analysis and limits                                         | this app's API routes `/api/v1/*` on its own server (deploy/) | `apiClient` (`src/lib/api/client.ts`)                 |
 
 Screens and components only call hooks: `useQuery(deadlineQueries.list())`, `useMarkDeadlineDone()`. No `fetch`, no direct DB calls, no `useEffect` data loading.
 
@@ -71,50 +71,56 @@ export function useMarkDeadlineDone() {
 
 ## 2. Calling the app's API routes
 
-The app calls two endpoints: `POST /api/v1/analyze` and `GET /api/v1/limits` (SPEC §7.2). Their client functions live in `features/analysis/api.ts` (and settings for limits). `GET /api/v1/metrics` is for the team only (bearer `METRICS_TOKEN`), never called from the app.
+The app calls the analysis job route `PUT`/`GET`/`PATCH`/`DELETE /api/v1/analyses/{jobId}` and `GET /api/v1/limits` (SPEC §7.2). Analysis is asynchronous (D-1, revised): `PUT` uploads the document under a `jobId` (UUID v4) the app made and saved on the document first, and answers `202` with the job's state as soon as the file is checked; `GET` returns the state (`queued` with `ahead`, `processing`, `done` with `analysis` and `pageCount`, `failed` with `analysis_failed` or `unavailable`) or `404 job_not_found`; `PATCH { pushToken }` adds the push token later (ANL-12); `DELETE` removes the job once the result is saved, or cancels it (ANL-13), and answers `204` even for an unknown job. Their client functions live in `features/analysis/api.ts` (and settings for limits); until task 4.8 lands, that file still calls the removed `POST /api/v1/analyze`. `GET /api/v1/metrics` is for the team only (bearer `METRICS_TOKEN`), never called from the app.
 
 - Base URL: `EXPO_PUBLIC_API_URL` via `env.apiUrl` (`src/lib/env.ts`). New public config → `.env.example` **and** `src/lib/env.ts` with direct `process.env.EXPO_PUBLIC_X` access. Never secrets in `EXPO_PUBLIC_*`.
-- Request types and the response schema come from `src/shared/`: the zod schema is the single source of truth. Validate the response at the boundary (`analyzeResponseSchema.parse` from `@/shared/analysis/contract`); error codes are `ANALYZE_ERROR_CODES` there.
+- Request types and the response schema come from `src/shared/`: the zod schema is the single source of truth. Validate the response at the boundary (`analysisJobStateSchema.parse` from `@/shared/analysis/contract`; a state that fails it counts as `analysis_failed`); the upload fields are `ANALYZE_FIELDS` (`files`, `locale`, `today`, `timezone`, `uiLocale`, optional `pushToken`), the codes a document can fail with are `ANALYZE_ERROR_CODES` (with `too_many_jobs`), and `API_ERROR_CODES` adds `job_not_found`, which the app turns into `interrupted` (ANL-4).
 - Headers on every call: `X-Device-Id`, `X-App-Version`, `X-Platform` (SPEC §7.2). `apiClient` adds them itself (`src/lib/api/client-headers.ts`). There are no accounts in MVP; `setAccessTokenGetter` stays unused.
 - `apiClient` sends a `FormData` body as it is (multipart, no JSON `Content-Type`) and takes `timeoutMs`, which aborts the request with `ApiTimeoutError`; `ApiError` keeps the response `headers` (`Retry-After`).
-- `useAnalyzeDocument()` (`features/analysis/queries.ts`) is a mutation **without retries** and with `networkMode: 'always'`, `multipart/form-data`, 90 s client timeout. `analyzeDocument()` in `features/analysis/api.ts` owns the document's way through `analyzing` to `ready` or `failed`, with the screen kept on meanwhile (D-1 = A, ANL-3). Files go up through the `upload-file` adapter: an `expo-file-system` `File` on native, a Blob on web. Never React Native's `{ uri, name, type }` part: since SDK 58 the global `fetch` on Android and iOS is `expo/fetch`, which rejects it («Unsupported FormDataPart implementation»), and the error surfaces as `network`.
+- The client side of the jobs is task 4.8 (SPEC §7.2 «Опрос»): the upload is a mutation **without retries** with `networkMode: 'always'`, a 5-minute timeout and the screen kept on only while it uploads (ANL-3); «Try again» after `network` or `timeout` repeats it with the same `jobId`, and the server answers with the job it already has (ANL-9). Then the app polls `GET` every 10 s in the foreground, at launch and on return; it saves `done` in the same transaction as a row in `analysis_job_deletions` and then sends `DELETE`, retried at launch and on return. Files go up through the `upload-file` adapter: an `expo-file-system` `File` on native, a Blob on web. Never React Native's `{ uri, name, type }` part: since SDK 58 the global `fetch` on Android and iOS is `expo/fetch`, which rejects it («Unsupported FormDataPart implementation»), and the error surfaces as `network`.
 - Errors: server errors are `{ error: { code, message } }` → `ApiError`. Network `TypeError`, timeout, offline (`isOnline()` from `src/lib/network.ts` first, ANL-10), missing page files and app restart mid-analysis map to `ClientErrorCode`. The mapping happens **once**, in `features/analysis/errors.ts` (`toAnalysisError`), not per screen. A `5xx` without a JSON body (isolate crash, spike 0.2) is `unavailable`.
 - Never log or send to crash reporting the document or its analysis — metadata only.
 
 ## 3. Writing an API route (server side)
 
 ```
-src/app/api/v1/analyze+api.ts            thin: parse request, call the handler, return its Response
-src/server/analysis/handle-analyze.ts     validation, limits, provider call, post-processing
-src/server/analysis/providers/*.ts        LlmProvider implementations (mock + the chosen one)
-src/shared/analysis/*.ts                  zod schema, API contract, toLlmJsonSchema(), fixtures
-src/shared/limits.ts                      pages and bytes per document (no react/react-native/expo imports)
+src/app/api/v1/analyses/[id]+api.ts             thin: PUT/GET/PATCH/DELETE, params.id → the handler
+src/server/analysis/jobs/handle-put-analysis.ts  upload: headers, limits, queue room, file checks, enqueue
+src/server/analysis/jobs/handle-analysis-job.ts  GET (state, charge on first done), PATCH, DELETE
+src/server/analysis/jobs/job-store.ts            AnalysisJobStore: queue and results in memory, 24 h expiry
+src/server/analysis/jobs/analysis-worker.ts      runs queued jobs: provider call, post-processing, abort
+src/server/analysis/providers/*.ts               LlmProvider implementations (mock + the chosen one)
+src/shared/analysis/*.ts                         zod schema, API contract, toLlmJsonSchema(), fixtures
+src/shared/limits.ts                             pages, bytes, daily analyses, unfinished jobs per device
 ```
 
 ```ts
-// src/app/api/v1/analyze+api.ts
-import { handleAnalyze } from '@/server/analysis/handle-analyze';
+// src/app/api/v1/analyses/[id]+api.ts — dynamic segments come as the second argument
+export function PUT(request: Request, { id }: Params) {
+  return handlePutAnalysis(request, id, createAnalysisJobDeps());
+}
 
-export function POST(request: Request) {
-  return handleAnalyze(request, createAnalyzeDeps());
+export function GET(request: Request, { id }: Params) {
+  return handleGetAnalysis(request, id, createServerDeps());
 }
 ```
 
-- Handlers take their dependencies (provider, counter store, limits, log, clock) as an argument so tests can pass fakes; `createServerDeps()` (`src/server/server-deps.ts`) builds the shared ones from server env vars and `createAnalyzeDeps()` adds the provider. In tests use `testServerDeps()` from `src/server/testing/server-deps.ts`: counters in memory, a clock that moves only with `advance()`, logs in `events`.
-- Limits and beta metrics go through `AnalysisUsage` (`src/server/limits/`): `begin()` before the body is read (429/503 with `Retry-After`), `end()` with the outcome; the device is charged only for a `200`. Counters live in a `CounterStore` (Redis commands; Upstash REST on EAS Hosting, `MemoryCounterStore` otherwise); keys come from `usage-keys.ts` with pseudonyms, never raw ids or IPs. A store failure lets the analysis through and logs `limits.unavailable`. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts` (`LLM_MOCK_FIXTURE` picks one, `LLM_MOCK_DELAY_MS` makes it slow).
+- Handlers take their dependencies (counter store, limits, jobs, log, clock; the worker and queue size for uploads) as an argument so tests can pass fakes; `createServerDeps()` (`src/server/server-deps.ts`) builds the shared ones from server env vars and `createAnalysisJobDeps()` (`jobs/job-deps.ts`) adds the worker with the model from `createLlmProvider()`. The job store and the worker are one per process, on `globalThis`: route bundles load separately, and `GET /api/v1/limits` counts the same jobs. In tests use `testServerDeps()` / `testJobDeps()` from `src/server/testing/server-deps.ts`: counters and jobs in memory, a clock that moves only with `advance()`, logs in `events`; `gatedProvider()` (`src/server/testing/gated-provider.ts`) holds model calls until the test answers them, and `worker.idle()` waits for the queue to drain.
+- Jobs live only in the process's memory (`MemoryAnalysisJobStore`, SPEC §7.1): never write a document or a result to disk or Redis. A job is keyed by the device's pseudonym and the `jobId`, so another device gets `404`. Files leave the job when the model call starts; a finished job is kept until `DELETE` or `ANALYSIS_RESULT_TTL_HOURS` (24) after its end; `ANALYSIS_CONCURRENCY` (1) and `ANALYSIS_QUEUE_MAX` (20) size the worker and the queue. Background work must never reject unhandled (it would stop the Node server): report it with `reportError()`.
+- Limits and beta metrics go through `AnalysisUsage` (`src/server/limits/`): `begin()` before the body is read, then `rejection(counts, unfinished)` in the SPEC §7.2 order (429 `rate_limited` for the device's day with its unfinished jobs counted, or the IP; 429 `too_many_jobs` at `ACTIVE_JOBS_PER_DEVICE`; 503 for the budget, with `Retry-After`), checked and followed by `jobs.reserve()` with no `await` in between; `uploadEnded()`, `jobEnded()`, `delivered()` (the daily limit is charged once, on the first `GET` that returns `done`) and `expired()` count the rest. Counters live in a `CounterStore` (Redis commands; Upstash REST on EAS Hosting, `MemoryCounterStore` otherwise); keys come from `usage-keys.ts` with pseudonyms, never raw ids or IPs. A store failure lets the analysis through and logs `limits.unavailable`. `MockLlmProvider` is used when `LLM_PROVIDER` is unset; it returns `ANALYSIS_FIXTURES` from `src/shared/analysis/fixtures.ts` (`LLM_MOCK_FIXTURE` picks one, `LLM_MOCK_DELAY_MS` makes it slow).
 - Check a request with the helpers in `src/server/http/` (`readClientHeaders()`, `readMultipartForm()` with a byte limit) and fail with `throw new ApiFailure(code, message)`; the handler turns it into the SPEC §7.2 body.
 - The provider sends `toLlmJsonSchema()` as its structured-output schema: the model's output without `schemaVersion`, which the server adds. `finalizeAnalysis()` checks the output's shape with `llmAnalysisShapeSchema` (a failure there is worth a retry), then `postProcessAnalysis()` repairs bounds, dates, pages and `deadlineId` links, and the result always passes the strict `analysisResultSchema`.
 - Return the SPEC §7.2 error codes with the JSON error body. Unsupported methods get 405 automatically.
-- Runtime is Cloudflare Workers on EAS Hosting: no native binaries, in-memory `fs`, ~250 MB per isolate **shared by concurrent requests**, and on the Free plan 10 ms CPU per request, enforced after a burst of heavy requests (`504 CPU time limit exceeded`, re-measured in task 3.1). Keep at most ~3× the upload size in memory: drop references to `File`/`ArrayBuffer` after encoding, before awaiting the model (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). A client disconnect cancels the handler, so charge the daily limit only after the model responds.
+- Runtime is the self-hosted Node server (`deploy/`, `expo export --platform web --api-only` behind `expo-server`'s Node adapter): a long-lived process, which the queue needs. EAS Hosting (Cloudflare Workers) can't run it — `ctx.waitUntil()` gives 30 s after the response — but keep the code free of native binaries and Node-only APIs anyway (spike 0.2, `docs/spikes/0.2-eas-hosting.md`). Memory is bounded by the queue: drop references to `File`/`ArrayBuffer` once the provider has the files.
 - Global `FormData` types in this project come from React Native; give uploaded files their own minimal type in server code.
 - Secrets via `process.env` only in `src/server/**`. `src/server` is imported only from `src/app/api/**`; server code may import only `src/server`, `src/shared` and `expo-server` (ESLint enforces both). `npm run check:bundle` fails if an `LLM_*` name reaches a client bundle.
-- Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1). Log through the handler's `deps.log` (`ServerLog` from `src/server/logs/server-log.ts`, one JSON line per event) with numbers, flags and closed sets of words only; no titles, file names, model output or error messages. Hash device ids with `hashDeviceId()` from `src/server/privacy/`. Rethrow unexpected errors through `redactError()` so crash reports carry no message. Test that a request's content never reaches the log (`handle-analyze.test.ts` shows the check).
+- Logs: latency, tokens, cost, error code, hashed device id — never content (SPEC §7.1). Log through the handler's `deps.log` (`ServerLog` from `src/server/logs/server-log.ts`, one JSON line per event) with numbers, flags and closed sets of words only; no titles, file names, model output or error messages. Hash device and job ids with `hashDeviceId()` and `hashJobId()` from `src/server/privacy/`; never log a push token. Job events are `upload.start`/`upload.end`, `analysis.start`/`analysis.end`, `analysis.delivered` and `job.removed` (SPEC §7.1). Rethrow unexpected errors through `redactError()` so crash reports carry no message. Test that a request's content never reaches the log (`jobs/handle-analysis-job.test.ts` shows the check).
 
 ## 4. Tests
 
 - Feature data and screens: `await installTestRepositories()` from `@/test/sqlite` (real SQLite in memory, installed as `getRepositories()`), seed through the repositories, render with `renderWithProviders`; `setRepositories(null)` in `afterEach`. Don't mock React Query or SQLite.
 - API client functions: `jest.spyOn(globalThis, 'fetch')` and assert URL, method, headers and body; cover every error code the UI distinguishes (`src/lib/api/client.test.ts` shows the pattern).
-- Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. Server tests start with `/** @jest-environment node */` and build requests and PDFs with `src/server/testing/analyze-request.ts` (server code can't import `@/test`). Jest's stream globals come from another realm than Node's `fetch`, so `pipeThrough()` on a request body fails there: wrap the reader in a plain `ReadableStream` instead.
+- Handlers: call `handleX(new Request(url, { method, body }), fakeDeps)` and assert on the `Response` (status, JSON). One test per SPEC §7.2 error code. Server tests start with `/** @jest-environment node */` and build requests and PDFs with `src/server/testing/analysis-request.ts` (`uploadRequest()`, `jobRequest()`; server code can't import `@/test`). Jest's stream globals come from another realm than Node's `fetch`, so `pipeThrough()` on a request body fails there: wrap the reader in a plain `ReadableStream` instead.
 - Pure post-processing (dates, `deadlineId` links, trimming) gets plain unit tests.
 
 Then run the `verify` skill.

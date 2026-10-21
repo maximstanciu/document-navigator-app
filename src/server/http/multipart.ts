@@ -1,4 +1,5 @@
 import { ApiFailure } from './api-failure';
+import { limitedBody } from './limited-body';
 
 // The global FormData and File types in this project are React Native's (spike 0.2), so server code
 // describes the parts of a parsed body it uses itself.
@@ -43,35 +44,12 @@ export async function readMultipartForm(request: Request, maxBytes: number): Pro
     throw new ApiFailure('invalid_request', 'The request has no body.');
   }
 
-  // A plain pull stream rather than pipeThrough(): Jest's globals and Node's fetch use streams from
-  // different realms, which pipeThrough() rejects.
-  const reader = request.body.getReader();
-  let received = 0;
-  let exceeded = false;
-  const limited = new ReadableStream<Uint8Array>({
-    async pull(controller) {
-      const { done, value } = await reader.read();
-      if (done) {
-        controller.close();
-        return;
-      }
-      received += value.byteLength;
-      if (received > maxBytes) {
-        exceeded = true;
-        controller.error(new Error('Body limit exceeded'));
-        await reader.cancel();
-        return;
-      }
-      controller.enqueue(value);
-    },
-    cancel: (reason) => reader.cancel(reason),
-  });
-
+  const { stream, exceeded } = limitedBody(request.body, maxBytes);
   try {
-    const response = new Response(limited, { headers: { 'Content-Type': contentType } });
+    const response = new Response(stream, { headers: { 'Content-Type': contentType } });
     return (await response.formData()) as unknown as ParsedForm;
   } catch {
-    if (exceeded) throw tooLarge(maxBytes);
+    if (exceeded()) throw tooLarge(maxBytes);
     throw new ApiFailure('invalid_request', 'The multipart body could not be parsed.');
   }
 }

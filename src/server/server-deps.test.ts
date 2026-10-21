@@ -10,8 +10,9 @@ describe('createServerDeps', () => {
     expect(deps.store).toBeInstanceOf(MemoryCounterStore);
     expect(deps.minAppVersion).toBeNull();
     expect(deps.metricsToken).toBeNull();
-    // One store per process, so counters survive between requests.
+    // One store per process, so counters survive between requests, and one set of analysis jobs.
     expect(createServerDeps({}).store).toBe(deps.store);
+    expect(createServerDeps({}).jobs).toBe(deps.jobs);
   });
 
   it('uses Upstash when both of its variables are set', () => {
@@ -37,6 +38,8 @@ describe('createServerDeps', () => {
     [{ DAILY_BUDGET_USD: 'ten' }, 'DAILY_BUDGET_USD'],
     [{ METRICS_TOKEN: 'short' }, 'METRICS_TOKEN'],
     [{ MIN_APP_VERSION: 'v2' }, 'MIN_APP_VERSION'],
+    [{ ANALYSIS_RESULT_TTL_HOURS: '0' }, 'ANALYSIS_RESULT_TTL_HOURS'],
+    [{ ANALYSIS_RESULT_TTL_HOURS: 'a day' }, 'ANALYSIS_RESULT_TTL_HOURS'],
   ])('fails on a misconfigured %o, naming the variable', (env, name) => {
     expect(() => createServerDeps(env)).toThrow(name);
   });
