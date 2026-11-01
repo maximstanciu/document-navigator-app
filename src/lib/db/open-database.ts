@@ -19,7 +19,8 @@ export async function openAppDatabase(): Promise<SqlDatabase> {
   await migrate(db);
   await purgeTombstones(db, new Date(Date.now() - TOMBSTONE_RETENTION_DAYS * 24 * 60 * 60 * 1000));
   const repositories = createRepositories(db);
-  // An analysis that was running when the app was closed has lost its request (ANL-4).
+  // An analysis left by a version of the app before jobs has lost its request (ANL-4); one with a
+  // job is asked about on the server once the app runs.
   await repositories.documents.failInterruptedAnalyses();
   setRepositories(repositories);
   return db;

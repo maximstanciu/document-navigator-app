@@ -64,12 +64,12 @@ async function addAnalyzed(id: string, analysis: AnalysisResult) {
     pageCount: 1,
     fileSize: 1000,
   });
-  await repositories.documents.startAnalysis(id);
+  await repositories.documents.startAnalysis(id, { jobId: `${id}-job`, locale: 'ru' });
   let next = 0;
   await repositories.documents.saveAnalysis(id, {
+    jobId: `${id}-job`,
     analysis,
     pageCount: 1,
-    analysisLocale: 'ru',
     ...analysisRecords(id, analysis, () => `${id}-${++next}`),
   });
   clock.advance(60_000);

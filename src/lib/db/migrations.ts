@@ -93,6 +93,21 @@ export const MIGRATIONS: readonly Migration[] = [
       `ALTER TABLE deadlines ADD COLUMN computation TEXT`,
     ],
   },
+  {
+    // Task 4.8: the analysis is a job on the server (D-1). A document keeps its job's id, made
+    // before the upload, and the explanation language it asked for, which the result is stored
+    // with when it arrives. Jobs to delete on the server wait in their own table until it answers.
+    version: 3,
+    statements: [
+      `ALTER TABLE documents ADD COLUMN analysis_job_id TEXT`,
+      `ALTER TABLE documents ADD COLUMN analysis_job_locale TEXT`,
+      `CREATE INDEX documents_analysis_job ON documents (analysis_job_id)`,
+      `CREATE TABLE analysis_job_deletions (
+        job_id TEXT PRIMARY KEY NOT NULL,
+        created_at TEXT NOT NULL
+      )`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

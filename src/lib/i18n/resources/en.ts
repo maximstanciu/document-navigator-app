@@ -280,19 +280,25 @@ export const en = {
     },
     draft: "This document hasn't been analyzed yet.",
     start: 'Analyze the document',
-    progress: 'Reading the document…',
+    uploading: 'Uploading the document…',
+    keepOpenWhileUploading: 'Keep the app open until the upload is done.',
+    queued_one: 'In the queue: {{count}} document ahead of yours',
+    queued_other: 'In the queue: {{count}} documents ahead of yours',
+    processing: 'Analyzing the document…',
+    canClose:
+      'This takes a few minutes. You can close the app: the result will be here when you open it again.',
+    cancel: 'Cancel the analysis',
+    cancelFailed: "Couldn't cancel the analysis. Try again.",
     previousShown: 'The previous result stays below until the new one is ready.',
     previousKept: 'Below is the result of the previous analysis.',
-    keepOpen:
-      'Keep the app open until the analysis is done: if you leave it or the screen turns off, the analysis stops.',
     rateLimitedUntil: 'The analysis limit is reached. You can try again after {{time}}.',
     error: {
       offline: "No internet connection. The document is saved: analyze it once you're online.",
       network:
-        'The connection to the server was lost. Check the internet and keep the app open until the analysis is done.',
+        'The upload broke off. Check the internet and keep the app open while the document uploads.',
       timeout: "The server didn't answer in time. Try again.",
       interrupted:
-        'The analysis stopped before it finished, for example because the app was closed. Try again.',
+        "The analysis stopped: the server doesn't have it anymore, for example because the upload didn't finish or the server restarted. Try again.",
       files_missing:
         "This document's pages are no longer on the device, so it can't be analyzed. Add the document again.",
       invalid_request: "The server couldn't accept the document. Add it again.",

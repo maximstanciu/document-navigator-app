@@ -47,8 +47,8 @@ export async function handlePutAnalysis(
   deps: AnalysisJobDeps
 ): Promise<Response> {
   const startedAt = deps.now();
-  // On EAS Hosting the Requests page finds a request by its Cf-Ray id.
-  const requestId = request.headers.get('cf-ray') ?? crypto.randomUUID();
+  // The server makes its own: an id a client sends would let it pick what the logs show.
+  const requestId = crypto.randomUUID();
   const facts: UploadFacts = {
     job: null,
     kind: null,

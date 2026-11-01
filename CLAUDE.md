@@ -23,6 +23,6 @@ The official `expo` plugin (enabled in `.claude/settings.json`) adds Expo-mainta
 
 ## Working rules
 
-- Ask before running anything that publishes or costs money: `eas build`, `eas submit`, `eas update`, `eas deploy`, store uploads.
+- Ask before running anything that publishes or costs money: `eas build`, `eas submit`, `eas update`, store uploads, and deploying to the self-hosted server (`deploy/`).
 - Ask before adding a dependency the user didn't request; say why it's needed.
 - If you can't verify something in this environment (e.g. iOS-only behavior on Linux), say so in your summary.

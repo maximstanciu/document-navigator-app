@@ -518,12 +518,14 @@ describe('handlePutAnalysis logs', () => {
     expect(ofType('upload.end').map((event) => event.ahead)).toEqual([null, 1]);
   });
 
-  it('uses the Cf-Ray id, which the EAS dashboard looks requests up by', async () => {
+  it('gives both events of an upload one request id of its own, whatever the client sends', async () => {
     await put(uploadRequest({ headers: { 'Cf-Ray': '8f1d2c3b4a5e6f70-FRA' } }));
 
-    expect(
-      deps.events.filter((event) => event.event.startsWith('upload.')).map((e) => e.requestId)
-    ).toEqual(['8f1d2c3b4a5e6f70-FRA', '8f1d2c3b4a5e6f70-FRA']);
+    const [start, end] = deps.events
+      .filter((event) => event.event.startsWith('upload.'))
+      .map((event) => event.requestId);
+    expect(start).toMatch(/^[0-9a-f-]{36}$/);
+    expect(end).toBe(start);
   });
 
   it('logs only the end when the client headers are wrong', async () => {

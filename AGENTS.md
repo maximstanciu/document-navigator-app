@@ -61,8 +61,9 @@ src/
                        #   http/ (errors, client headers and IP, multipart), analysis/ (handler,
                        #   prompt and the legal memo for Germany, LlmProvider, providers/,
                        #   post-processing), limits/ (daily limits, budget),
-                       #   metrics/ (beta report), store/ (counters: memory, Upstash), logs/, privacy/
-                       #   (pseudonyms), testing/ (request, PDF and deps helpers)
+                       #   metrics/ (beta report), store/ (counters: memory, Redis over the Upstash
+                       #   REST API), logs/, privacy/ (pseudonyms), testing/ (request, PDF and deps
+                       #   helpers)
   providers/           # AppProviders (React Query, navigation theme)
   test/                # test helpers (renderWithProviders)
 deploy/                # self-hosted backend: Dockerfile, compose.yaml (API on Node, Redis + Upstash-compatible
@@ -79,7 +80,7 @@ scripts/eval/          # analysis quality evaluation: synthetic test documents w
 - **Data is local-first.** Documents, pages, deadlines, actions and settings live on the device in SQLite; access them only through repositories in `src/lib/db/` (`getRepositories()`), read and written through React Query (`queryOptions` for reads, mutations that invalidate the affected `dbKeys`). Local queries spread `localQueryDefaults` (`staleTime: Infinity`, no retries). The only HTTP calls are to this app's own API routes (`/api/v1/*`) through `apiClient`. No `fetch`, direct DB calls, or `useEffect` data loading in components. Every data screen handles loading, error (with retry), and empty states.
   - `features/documents` is the reference implementation of a local-data feature.
 - **Feature dependencies**: features may import another feature's components and explicitly shared functions (e.g. `syncReminders()`), never in a cycle (`import/no-cycle` on `src/features/**`). DB access always goes through `src/lib/db`, never another feature's internals.
-- **Server code** (`src/server/**`) is imported only from `src/app/api/**/*+api.ts`, and itself imports only `src/server`, `src/shared` and `expo-server` among app and Expo code (all enforced by ESLint, `eslint.config.js`). It runs on EAS Hosting (Cloudflare Workers): no native binaries, in-memory `fs`, about 250 MB of memory per isolate shared by all its concurrent requests (measured in spike 0.2, `docs/spikes/0.2-eas-hosting.md`). Secrets (LLM keys) are read from `process.env` only here, never with an `EXPO_PUBLIC_` prefix.
+- **Server code** (`src/server/**`) is imported only from `src/app/api/**/*+api.ts`, and itself imports only `src/server`, `src/shared` and `expo-server` among app and Expo code (all enforced by ESLint, `eslint.config.js`). It runs on the project's own server: `expo export --platform web --api-only` bundles the routes, and `deploy/` runs them on Node in Docker Compose, one long-lived process that holds the analysis queue (SPEC §7.1). Bundled by Metro, it can't use native binaries; keep to web APIs. Secrets (LLM keys) are read from `process.env` only here, never with an `EXPO_PUBLIC_` prefix.
 - **Shared code** (`src/shared/**`) is plain TypeScript: no `react`, `react-native`, or `expo*` imports, and only `src/shared` among app code (enforced by ESLint). The zod schema there is the single source of truth for the analysis type, runtime validation, and the JSON Schema sent to the LLM.
 - **Config**: public runtime config via `EXPO_PUBLIC_*` env vars, read only through `src/lib/env.ts`. Never put secrets in the client.
 - **Strings**: every user-facing string goes through the i18n dictionaries in `src/lib/i18n/resources/` (`ru.ts` is the source, `en.ts` must match its keys), including accessibility labels: `const { t } = useTranslation()`. Plurals use i18next `_one`/`_few`/`_many`/`_other` keys (Russian needs all four). Format dates and amounts with `Intl` in the current language (`src/lib/i18n/format.ts`). Permission texts and other strings the OS shows go into `src/lib/i18n/native/*.json`.
@@ -113,7 +114,7 @@ Prefer those package docs over stale assumptions, and follow deprecation notices
 
 ## Building with EAS
 
-Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`), to deploy API routes to EAS Hosting (`eas deploy`), and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. Run EAS CLI as `npx eas-cli@latest <command>`; substitute that for bare `eas` in docs examples. Profiles are in `eas.json` (`development`, `preview`, `production`).
+Use EAS to build, sign, and submit the app in the cloud (`eas build`, `eas submit`) and to ship over-the-air updates (`eas update`) — no local Xcode or Android Studio required. The API routes don't go to EAS Hosting: they run on the self-hosted server in `deploy/` (see `deploy/README.md`). Run EAS CLI as `npx eas-cli@latest <command>`; substitute that for bare `eas` in docs examples. Profiles are in `eas.json` (`development`, `preview`, `production`).
 Docs: https://docs.expo.dev/eas/index.md
 
 ## Rules

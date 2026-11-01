@@ -43,7 +43,7 @@ const server = createServer((req, res) => {
   closeIfAnsweredEarly(req, res);
   handleApi(req, res, (error) => {
     logError(error);
-    // No SPEC §7.2 body: the app reads a bare 5xx as `unavailable`, as on EAS Hosting.
+    // No SPEC §7.2 body: the app reads a bare 5xx as `unavailable`.
     if (!res.headersSent) res.writeHead(500);
     res.end();
   });
@@ -70,7 +70,7 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
 
 /** Replaces client-supplied forwarding headers with the address of the TCP peer. */
 function useSocketAddress(req) {
-  const dropped = new Set(['x-real-ip', 'x-forwarded-for', 'cf-ray']);
+  const dropped = new Set(['x-real-ip', 'x-forwarded-for']);
   const headers = [];
   for (let index = 0; index < req.rawHeaders.length; index += 2) {
     if (dropped.has(req.rawHeaders[index].toLowerCase())) continue;

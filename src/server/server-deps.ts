@@ -17,7 +17,7 @@ export type ServerDeps = {
   /** HMAC key that turns device ids and IP addresses into pseudonyms. */
   deviceHashKey: string;
   log: ServerLog;
-  /** Milliseconds. On Workers the clock stands still during computation and moves across I/O. */
+  /** Milliseconds. */
   now: () => number;
   store: CounterStore;
   usage: AnalysisUsage;
@@ -34,15 +34,16 @@ const HOUR_MS = 60 * 60 * 1000;
 const MIN_METRICS_TOKEN_LENGTH = 32;
 
 /**
- * Builds the dependencies from server environment variables (EAS environment variables on EAS
- * Hosting, `.env.local` in development). A misconfigured server fails loudly: the error names the
- * variable, never a value.
+ * Builds the dependencies from server environment variables (deploy/.env and deploy/compose.yaml
+ * on the server, `.env.local` in development). A misconfigured server fails loudly: the error
+ * names the variable, never a value.
  *
  * - `MIN_APP_VERSION`: `major.minor.patch`; older apps get `426`. Unset — every version.
- * - `DEVICE_ID_HASH_KEY`: HMAC key for pseudonyms, a sensitive EAS variable on every deployment.
+ * - `DEVICE_ID_HASH_KEY`: HMAC key for pseudonyms, a secret of every server.
  *   Unset — a development key that anyone could reproduce.
- * - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: the counter store (SPEC §8.3). Unset —
- *   counters in this process's memory, fine for the dev server only.
+ * - `UPSTASH_REDIS_REST_URL`, `UPSTASH_REDIS_REST_TOKEN`: the counter store (SPEC §8.3), the
+ *   server's Redis behind its Upstash-compatible proxy. Unset — counters in this process's memory,
+ *   fine for the dev server only.
  * - `IP_ATTEMPTS_PER_HOUR`: default 60. `DAILY_BUDGET_USD`: unset — no cap.
  * - `METRICS_TOKEN`: at least 32 characters; unset — `GET /api/v1/metrics` answers 404.
  * - `ANALYSIS_RESULT_TTL_HOURS`: how long a finished job waits for the app, default 24.

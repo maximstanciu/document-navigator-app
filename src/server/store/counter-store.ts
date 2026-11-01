@@ -1,5 +1,6 @@
-// Counters for limits and beta metrics (SPEC §8.3, §8.7) in Redis terms: Upstash Redis on EAS
-// Hosting, an in-memory copy for tests and the dev server. Only the commands the server uses.
+// Counters for limits and beta metrics (SPEC §8.3, §8.7) in Redis terms: the server's own Redis
+// behind its Upstash-compatible REST proxy (deploy/compose.yaml), an in-memory copy for tests and
+// the dev server. Only the commands the server uses.
 
 export type StoreCommand =
   | ['GET', key: string]
@@ -15,7 +16,7 @@ export type StoreValue = string | number | string[] | null;
 export interface CounterStore {
   /**
    * Runs the commands in order in one round trip. Not atomic: other requests' commands can come in
-   * between, as in an Upstash pipeline. Throws `StoreUnavailableError` when the store can't answer.
+   * between, as in a Redis pipeline. Throws `StoreUnavailableError` when the store can't answer.
    */
   run(commands: StoreCommand[]): Promise<StoreValue[]>;
 }
@@ -30,8 +31,8 @@ export class StoreUnavailableError extends Error {
 type Entry = { value: number | Set<string>; expiresAt: number | null };
 
 /**
- * The store in this process's memory. On EAS Hosting every isolate would get its own, so limits
- * there need Upstash; this one is for tests and the dev server.
+ * The store in this process's memory, for tests and the dev server: it forgets the counters on
+ * every restart, which the server's Redis keeps (SPEC §8.3).
  */
 export class MemoryCounterStore implements CounterStore {
   private readonly entries = new Map<string, Entry>();

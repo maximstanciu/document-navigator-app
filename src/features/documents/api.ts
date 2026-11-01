@@ -1,3 +1,4 @@
+import { forgetDocumentAnalysis } from '@/features/analysis/api';
 import { getRepositories } from '@/lib/db/repositories';
 import type { DocumentRecord } from '@/lib/db/types';
 import { deleteDocumentFiles, pageFileExists, pageFileUri } from '@/lib/files/page-files';
@@ -55,11 +56,14 @@ export async function renameDocument(id: string, title: string): Promise<void> {
 
 /**
  * «Delete» (DET-9, STO-6): the content is wiped in the database at once and the page files go with
- * the document's folder. `useDeleteDocument()` then syncs reminders, which cancels the document's.
+ * the document's folder. An analysis in progress stops, and its job is deleted on the server, or
+ * later without a network. `useDeleteDocument()` then syncs reminders, which cancels the document's.
  */
 export async function deleteDocument(id: string): Promise<void> {
   const removed = await getRepositories().documents.remove(id);
-  if (removed) await deleteDocumentFiles(id);
+  if (!removed) return;
+  await forgetDocumentAnalysis(id);
+  await deleteDocumentFiles(id);
 }
 
 /** `null` when the document doesn't exist or was deleted. */

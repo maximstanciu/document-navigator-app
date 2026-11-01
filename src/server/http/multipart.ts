@@ -30,7 +30,7 @@ export function isFormFile(value: unknown): value is FormFile {
 /**
  * Parses a `multipart/form-data` body, reading at most `maxBytes` of it: a declared
  * `Content-Length` over the limit is refused before reading, and a body without one stops at the
- * limit, so an oversized upload never fills the isolate's memory (SPEC §7.1).
+ * limit, so an oversized upload never fills the server's memory (SPEC §7.1).
  */
 export async function readMultipartForm(request: Request, maxBytes: number): Promise<ParsedForm> {
   const contentType = request.headers.get('Content-Type') ?? '';

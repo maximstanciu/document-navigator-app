@@ -342,6 +342,38 @@ describe('SettingsScreen «Delete all data» (SET-3, STO-7)', () => {
     expect(dismissShownNotifications).toHaveBeenCalled();
   });
 
+  it('deletes the analysis jobs on the server first: unfinished ones and those waiting for it', async () => {
+    const user = userEvent.setup();
+    await repositories.documents.create({
+      id: 'doc-2',
+      title: '',
+      source: 'scan',
+      mimeType: 'image/jpeg',
+      fileSize: 10,
+    });
+    await repositories.documents.startAnalysis('doc-2', { jobId: 'job-waiting', locale: 'en' });
+    await repositories.documents.create({
+      id: 'doc-3',
+      title: '',
+      source: 'scan',
+      mimeType: 'image/jpeg',
+      fileSize: 10,
+    });
+    await repositories.documents.startAnalysis('doc-3', { jobId: 'job-cancelled', locale: 'en' });
+    await repositories.documents.cancelAnalysis('doc-3', 'job-cancelled');
+    await renderSettings();
+
+    await user.press(await screen.findByRole('button', { name: 'Удалить все данные' }));
+    await user.press(screen.getByRole('button', { name: 'Удалить всё' }));
+
+    expect(await screen.findByText('All data deleted.')).toBeOnTheScreen();
+    const deleted = fetchSpy.mock.calls
+      .filter(([, init]) => init?.method === 'DELETE')
+      .map(([url]) => url);
+    expect(deleted).toEqual(['/api/v1/analyses/job-waiting', '/api/v1/analyses/job-cancelled']);
+    expect(await repositories.analysisJobDeletions.list()).toEqual([]);
+  });
+
   it('says when it failed, and deletes everything on a second try', async () => {
     const user = userEvent.setup();
     jest.spyOn(repositories, 'wipeAll').mockRejectedValueOnce(new Error('disk I/O error'));

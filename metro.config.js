@@ -9,7 +9,8 @@ if (!config.resolver.assetExts.includes('wasm')) {
 }
 
 // expo-sqlite on web needs SharedArrayBuffer, which requires cross-origin isolation.
-// This covers the dev server; EAS Hosting gets the same headers from the expo-router plugin in app.json.
+// This covers the dev server; an exported web build gets the same headers from the expo-router
+// plugin in app.json.
 const enhanceMiddleware = config.server.enhanceMiddleware;
 config.server.enhanceMiddleware = (middleware, metroServer) => {
   const enhancedMiddleware = enhanceMiddleware

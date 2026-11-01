@@ -1,4 +1,5 @@
 import { insertAction, type NewAction } from './actions-repository';
+import { queueJobDeletion } from './analysis-job-deletions-repository';
 import type { SqlDatabase } from './database';
 import { insertDeadline, type NewDeadline } from './deadlines-repository';
 import type { NewPage } from './pages-repository';
@@ -22,6 +23,7 @@ type DocumentRow = {
   document_date: string | null;
   status: DocumentRecord['status'];
   error_code: DocumentRecord['errorCode'];
+  analysis_job_id: string | null;
   source: DocumentRecord['source'];
   mime_type: DocumentRecord['mimeType'];
   page_count: number | null;
@@ -36,9 +38,9 @@ type DocumentRow = {
   deleted_at: string | null;
 };
 
-const COLUMNS = `id, title, document_type, sender_name, document_date, status, error_code, source,
-  mime_type, page_count, file_size, analysis, analysis_locale, analyzed_at, search_text,
-  attention_dismissed_at, created_at, updated_at, deleted_at`;
+const COLUMNS = `id, title, document_type, sender_name, document_date, status, error_code,
+  analysis_job_id, source, mime_type, page_count, file_size, analysis, analysis_locale, analyzed_at,
+  search_text, attention_dismissed_at, created_at, updated_at, deleted_at`;
 
 function toRecord(row: DocumentRow): DocumentRecord {
   return {
@@ -49,6 +51,7 @@ function toRecord(row: DocumentRow): DocumentRecord {
     documentDate: row.document_date,
     status: row.status,
     errorCode: row.error_code,
+    analysisJobId: row.analysis_job_id,
     source: row.source,
     mimeType: row.mime_type,
     pageCount: row.page_count,
@@ -117,14 +120,27 @@ const PATCH_COLUMNS = {
 /** What the caller still has to clean up outside the database after a delete (STO-6). */
 export type RemovedDocument = { pagePaths: string[]; notificationIds: string[] };
 
-/** A finished analysis with the deadlines and actions made from it, ready to store. */
+/** The job an analysis runs as on the server (SPEC §7.2), and the explanation language it asked for. */
+export type AnalysisJobRef = { jobId: string; locale: string };
+
+/**
+ * A finished analysis with the deadlines and actions made from it, ready to store. It belongs to
+ * the job that produced it: a document analyzing under another job isn't written.
+ */
 export type AnalysisOutcome = {
+  jobId: string;
   analysis: NonNullable<DocumentRecord['analysis']>;
   /** What the server counted (D-4). */
   pageCount: number;
-  analysisLocale: string;
   deadlines: readonly NewDeadline[];
   actions: readonly NewAction[];
+};
+
+/** Why the analysis under `jobId` failed; `removeJob` also queues the job for deletion on the server. */
+export type AnalysisFailure = {
+  jobId: string;
+  code: NonNullable<DocumentRecord['errorCode']>;
+  removeJob?: boolean;
 };
 
 /** Statuses an analysis can start from (SPEC §6.3): a `ready` document is analyzed again (ANL-8). */
@@ -259,19 +275,30 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
-     * Moves a document to `analyzing` and clears the previous error (SPEC §6.3): a draft, a failed
-     * one, or a ready one to analyze again (ANL-8), which keeps its analysis until the new one is
-     * stored, and keeps it if the new one fails.
+     * Moves a document to `analyzing` under the job `jobId` and clears the previous error (SPEC
+     * §6.3): a draft, a failed one, or a ready one to analyze again (ANL-8), which keeps its
+     * analysis until the new one is stored, and keeps it if the new one fails. The job id is stored
+     * before the upload, so a broken upload can be checked with the server later (ANL-4, ANL-9).
      * `false` when the document is gone or in another status, e.g. already being analyzed: the
      * check and the change are one statement, so two taps can't start two analyses.
      */
-    async startAnalysis(id: string): Promise<boolean> {
+    async startAnalysis(id: string, job: AnalysisJobRef): Promise<boolean> {
       const result = await db.runAsync(
-        `UPDATE documents SET status = 'analyzing', error_code = NULL, updated_at = ?
+        `UPDATE documents SET status = 'analyzing', error_code = NULL, analysis_job_id = ?,
+           analysis_job_locale = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL AND status IN ${ANALYZABLE}`,
-        [now().toISOString(), id]
+        [job.jobId, job.locale, now().toISOString(), id]
       );
       return result.changes > 0;
+    },
+
+    /** Documents being analyzed with their jobs (SPEC §7.2 «Опрос»), oldest first. */
+    async listAnalyzing(): Promise<{ id: string; jobId: string }[]> {
+      return db.getAllAsync<{ id: string; jobId: string }>(
+        `SELECT id, analysis_job_id AS jobId FROM documents
+         WHERE deleted_at IS NULL AND status = 'analyzing' AND analysis_job_id IS NOT NULL
+         ORDER BY created_at, id`
+      );
     },
 
     /**
@@ -280,18 +307,21 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
      * (`mergeReanalysis()`): what the person did to deadlines stays, the rest is replaced; replaced
      * deadlines and actions are wiped like deleted ones, and their scheduled reminders are left for
      * `syncReminders()` to cancel. One transaction, read and write, so «Done» pressed while the
-     * analysis ran is not lost. Only a document that is still `analyzing` is written: `false` when
-     * it was deleted meanwhile.
+     * analysis ran is not lost. The explanation language is the one the job asked for. The job is
+     * queued for deletion on the server in the same transaction (SPEC §7.2 «Опрос»).
+     * Only a document still `analyzing` under `outcome.jobId` is written: `false` when it was
+     * deleted, its analysis cancelled, or started again under another job meanwhile.
      */
     async saveAnalysis(id: string, outcome: AnalysisOutcome): Promise<boolean> {
       const timestamp = now().toISOString();
       return db.transaction(async (tx) => {
         const current = await tx.getFirstAsync<Pick<DocumentRow, 'title' | 'analysis'>>(
           `SELECT title, analysis FROM documents
-           WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
-          [id]
+           WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing' AND analysis_job_id = ?`,
+          [id, outcome.jobId]
         );
         if (!current) return false;
+        await queueJobDeletion(tx, outcome.jobId, timestamp);
         const { analysis } = outcome;
         const named = {
           title: titleAfterAnalysis(
@@ -305,8 +335,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         };
         await tx.runAsync(
           `UPDATE documents SET title = ?, document_type = ?, sender_name = ?, document_date = ?,
-             status = 'ready', error_code = NULL, page_count = ?, analysis = ?, analysis_locale = ?,
-             analyzed_at = ?, search_text = ?, updated_at = ?
+             status = 'ready', error_code = NULL, page_count = ?, analysis = ?,
+             analysis_locale = analysis_job_locale, analyzed_at = ?, search_text = ?, updated_at = ?
            WHERE id = ?`,
           [
             named.title,
@@ -315,7 +345,6 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             analysis.documentDate,
             outcome.pageCount,
             toJson(analysis),
-            outcome.analysisLocale,
             timestamp,
             searchTextOf({ ...named, analysis }),
             timestamp,
@@ -377,24 +406,55 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
       });
     },
 
-    /** Marks an analysis in progress as failed with `code` (SPEC §6.3). `false` if it isn't running. */
-    async failAnalysis(id: string, code: NonNullable<DocumentRecord['errorCode']>) {
-      const result = await db.runAsync(
-        `UPDATE documents SET status = 'failed', error_code = ?, updated_at = ?
-         WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing'`,
-        [code, now().toISOString(), id]
-      );
-      return result.changes > 0;
+    /**
+     * Marks the analysis under `jobId` as failed with `code` (SPEC §6.3); with `removeJob`, the job
+     * is queued for deletion on the server in the same transaction. `false` if the document isn't
+     * analyzing under that job (deleted, cancelled, or started again meanwhile).
+     */
+    async failAnalysis(id: string, { jobId, code, removeJob = false }: AnalysisFailure) {
+      const timestamp = now().toISOString();
+      return db.transaction(async (tx) => {
+        const result = await tx.runAsync(
+          `UPDATE documents SET status = 'failed', error_code = ?, updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing' AND analysis_job_id = ?`,
+          [code, timestamp, id, jobId]
+        );
+        if (result.changes === 0) return false;
+        if (removeJob) await queueJobDeletion(tx, jobId, timestamp);
+        return true;
+      });
     },
 
     /**
-     * At startup nothing can be analyzing: such a document lost its request with the previous run of
-     * the app, so it becomes `failed` with `interrupted` (ANL-4). Returns how many there were.
+     * «Cancel the analysis» (ANL-13): the document goes back to `draft`, or to `ready` with its
+     * previous analysis (ANL-8), and the job is queued for deletion on the server in the same
+     * transaction, so its result is never stored. `false` if it isn't analyzing under `jobId`.
+     */
+    async cancelAnalysis(id: string, jobId: string): Promise<boolean> {
+      const timestamp = now().toISOString();
+      return db.transaction(async (tx) => {
+        const result = await tx.runAsync(
+          `UPDATE documents
+           SET status = CASE WHEN analysis IS NULL THEN 'draft' ELSE 'ready' END,
+             error_code = NULL, updated_at = ?
+           WHERE id = ? AND deleted_at IS NULL AND status = 'analyzing' AND analysis_job_id = ?`,
+          [timestamp, id, jobId]
+        );
+        if (result.changes === 0) return false;
+        await queueJobDeletion(tx, jobId, timestamp);
+        return true;
+      });
+    },
+
+    /**
+     * At startup a document analyzing without a job was left by a version of the app before the
+     * analysis became a job: its request is lost, so it becomes `failed` with `interrupted` (ANL-4).
+     * One with a job is asked about on the server instead. Returns how many there were.
      */
     async failInterruptedAnalyses(): Promise<number> {
       const result = await db.runAsync(
         `UPDATE documents SET status = 'failed', error_code = 'interrupted', updated_at = ?
-         WHERE deleted_at IS NULL AND status = 'analyzing'`,
+         WHERE deleted_at IS NULL AND status = 'analyzing' AND analysis_job_id IS NULL`,
         [now().toISOString()]
       );
       return result.changes;
@@ -402,17 +462,25 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
 
     /**
      * Deletes a document (STO-6): wipes its content and that of its deadlines and actions, removes
-     * its page rows and scheduled reminders, and keeps a tombstone for future sync. The caller deletes
-     * the returned page files and cancels the returned notifications. Returns `null` if already gone.
+     * its page rows and scheduled reminders, and keeps a tombstone for future sync. The job of an
+     * analysis that is running, or whose upload may have reached the server before it broke off, is
+     * queued for deletion there. The caller deletes the returned page files, cancels the returned
+     * notifications and sends the queued deletions. Returns `null` if already gone.
      */
     async remove(id: string): Promise<RemovedDocument | null> {
       return db.transaction(async (tx) => {
-        const exists = await tx.getFirstAsync<{ id: string }>(
-          'SELECT id FROM documents WHERE id = ? AND deleted_at IS NULL',
+        const exists = await tx.getFirstAsync<Pick<DocumentRow, 'status' | 'analysis_job_id'>>(
+          'SELECT status, analysis_job_id FROM documents WHERE id = ? AND deleted_at IS NULL',
           [id]
         );
         if (!exists) return null;
         const timestamp = now().toISOString();
+        if (
+          exists.analysis_job_id &&
+          (exists.status === 'analyzing' || exists.status === 'failed')
+        ) {
+          await queueJobDeletion(tx, exists.analysis_job_id, timestamp);
+        }
 
         const pages = await tx.getAllAsync<{ relative_path: string }>(
           'SELECT relative_path FROM pages WHERE document_id = ? ORDER BY page_index',
@@ -453,7 +521,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         );
         await tx.runAsync(
           `UPDATE documents SET title = '', document_type = NULL, sender_name = NULL,
-             document_date = NULL, error_code = NULL, analysis = NULL, analysis_locale = NULL,
+             document_date = NULL, error_code = NULL, analysis_job_id = NULL,
+             analysis_job_locale = NULL, analysis = NULL, analysis_locale = NULL,
              search_text = '', updated_at = ?, deleted_at = ?
            WHERE id = ?`,
           [timestamp, timestamp, id]

@@ -23,8 +23,7 @@ const NO_REACT_NATIVE_OR_EXPO = {
     'expo-*',
     '@expo/*',
   ],
-  message:
-    'Runs outside the app (shared with the server / on Workers): no React, React Native or Expo.',
+  message: 'Runs outside the app (shared with the server): no React, React Native or Expo.',
 };
 
 module.exports = defineConfig([
@@ -67,7 +66,8 @@ module.exports = defineConfig([
     },
   },
   {
-    // Server code runs on EAS Hosting (Cloudflare Workers): no app code, no native modules.
+    // Server code is bundled by `expo export --api-only` and runs on Node on the project's own
+    // server (deploy/): no app code, no native modules.
     files: ['src/server/**/*.{ts,tsx}'],
     rules: {
       'no-restricted-imports': [

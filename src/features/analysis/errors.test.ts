@@ -36,7 +36,7 @@ describe('toAnalysisError (SPEC §7.2)', () => {
   });
 
   it.each([500, 502, 504])(
-    'reads a %s without our body (crashed isolate, CPU limit) as unavailable',
+    'reads a %s without our body (a crash, a server down behind the proxy) as unavailable',
     (status) => {
       expect(toAnalysisError(apiError(status, 'Internal Server Error'), NOW).code).toBe(
         'unavailable'

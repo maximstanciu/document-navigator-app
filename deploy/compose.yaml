@@ -63,8 +63,8 @@ services:
     security_opt: ['no-new-privileges:true']
     logging: *logging
 
-  # Upstash-compatible REST proxy (https://github.com/hiett/serverless-redis-http), so the server
-  # talks to this Redis with the same UpstashCounterStore it uses on EAS Hosting.
+  # Upstash-compatible REST proxy (https://github.com/hiett/serverless-redis-http): the server
+  # talks to this Redis over HTTP with UpstashCounterStore, plain fetch and no Redis client.
   redis-http:
     image: hiett/serverless-redis-http:0.0.10
     restart: unless-stopped

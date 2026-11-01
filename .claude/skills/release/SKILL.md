@@ -7,7 +7,7 @@ disable-model-invocation: true
 
 # Release
 
-Builds cost EAS minutes; submissions, updates and deployments reach real users. **Confirm with the user before every `eas build`, `eas submit`, `eas update`, and `eas deploy` command**, showing the exact command, profile, platform, and version.
+Builds cost EAS minutes; submissions, updates and server deployments reach real users. **Confirm with the user before every `eas build`, `eas submit` and `eas update` command, and before deploying the backend**, showing the exact command, profile, platform, and version.
 
 Run EAS CLI as `npx eas-cli@latest <command>`. For store-submission details, credentials, and CI (EAS Workflows), the official `expo` plugin skills have current guidance.
 
@@ -60,17 +60,11 @@ npx eas-cli@latest update --channel production --message "<what changed>"
 
 Prefer `--channel preview` first and verify on a preview build. Roll back with `npx eas-cli@latest update:republish` to a previous update group if needed.
 
-## API routes (EAS Hosting)
+## API routes (own server)
 
-API routes deploy separately from app builds (task 3.6). After confirmation:
+The API routes don't go to EAS Hosting: the analysis queue needs a long-lived process (SPEC §7.1). They run on the self-hosted server in `deploy/` (Docker Compose), deployed separately from app builds; `deploy/README.md` has the commands. After confirmation, copy the committed tree to the server and rebuild there (`docker compose up -d --build`). A restart of `api` drops the jobs in memory: the app shows them as interrupted and offers to try again.
 
-```bash
-npx expo export --platform web
-npx eas-cli@latest deploy                 # preview deployment
-npx eas-cli@latest deploy --prod          # production, only when the user says so
-```
-
-Secrets (LLM keys) live in EAS environment variables, never in `EXPO_PUBLIC_*`. Production URL changes need a matching `EXPO_PUBLIC_API_URL` in the app build.
+Secrets (LLM keys, `DEVICE_ID_HASH_KEY`, `COUNTER_STORE_TOKEN`) live in `deploy/.env` on the server, never in `EXPO_PUBLIC_*`. A new server address needs a matching `EXPO_PUBLIC_API_URL` in the app build (an `http://` address on the local network: `app.config.js` allows it on Android).
 
 ## Never
 

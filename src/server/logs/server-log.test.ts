@@ -3,7 +3,7 @@ import { consoleServerLog, redactError, reportError } from './server-log';
 describe('consoleServerLog', () => {
   afterEach(() => jest.restoreAllMocks());
 
-  it('writes one JSON line to console.info, which EAS Hosting keeps', () => {
+  it('writes one JSON line to console.info, which docker compose logs keeps', () => {
     const info = jest.spyOn(console, 'info').mockImplementation(() => {});
 
     consoleServerLog({ event: 'upload.end', status: 202, push: true, pages: null });

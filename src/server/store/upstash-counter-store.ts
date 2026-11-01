@@ -6,9 +6,9 @@ import {
 } from './counter-store';
 
 export type UpstashOptions = {
-  /** `UPSTASH_REDIS_REST_URL`, e.g. https://eu1-example-12345.upstash.io */
+  /** `UPSTASH_REDIS_REST_URL`: `http://redis-http` in deploy/compose.yaml. */
   url: string;
-  /** `UPSTASH_REDIS_REST_TOKEN`, a sensitive EAS variable. */
+  /** `UPSTASH_REDIS_REST_TOKEN`: `COUNTER_STORE_TOKEN` of deploy/.env, a secret. */
   token: string;
   /** A slow store must not hold up an analysis: past this the call counts as failed. */
   timeoutMs?: number;
@@ -18,8 +18,9 @@ export type UpstashOptions = {
 type PipelineEntry = { result?: unknown; error?: string };
 
 /**
- * Upstash Redis over its REST API: one `POST /pipeline` per `run()`, plain `fetch`, no SDK
- * (https://upstash.com/docs/redis/features/restapi). Error texts from Upstash aren't passed on:
+ * Redis over the Upstash REST API, which the `redis-http` proxy of deploy/compose.yaml serves for
+ * the server's own Redis: one `POST /pipeline` per `run()`, plain `fetch`, no SDK
+ * (https://upstash.com/docs/redis/features/restapi). Error texts from the store aren't passed on:
  * the caller logs only that the store was unavailable.
  */
 export class UpstashCounterStore implements CounterStore {

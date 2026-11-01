@@ -1,21 +1,23 @@
 import { randomUUID } from 'expo-crypto';
 import { getCalendars } from 'expo-localization';
 
-import { apiClient } from '@/lib/api/client';
+import { ApiError, apiClient } from '@/lib/api/client';
 import { getRepositories } from '@/lib/db/repositories';
-import { env } from '@/lib/env';
-import type { DocumentMimeType } from '@/lib/db/types';
+import type { DocumentMimeType, DocumentRecord } from '@/lib/db/types';
 import { pageFileExists, pageFileUri } from '@/lib/files/page-files';
 import { currentLanguage } from '@/lib/i18n/i18n';
 import { isOnline } from '@/lib/network';
 import {
   ANALYZE_FIELDS,
-  analyzeResponseSchema,
-  type AnalyzeResponse,
+  analysisJobStateSchema,
+  apiErrorBodySchema,
+  type AnalysisJobState,
 } from '@/shared/analysis/contract';
 import { localCalendarDate } from '@/shared/calendar-date';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import { ACTIVE_JOBS_PER_DEVICE } from '@/shared/limits';
 import { limitsResponseSchema, type LimitsResponse } from '@/shared/limits-contract';
+import type { UiLocale } from '@/shared/ui-locales';
 
 import { analysisRecords } from './analysis-records';
 import { AnalysisError, toAnalysisError } from './errors';
@@ -23,46 +25,79 @@ import { keepScreenAwake } from './keep-awake';
 import { appendUploadFile, type UploadFile } from './upload-file';
 
 /**
- * Data access for the analysis feature, no React: the request to `POST /api/v1/analyze` and the
- * document's way through `analyzing` to `ready` or `failed` (SPEC §6.3). `./queries.ts` wraps it.
+ * Data access for the analysis feature, no React: the analysis jobs on the server (SPEC §7.2) and
+ * the document's way through `analyzing` to `ready` or `failed` (SPEC §6.3). `./queries.ts` wraps it.
+ *
+ * An analysis runs in two stages (ANL-3, D-1): the upload (`PUT`) creates a job on the server, and
+ * the app then asks about it (`GET`) until it ends, saves the result and deletes the job (`DELETE`).
  */
 
-const ANALYZE_PATH = '/api/v1/analyze';
+const JOBS_PATH = '/api/v1/analyses';
 const LIMITS_PATH = '/api/v1/limits';
 
-/**
- * The analysis is one synchronous request (D-1); the client gives up after 90 s (SPEC §7.2), or
- * after `EXPO_PUBLIC_ANALYZE_TIMEOUT_MS` in builds for a model on a CPU.
- */
-export const ANALYZE_TIMEOUT_MS = env.analyzeTimeoutMs;
+/** The upload gives up after 5 minutes without an answer (`timeout`, SPEC §7.2). */
+export const UPLOAD_TIMEOUT_MS = 5 * 60 * 1000;
 
-export type AnalyzeRequest = {
+/** How often the app asks about its jobs while it is in the foreground (SPEC §7.2 «Опрос»). */
+export const POLL_INTERVAL_MS = 10_000;
+
+/** A question about a job or its deletion: a server that doesn't answer it is asked again later. */
+const JOB_REQUEST_TIMEOUT_MS = 30_000;
+
+const jobPath = (jobId: string) => `${JOBS_PATH}/${encodeURIComponent(jobId)}`;
+
+export type UploadRequest = {
   files: readonly UploadFile[];
   locale: ExplanationLocale;
   /** The device's date, `YYYY-MM-DD`, and IANA time zone, for relative deadlines (ANL-5). */
   today: string;
   timezone: string;
+  /** The interface language, for the push about the finished job (ANL-12). */
+  uiLocale: UiLocale;
 };
 
+/** A state the shared schema rejects counts as `analysis_failed` (SPEC §7.2). */
+function parseJobState(body: unknown): AnalysisJobState {
+  const parsed = analysisJobStateSchema.safeParse(body);
+  if (!parsed.success) throw new AnalysisError('analysis_failed');
+  return parsed.data;
+}
+
 /**
- * Sends the pages to `POST /api/v1/analyze` and returns the response, checked against the shared
- * schema. Fails as `apiClient` does (`ApiError`, `ApiTimeoutError`, a network `TypeError`), or with
- * `analysis_failed` when the body isn't a valid analysis.
+ * Uploads the pages as the job `jobId` (`PUT /api/v1/analyses/{jobId}`) and returns its state.
+ * A repeated upload under the same id gets the job the first one created (ANL-9). Fails as
+ * `apiClient` does (`ApiError`, `ApiTimeoutError`, a network `TypeError`, an abort), or with
+ * `analysis_failed` when the state isn't what the contract says.
  */
-export async function requestAnalysis(request: AnalyzeRequest): Promise<AnalyzeResponse> {
+export async function uploadDocument(
+  jobId: string,
+  request: UploadRequest,
+  signal?: AbortSignal
+): Promise<AnalysisJobState> {
   const form = new FormData();
   for (const file of request.files) await appendUploadFile(form, ANALYZE_FIELDS.files, file);
   form.append(ANALYZE_FIELDS.locale, request.locale);
   form.append(ANALYZE_FIELDS.today, request.today);
   form.append(ANALYZE_FIELDS.timezone, request.timezone);
+  form.append(ANALYZE_FIELDS.uiLocale, request.uiLocale);
 
-  const body = await apiClient.post<unknown>(ANALYZE_PATH, {
+  const body = await apiClient.put<unknown>(jobPath(jobId), {
     body: form,
-    timeoutMs: ANALYZE_TIMEOUT_MS,
+    timeoutMs: UPLOAD_TIMEOUT_MS,
+    signal,
   });
-  const parsed = analyzeResponseSchema.safeParse(body);
-  if (!parsed.success) throw new AnalysisError('analysis_failed');
-  return parsed.data;
+  return parseJobState(body);
+}
+
+/** The state of a job (`GET /api/v1/analyses/{jobId}`). Fails like `uploadDocument()`. */
+export async function fetchJobState(jobId: string): Promise<AnalysisJobState> {
+  const body = await apiClient.get<unknown>(jobPath(jobId), { timeoutMs: JOB_REQUEST_TIMEOUT_MS });
+  return parseJobState(body);
+}
+
+/** Deletes a job on the server (`DELETE`): `204` even for one it doesn't know (SPEC §7.2). */
+export async function deleteJob(jobId: string): Promise<void> {
+  await apiClient.delete<unknown>(jobPath(jobId), { timeoutMs: JOB_REQUEST_TIMEOUT_MS });
 }
 
 /**
@@ -103,60 +138,273 @@ function deviceTimeZone(): string {
 }
 
 /**
- * Analyzes a draft or a failed document, or a ready one again (ANL-1…ANL-3, ANL-8, SPEC §6.3); a
- * new analysis merges with what the person did to the old one (`documents.saveAnalysis()`), and a
- * failed one leaves the old one in place. The document becomes `analyzing`
- * (then `onStarted` runs, so screens can show it), and ends up either `ready` with the analysis,
- * its deadlines and actions, or `failed` with the reason; the reason is also thrown as an
- * `AnalysisError`. The screen stays on meanwhile (D-1). Without a network the request isn't sent
- * and the document fails as `offline`, its pages kept (ANL-10).
+ * «Try again» after an upload that broke off or got no answer uploads under the same job: if the
+ * first upload got through after all, the server answers with that job, and no second analysis
+ * starts (ANL-9). Any other start gets a new job.
+ */
+function jobIdToStart(document: DocumentRecord): string {
+  const brokeOff = document.errorCode === 'network' || document.errorCode === 'timeout';
+  return document.status === 'failed' && brokeOff && document.analysisJobId
+    ? document.analysisJobId
+    : randomUUID();
+}
+
+type Upload = { controller: AbortController; ended: Promise<void> };
+
+/**
+ * Uploads running in this run of the app, by document. Their jobs aren't asked about until the
+ * upload ends: the server doesn't know them yet. After a restart the map is empty, and the job of
+ * an upload that broke off is asked about like any other (ANL-4).
+ */
+const uploads = new Map<string, Upload>();
+
+/** Runs `work` after the previous call has finished: one check of the jobs at a time. */
+function serialQueue() {
+  let last: Promise<unknown> = Promise.resolve();
+  return <T>(work: () => Promise<T>): Promise<T> => {
+    const run = last.then(work, work);
+    last = run.catch(() => undefined);
+    return run;
+  };
+}
+
+const oneCheckAtATime = serialQueue();
+const oneDeletionRunAtATime = serialQueue();
+
+/**
+ * Analyzes a draft or a failed document, or a ready one again (ANL-1, ANL-3, ANL-8, SPEC §6.3).
+ * The document becomes `analyzing` under a job (then `onStarted` runs, so screens can show it), and
+ * its pages are uploaded with the screen kept on (D-1). This resolves once the server has the job:
+ * its result comes later, through `checkAnalysisJobs()`. A rejected or broken upload fails the
+ * document with the reason, which is also thrown as an `AnalysisError`. Without a network nothing
+ * is sent and the document fails as `offline`, its pages kept (ANL-10); with three documents
+ * already analyzing, as `too_many_jobs` (ANL-3, SPEC §8.3).
  *
  * Throws a plain `Error` without touching the document when it's gone or already being analyzed.
- * A document deleted during the analysis stays deleted: the result is dropped.
+ * Cancelling (`cancelAnalysis()`) or deleting the document aborts the upload.
  */
 export async function analyzeDocument(
   documentId: string,
   onStarted?: () => unknown
 ): Promise<void> {
   const { documents } = getRepositories();
-  if (!(await documents.startAnalysis(documentId))) {
+  const document = await documents.get(documentId);
+  if (!document || uploads.has(documentId)) {
     throw new Error(`Document ${documentId} can't be analyzed now`);
   }
-  await onStarted?.();
+  const job = { jobId: jobIdToStart(document), locale: await explanationLocale() };
+
+  // Registered before the document turns `analyzing`, so no check asks about the job too early.
+  const controller = new AbortController();
+  let ended!: () => void;
+  uploads.set(documentId, { controller, ended: new Promise((resolve) => (ended = resolve)) });
   const release = keepScreenAwake(`analysis-${documentId}`);
+  let state: AnalysisJobState;
   try {
-    let response: AnalyzeResponse;
-    let locale: ExplanationLocale;
+    if (!(await documents.startAnalysis(documentId, job))) {
+      throw new Error(`Document ${documentId} can't be analyzed now`);
+    }
+    await onStarted?.();
     try {
-      const document = await documents.get(documentId);
-      if (!document) return;
       if (!(await isOnline())) throw new AnalysisError('offline');
-      locale = await explanationLocale();
-      response = await requestAnalysis({
-        files: await filesToUpload(documentId, document.mimeType),
-        locale,
-        today: localCalendarDate(new Date()),
-        timezone: deviceTimeZone(),
-      });
+      const others = (await documents.listAnalyzing()).filter(({ id }) => id !== documentId);
+      if (others.length >= ACTIVE_JOBS_PER_DEVICE) throw new AnalysisError('too_many_jobs');
+      state = await uploadDocument(
+        job.jobId,
+        {
+          files: await filesToUpload(documentId, document.mimeType),
+          locale: job.locale,
+          today: localCalendarDate(new Date()),
+          timezone: deviceTimeZone(),
+          uiLocale: currentLanguage(),
+        },
+        controller.signal
+      );
     } catch (error) {
       const failure = toAnalysisError(error);
-      await documents.failAnalysis(documentId, failure.code);
+      // A state the app can't read is a job it can't use: the server may drop it.
+      const removeJob = failure.code === 'analysis_failed';
+      await documents.failAnalysis(documentId, { jobId: job.jobId, code: failure.code, removeJob });
       throw failure;
-    }
-
-    try {
-      await documents.saveAnalysis(documentId, {
-        analysis: response.analysis,
-        pageCount: response.pageCount,
-        analysisLocale: locale,
-        ...analysisRecords(documentId, response.analysis, randomUUID),
-      });
-    } catch (error) {
-      // The result couldn't be stored: let the person try again instead of waiting forever.
-      await documents.failAnalysis(documentId, 'interrupted');
-      throw error;
     }
   } finally {
     release();
+    uploads.delete(documentId);
+    ended();
   }
+  // A repeated upload may find its job already finished.
+  await applyJobState({ id: documentId, jobId: job.jobId }, state);
+}
+
+/** Aborts the upload of a document, if one is running, and waits until it has given up. */
+async function stopUpload(documentId: string): Promise<void> {
+  const upload = uploads.get(documentId);
+  if (!upload) return;
+  upload.controller.abort();
+  await upload.ended;
+}
+
+/**
+ * «Cancel the analysis» (ANL-13), during the upload or while the job waits: the document goes back
+ * to `draft`, or to `ready` with its previous result, and the job is deleted on the server. Doesn't
+ * wait for the server: without a network the deletion is sent again later (SPEC §6.2), and the
+ * result of a cancelled job is never stored. `false` if the document wasn't being analyzed.
+ */
+export async function cancelAnalysis(documentId: string): Promise<boolean> {
+  const { documents } = getRepositories();
+  const document = await documents.get(documentId);
+  if (document?.status !== 'analyzing' || !document.analysisJobId) return false;
+  const cancelled = await documents.cancelAnalysis(documentId, document.analysisJobId);
+  // An upload that is cut off creates no job; one that got through is deleted after it.
+  await stopUpload(documentId);
+  sendJobDeletionsInBackground();
+  return cancelled;
+}
+
+/**
+ * For a document being deleted (STO-6): stops its upload, then sends the deletion of its job, which
+ * `documents.remove()` has queued. Doesn't wait for the server.
+ */
+export async function forgetDocumentAnalysis(documentId: string): Promise<void> {
+  await stopUpload(documentId);
+  sendJobDeletionsInBackground();
+}
+
+/**
+ * For «Delete all data» (STO-7), before the database is wiped: stops every upload and sends
+ * `DELETE` for every unfinished job and every job waiting to be deleted, without waiting for the
+ * server. What isn't deleted the server removes when it expires.
+ */
+export async function deleteAllAnalysisJobs(): Promise<void> {
+  const { documents, analysisJobDeletions } = getRepositories();
+  await Promise.all([...uploads.keys()].map(stopUpload));
+  const jobIds = new Set([
+    ...(await documents.listAnalyzing()).map(({ jobId }) => jobId),
+    ...(await analysisJobDeletions.list()),
+  ]);
+  for (const jobId of jobIds) void deleteJob(jobId).catch(() => undefined);
+}
+
+/** A `4xx` other than `429` won't change by asking again: the request itself is refused. */
+function isRefused(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429
+  );
+}
+
+/**
+ * Sends `DELETE` for every job waiting to be deleted (SPEC §6.2) and forgets the ones the server
+ * answered. A job the server refuses to delete (e.g. `426`) is forgotten too: it expires there by
+ * itself. The rest stay for the next run, at startup or on return to the foreground.
+ */
+export function sendJobDeletions(): Promise<void> {
+  return oneDeletionRunAtATime(async () => {
+    const { analysisJobDeletions } = getRepositories();
+    for (const jobId of await analysisJobDeletions.list()) {
+      try {
+        await deleteJob(jobId);
+      } catch (error) {
+        if (!isRefused(error)) continue;
+      }
+      await analysisJobDeletions.remove(jobId);
+    }
+  });
+}
+
+export function sendJobDeletionsInBackground(): void {
+  void sendJobDeletions().catch(() => undefined);
+}
+
+/** Where a job that hasn't ended stands, for the status panel (ANL-3). */
+export type JobProgress = { status: 'queued'; ahead: number } | { status: 'processing' };
+
+/**
+ * One check of the jobs. `progress` has an entry for every document whose job hasn't ended, by
+ * document id; `null` when the server couldn't be asked this time. `changed` tells that a document
+ * was finished, so local data must be read again.
+ */
+export type AnalysisJobsCheck = {
+  progress: Record<string, JobProgress | null>;
+  changed: boolean;
+};
+
+/**
+ * Applies a job's state to its document (SPEC §7.2 «Опрос»): `done` is stored (merged by ANL-8 on
+ * a re-analysis) with the job queued for deletion in the same transaction, `failed` keeps the
+ * reason and drops the job too. Returns the progress of a job that hasn't ended, or `'ended'`.
+ */
+async function applyJobState(
+  job: { id: string; jobId: string },
+  state: AnalysisJobState
+): Promise<JobProgress | 'ended'> {
+  const { documents } = getRepositories();
+  switch (state.status) {
+    case 'queued':
+      return { status: 'queued', ahead: state.ahead };
+    case 'processing':
+      return { status: 'processing' };
+    case 'done':
+      try {
+        await documents.saveAnalysis(job.id, {
+          jobId: job.jobId,
+          analysis: state.analysis,
+          pageCount: state.pageCount,
+          ...analysisRecords(job.id, state.analysis, randomUUID),
+        });
+      } catch {
+        // The result couldn't be stored: let the person try again instead of waiting forever.
+        await documents.failAnalysis(job.id, { ...job, code: 'interrupted', removeJob: true });
+      }
+      return 'ended';
+    case 'failed':
+      await documents.failAnalysis(job.id, { ...job, code: state.error.code, removeJob: true });
+      return 'ended';
+  }
+}
+
+/** Asks the server about one job; `null` when it can't answer now, which ends nothing (ANL-10). */
+async function checkJob(job: { id: string; jobId: string }): Promise<JobProgress | 'ended' | null> {
+  const { documents } = getRepositories();
+  let state: AnalysisJobState;
+  try {
+    state = await fetchJobState(job.jobId);
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) {
+      // No such job: the upload never got through, the server restarted, or 24 hours passed (ANL-4).
+      const body = apiErrorBodySchema.safeParse(error.body);
+      if (!body.success || body.data.error.code === 'job_not_found') {
+        await documents.failAnalysis(job.id, { ...job, code: 'interrupted' });
+        return 'ended';
+      }
+    }
+    if (error instanceof AnalysisError || isRefused(error)) {
+      const failure = toAnalysisError(error);
+      await documents.failAnalysis(job.id, { ...job, code: failure.code, removeJob: true });
+      return 'ended';
+    }
+    // No network, a timeout, a 5xx or a 429: the job goes on, and is asked about again.
+    return null;
+  }
+  return applyJobState(job, state);
+}
+
+/**
+ * Asks the server about the job of every document being analyzed, except those still uploading,
+ * and applies what it says (SPEC §7.2 «Опрос»): a finished job is stored or fails the document,
+ * one the server doesn't know fails it as `interrupted` (ANL-4). Then sends the queued deletions.
+ * One check runs at a time.
+ */
+export function checkAnalysisJobs(): Promise<AnalysisJobsCheck> {
+  return oneCheckAtATime(async () => {
+    const progress: AnalysisJobsCheck['progress'] = {};
+    let changed = false;
+    for (const job of await getRepositories().documents.listAnalyzing()) {
+      if (uploads.has(job.id)) continue;
+      const outcome = await checkJob(job);
+      if (outcome === 'ended') changed = true;
+      else progress[job.id] = outcome;
+    }
+    await sendJobDeletions().catch(() => undefined);
+    return { progress, changed };
+  });
 }

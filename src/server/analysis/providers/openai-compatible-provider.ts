@@ -190,7 +190,7 @@ function parseJson(text: string): { ok: true; value: unknown } | { ok: false } {
   }
 }
 
-/** Base64 without Node's Buffer, which Workers don't have. */
+/** Base64 with web APIs only (`btoa`), like the rest of the server code. */
 function toBase64(bytes: Uint8Array): string {
   const CHUNK = 0x8000;
   let binary = '';

@@ -162,10 +162,13 @@ describe('documents repository', () => {
 
   describe('analysis status (SPEC §6.3)', () => {
     const invoice = ANALYSIS_FIXTURES.invoice;
-    const outcome = (documentId: string) => ({
+    const job = (jobId = 'job-1') => ({ jobId, locale: 'ru' });
+    const failure = (code: 'network' | 'interrupted', jobId = 'job-1') => ({ jobId, code });
+    const queuedDeletions = () => repos.analysisJobDeletions.list();
+    const outcome = (documentId: string, jobId = 'job-1') => ({
+      jobId,
       analysis: invoice,
       pageCount: 2,
-      analysisLocale: 'ru',
       deadlines: [
         {
           id: 'dl-1',
@@ -191,15 +194,15 @@ describe('documents repository', () => {
     it('starts an analysis of a draft once, and of a failed document again', async () => {
       await repos.documents.create(newDocument('doc-1', ''));
 
-      expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
-      expect(await repos.documents.startAnalysis('doc-1')).toBe(false);
-      expect(await repos.documents.failAnalysis('doc-1', 'network')).toBe(true);
+      expect(await repos.documents.startAnalysis('doc-1', job())).toBe(true);
+      expect(await repos.documents.startAnalysis('doc-1', job())).toBe(false);
+      expect(await repos.documents.failAnalysis('doc-1', failure('network'))).toBe(true);
       expect(await repos.documents.get('doc-1')).toMatchObject({
         status: 'failed',
         errorCode: 'network',
       });
 
-      expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
+      expect(await repos.documents.startAnalysis('doc-1', job())).toBe(true);
       expect(await repos.documents.get('doc-1')).toMatchObject({
         status: 'analyzing',
         errorCode: null,
@@ -211,15 +214,15 @@ describe('documents repository', () => {
       await repos.documents.create(newDocument('deleted'));
       await repos.documents.remove('deleted');
 
-      expect(await repos.documents.startAnalysis('ready')).toBe(true);
-      expect(await repos.documents.startAnalysis('ready')).toBe(false);
-      expect(await repos.documents.startAnalysis('deleted')).toBe(false);
-      expect(await repos.documents.startAnalysis('missing')).toBe(false);
+      expect(await repos.documents.startAnalysis('ready', job())).toBe(true);
+      expect(await repos.documents.startAnalysis('ready', job())).toBe(false);
+      expect(await repos.documents.startAnalysis('deleted', job())).toBe(false);
+      expect(await repos.documents.startAnalysis('missing', job())).toBe(false);
     });
 
     it('stores the analysis with its deadlines and actions and makes the document ready', async () => {
       await repos.documents.create(newDocument('doc-1', ''));
-      await repos.documents.startAnalysis('doc-1');
+      await repos.documents.startAnalysis('doc-1', job());
       clock.advance(30_000);
 
       expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1'))).toBe(true);
@@ -249,7 +252,7 @@ describe('documents repository', () => {
       /** doc-1 analyzed once: a payment deadline with its action, and an undated action. */
       async function analyzedOnce() {
         await repos.documents.create(newDocument('doc-1', ''));
-        await repos.documents.startAnalysis('doc-1');
+        await repos.documents.startAnalysis('doc-1', job());
         const first = outcome('doc-1');
         await repos.documents.saveAnalysis('doc-1', {
           ...first,
@@ -302,8 +305,10 @@ describe('documents repository', () => {
 
       async function analyzeAgain() {
         clock.advance(60_000);
-        expect(await repos.documents.startAnalysis('doc-1')).toBe(true);
-        expect(await repos.documents.saveAnalysis('doc-1', second())).toBe(true);
+        expect(await repos.documents.startAnalysis('doc-1', job('job-2'))).toBe(true);
+        expect(await repos.documents.saveAnalysis('doc-1', { ...second(), jobId: 'job-2' })).toBe(
+          true
+        );
       }
 
       const liveDeadlines = async () =>
@@ -341,7 +346,7 @@ describe('documents repository', () => {
 
       it('keeps a deadline done meanwhile with its action, and drops the new duplicate', async () => {
         await analyzedOnce();
-        await repos.documents.startAnalysis('doc-1');
+        await repos.documents.startAnalysis('doc-1', job());
         // «Done» while the new analysis is on its way.
         await repos.actions.setDone('ac-1', true);
         await repos.documents.saveAnalysis('doc-1', second());
@@ -389,7 +394,7 @@ describe('documents repository', () => {
 
       it('keeps a title given before the first analysis', async () => {
         await repos.documents.create(newDocument('doc-1', 'Письмо со дня рождения'));
-        await repos.documents.startAnalysis('doc-1');
+        await repos.documents.startAnalysis('doc-1', job());
 
         await repos.documents.saveAnalysis('doc-1', outcome('doc-1'));
 
@@ -401,9 +406,9 @@ describe('documents repository', () => {
 
       it('leaves the previous analysis in place when the new one fails', async () => {
         await analyzedOnce();
-        await repos.documents.startAnalysis('doc-1');
+        await repos.documents.startAnalysis('doc-1', job());
 
-        await repos.documents.failAnalysis('doc-1', 'network');
+        await repos.documents.failAnalysis('doc-1', failure('network'));
 
         expect(await repos.documents.get('doc-1')).toMatchObject({
           status: 'failed',
@@ -415,19 +420,120 @@ describe('documents repository', () => {
       });
     });
 
+    it('stores the explanation language the job asked for, and queues the job for deletion', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'en' });
+
+      await repos.documents.saveAnalysis('doc-1', outcome('doc-1'));
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        analysisLocale: 'en',
+        analysisJobId: 'job-1',
+      });
+      expect(await queuedDeletions()).toEqual(['job-1']);
+    });
+
+    it('stores no result of another job than the current one', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1', job('job-2'));
+
+      expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1', 'job-1'))).toBe(false);
+      expect(await repos.documents.failAnalysis('doc-1', failure('network', 'job-1'))).toBe(false);
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({ status: 'analyzing' });
+      expect(await repos.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
+      expect(await queuedDeletions()).toEqual([]);
+    });
+
+    it('queues the job of a failed analysis for deletion only when asked', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.startAnalysis('doc-1', job());
+      await repos.documents.failAnalysis('doc-1', failure('network'));
+      expect(await queuedDeletions()).toEqual([]);
+
+      await repos.documents.startAnalysis('doc-1', job('job-2'));
+      await repos.documents.failAnalysis('doc-1', {
+        jobId: 'job-2',
+        code: 'analysis_failed',
+        removeJob: true,
+      });
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        status: 'failed',
+        errorCode: 'analysis_failed',
+      });
+      expect(await queuedDeletions()).toEqual(['job-2']);
+    });
+
+    it('lists the documents being analyzed with their jobs', async () => {
+      await repos.documents.create(newDocument('doc-1'));
+      await repos.documents.create(newDocument('doc-2'));
+      await repos.documents.create(newDocument('draft'));
+      await repos.documents.startAnalysis('doc-1', job('job-1'));
+      await repos.documents.startAnalysis('doc-2', job('job-2'));
+
+      expect(await repos.documents.listAnalyzing()).toEqual([
+        { id: 'doc-1', jobId: 'job-1' },
+        { id: 'doc-2', jobId: 'job-2' },
+      ]);
+    });
+
+    describe('cancel (ANL-13)', () => {
+      it('returns a draft to draft and queues its job for deletion', async () => {
+        await repos.documents.create(newDocument('doc-1', ''));
+        await repos.documents.startAnalysis('doc-1', job());
+
+        expect(await repos.documents.cancelAnalysis('doc-1', 'job-1')).toBe(true);
+
+        expect(await repos.documents.get('doc-1')).toMatchObject({
+          status: 'draft',
+          errorCode: null,
+        });
+        expect(await queuedDeletions()).toEqual(['job-1']);
+        // The result of the cancelled job is never stored.
+        expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1'))).toBe(false);
+      });
+
+      it('returns a re-analyzed document to ready with its previous result', async () => {
+        await repos.documents.create(newDocument('doc-1', ''));
+        await repos.documents.startAnalysis('doc-1', job());
+        await repos.documents.saveAnalysis('doc-1', outcome('doc-1'));
+        await repos.documents.startAnalysis('doc-1', job('job-2'));
+
+        expect(await repos.documents.cancelAnalysis('doc-1', 'job-2')).toBe(true);
+
+        expect(await repos.documents.get('doc-1')).toMatchObject({
+          status: 'ready',
+          analysis: invoice,
+        });
+        expect(await repos.deadlines.list({ documentId: 'doc-1' })).toHaveLength(1);
+      });
+
+      it('cancels nothing that is not analyzing under that job', async () => {
+        await repos.documents.create(newDocument('doc-1', ''));
+        await repos.documents.startAnalysis('doc-1', job());
+
+        expect(await repos.documents.cancelAnalysis('doc-1', 'job-other')).toBe(false);
+        await repos.documents.failAnalysis('doc-1', failure('network'));
+        expect(await repos.documents.cancelAnalysis('doc-1', 'job-1')).toBe(false);
+
+        expect(await queuedDeletions()).toEqual([]);
+      });
+    });
+
     it('stores nothing for a document deleted while it was analyzed', async () => {
       await repos.documents.create(newDocument('doc-1', ''));
-      await repos.documents.startAnalysis('doc-1');
+      await repos.documents.startAnalysis('doc-1', job());
       await repos.documents.remove('doc-1');
 
       expect(await repos.documents.saveAnalysis('doc-1', outcome('doc-1'))).toBe(false);
-      expect(await repos.documents.failAnalysis('doc-1', 'network')).toBe(false);
+      expect(await repos.documents.failAnalysis('doc-1', failure('network'))).toBe(false);
       expect(await repos.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
     });
 
     it('writes neither the document nor any deadline when one record can not be stored', async () => {
       await repos.documents.create(newDocument('doc-1', ''));
-      await repos.documents.startAnalysis('doc-1');
+      await repos.documents.startAnalysis('doc-1', job());
       const broken = outcome('doc-1');
       // The action points to a deadline that doesn't exist: the foreign key rejects it.
       broken.actions[0] = { ...broken.actions[0], deadlineId: 'missing-deadline' };
@@ -438,17 +544,21 @@ describe('documents repository', () => {
       expect(await repos.deadlines.list({ documentId: 'doc-1' })).toEqual([]);
     });
 
-    it('fails analyses that were running when the app was closed as interrupted (ANL-4)', async () => {
-      await repos.documents.create(newDocument('running'));
-      await repos.documents.startAnalysis('running');
+    it('fails analyses without a job, left by an older app, as interrupted at startup (ANL-4)', async () => {
+      await repos.documents.create(newDocument('with-job'));
+      await repos.documents.startAnalysis('with-job', job());
+      // Before task 4.8 an analysis had no job: the column stays empty in such a row.
+      await repos.documents.create({ ...newDocument('without-job'), status: 'analyzing' });
       await repos.documents.create(newDocument('draft'));
 
       expect(await repos.documents.failInterruptedAnalyses()).toBe(1);
 
-      expect(await repos.documents.get('running')).toMatchObject({
+      expect(await repos.documents.get('without-job')).toMatchObject({
         status: 'failed',
         errorCode: 'interrupted',
       });
+      // The server is asked about this one.
+      expect(await repos.documents.get('with-job')).toMatchObject({ status: 'analyzing' });
       expect(await repos.documents.get('draft')).toMatchObject({ status: 'draft' });
     });
   });
@@ -532,6 +642,25 @@ describe('documents repository', () => {
       expect(action?.description).toBe('');
     });
 
+    it('queues the job of an analysis in progress, or of a broken upload, for deletion', async () => {
+      await repos.documents.create(newDocument('analyzing'));
+      await repos.documents.startAnalysis('analyzing', { jobId: 'job-a', locale: 'ru' });
+      await repos.documents.create(newDocument('broken'));
+      await repos.documents.startAnalysis('broken', { jobId: 'job-b', locale: 'ru' });
+      await repos.documents.failAnalysis('broken', { jobId: 'job-b', code: 'network' });
+
+      await repos.documents.remove('analyzing');
+      await repos.documents.remove('broken');
+      await repos.documents.remove('doc-1');
+
+      expect(await repos.analysisJobDeletions.list()).toEqual(['job-a', 'job-b']);
+      const tombstone = await db.getFirstAsync<Record<string, unknown>>(
+        'SELECT analysis_job_id, analysis_job_locale FROM documents WHERE id = ?',
+        ['analyzing']
+      );
+      expect({ ...tombstone }).toEqual({ analysis_job_id: null, analysis_job_locale: null });
+    });
+
     it('returns null for a document that is already gone', async () => {
       await repos.documents.remove('doc-1');
 
@@ -542,10 +671,13 @@ describe('documents repository', () => {
       await repos.documents.create(newDocument('doc-2'));
       await repos.documents.remove('doc-2');
       await repos.settings.update({ locale: 'ru', reminderTime: '08:30' });
+      await repos.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'ru' });
+      await repos.documents.cancelAnalysis('doc-1', 'job-1');
 
       await repos.wipeAll();
 
       for (const table of [
+        'analysis_job_deletions',
         'documents',
         'pages',
         'deadlines',

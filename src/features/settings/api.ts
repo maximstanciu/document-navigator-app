@@ -1,3 +1,4 @@
+import { deleteAllAnalysisJobs } from '@/features/analysis/api';
 import { clearAllReminders } from '@/features/reminders/sync-reminders';
 import { getRepositories } from '@/lib/db/repositories';
 import { deleteAllDocumentFiles } from '@/lib/files/page-files';
@@ -8,11 +9,13 @@ import { deleteAllDocumentFiles } from '@/lib/files/page-files';
  */
 
 /**
- * «Delete all data» (STO-7, SET-3): the database first (documents, deadlines, settings…, as on a
- * fresh install), then the page files and the reminders in the OS. Each step can run again, so after
- * a failure the whole thing is simply repeated. The device id stays: it only counts analyses (§8.3).
+ * «Delete all data» (STO-7, SET-3): the analysis jobs on the server first (without waiting for it),
+ * then the database (documents, deadlines, settings…, as on a fresh install), the page files and
+ * the reminders in the OS. Each step can run again, so after a failure the whole thing is simply
+ * repeated. The device id stays: it only counts analyses (§8.3).
  */
 export async function deleteAllData(): Promise<void> {
+  await deleteAllAnalysisJobs();
   await getRepositories().wipeAll();
   await deleteAllDocumentFiles();
   await clearAllReminders();

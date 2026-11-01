@@ -1,6 +1,6 @@
 // Server logs carry metadata only (SPEC §7.1): never a title, a file name, a quote, a model answer
-// or an error message — any of them can hold content of the document. EAS Hosting keeps
-// console.info output on the deployment's Logs page, one JSON object per line.
+// or an error message — any of them can hold content of the document. The server in deploy/
+// writes console.info output to `docker compose logs`, one JSON object per line.
 
 /** A log event: a name and flat fields with numbers, flags and closed sets of words. */
 export type LogEvent = { event: string } & Record<string, string | number | boolean | null>;

@@ -1,4 +1,5 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { focusManager } from '@tanstack/react-query';
+import { act, screen, userEvent } from '@testing-library/react-native';
 import { renderRouter } from 'expo-router/testing-library';
 
 import DocumentRoute from '@/app/documents/[id]';
@@ -32,7 +33,25 @@ function json(status: number, body: unknown, headers?: Record<string, string>) {
   return new Response(JSON.stringify(body), { status, headers });
 }
 
-const analyzed = () => json(200, { analysis: ANALYSIS_FIXTURES.invoice, pageCount: 1 });
+const done = () => json(200, { status: 'done', analysis: ANALYSIS_FIXTURES.invoice, pageCount: 1 });
+
+type Respond = (init?: RequestInit) => Response | Promise<Response>;
+
+/** A response that never comes; the request ends only when it's aborted, as with `fetch`. */
+const hang: Respond = (init) =>
+  new Promise((_resolve, reject) =>
+    init?.signal?.addEventListener('abort', () =>
+      reject(new DOMException('The operation was aborted.', 'AbortError'))
+    )
+  );
+
+/** The analysis server, by method; `DELETE` answers `204`. */
+const server: { PUT?: Respond; GET?: Respond; DELETE: Respond } = {
+  DELETE: () => new Response(null, { status: 204 }),
+};
+
+const sent = (method: string) =>
+  fetchSpy.mock.calls.filter(([, init]) => (init?.method ?? 'GET') === method);
 
 /** A one-page draft with its file, in the status the test needs (SPEC §6.3). */
 async function seedDocument(
@@ -46,8 +65,10 @@ async function seedDocument(
     [{ id: 'p1', relativePath, width: 1448, height: 2048 }]
   );
   if (status === 'draft') return;
-  await repositories.documents.startAnalysis('doc-1');
-  if (status === 'failed') await repositories.documents.failAnalysis('doc-1', errorCode);
+  await repositories.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'en' });
+  if (status === 'failed') {
+    await repositories.documents.failAnalysis('doc-1', { jobId: 'job-1', code: errorCode });
+  }
 }
 
 async function renderDocument() {
@@ -57,52 +78,113 @@ async function renderDocument() {
   );
 }
 
+/** The app goes to the background and comes back (SPEC §7.2 «Опрос»). */
+async function returnToForeground() {
+  await act(async () => {
+    focusManager.setFocused(false);
+    focusManager.setFocused(true);
+  });
+}
+
 beforeEach(async () => {
+  mockUuidCounter = 0;
   fakeFileSystem.reset();
   ({ repositories } = await installTestRepositories());
   online.mockResolvedValue(true);
-  fetchSpy = jest.spyOn(globalThis, 'fetch');
+  delete server.PUT;
+  delete server.GET;
+  fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
+    const respond = server[(init?.method ?? 'GET') as keyof typeof server];
+    if (!respond) throw new TypeError(`Network request failed: ${String(url)}`);
+    return respond(init);
+  });
 });
 
 afterEach(() => {
   setRepositories(null);
   jest.restoreAllMocks();
+  focusManager.setFocused(undefined);
 });
 
 describe('AnalysisStatusPanel on the document screen', () => {
-  it('analyzes a draft, asks to keep the app open meanwhile and shows the result (ANL-3)', async () => {
+  it('uploads a draft, shows its place in the queue and then the result (ANL-3)', async () => {
     const user = userEvent.setup();
     let answer!: (response: Response) => void;
-    fetchSpy.mockReturnValue(new Promise((resolve) => (answer = resolve)));
+    server.PUT = () => new Promise((resolve) => (answer = resolve));
+    server.GET = () => json(200, { status: 'queued', ahead: 2 });
     await seedDocument('draft');
     await renderDocument();
 
     expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Analyze the document' }));
 
-    expect(await screen.findByText('Reading the document…')).toBeOnTheScreen();
-    expect(screen.getByText(/Keep the app open until the analysis is done/)).toBeOnTheScreen();
+    expect(await screen.findByText('Uploading the document…')).toBeOnTheScreen();
+    expect(screen.getByText('Keep the app open until the upload is done.')).toBeOnTheScreen();
 
-    answer(analyzed());
+    answer(json(202, { status: 'queued', ahead: 2 }));
+
+    expect(await screen.findByText('In the queue: 2 documents ahead of yours')).toBeOnTheScreen();
+    expect(screen.getByText(/You can close the app/)).toBeOnTheScreen();
+
+    server.GET = done;
+    await returnToForeground();
 
     expect(
       await screen.findByRole('heading', { name: 'Счёт за электричество, сентябрь 2026' })
     ).toBeOnTheScreen();
     expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
-    expect(screen.queryByText('Reading the document…')).not.toBeOnTheScreen();
+    expect(screen.queryByText(/You can close the app/)).not.toBeOnTheScreen();
+    expect(sent('DELETE')).toHaveLength(1);
   });
 
-  it('shows an analysis in progress started elsewhere, e.g. on the review screen', async () => {
+  it('shows a job waiting from an earlier run, and asks the server about it (ANL-4)', async () => {
+    server.GET = () => json(200, { status: 'processing' });
     await seedDocument('analyzing');
     await renderDocument();
 
-    expect(await screen.findByText('Reading the document…')).toBeOnTheScreen();
+    expect(await screen.findByText('Analyzing the document…')).toBeOnTheScreen();
     expect(screen.queryByRole('button', { name: 'Analyze the document' })).not.toBeOnTheScreen();
+    expect(sent('GET')[0][0]).toBe('/api/v1/analyses/job-1');
+  });
+
+  it('says the analysis was interrupted when the server no longer has the job (ANL-4)', async () => {
+    server.GET = () => json(404, { error: { code: 'job_not_found', message: 'No job' } });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/The analysis stopped/);
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
+  });
+
+  it('cancels a waiting analysis: the draft comes back and the job is deleted (ANL-13)', async () => {
+    const user = userEvent.setup();
+    server.GET = () => json(200, { status: 'queued', ahead: 1 });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    await user.press(await screen.findByRole('button', { name: 'Cancel the analysis' }));
+
+    expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
+    expect(sent('DELETE')[0][0]).toBe('/api/v1/analyses/job-1');
+  });
+
+  it('cancels during the upload too', async () => {
+    const user = userEvent.setup();
+    server.PUT = hang;
+    await seedDocument('draft');
+    await renderDocument();
+    await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
+
+    await user.press(await screen.findByRole('button', { name: 'Cancel the analysis' }));
+
+    expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
   });
 
   it('says why an analysis failed and tries again (ANL-9)', async () => {
     const user = userEvent.setup();
-    fetchSpy.mockResolvedValue(analyzed());
+    server.PUT = () => json(202, { status: 'processing' });
+    server.GET = done;
     await seedDocument('failed', 'offline');
     await renderDocument();
 
@@ -119,9 +201,8 @@ describe('AnalysisStatusPanel on the document screen', () => {
 
   it('tells when the limit lets the person try again after a 429 (ANL-9)', async () => {
     const user = userEvent.setup();
-    fetchSpy.mockResolvedValue(
-      json(429, { error: { code: 'rate_limited', message: 'Limit' } }, { 'Retry-After': '600' })
-    );
+    server.PUT = () =>
+      json(429, { error: { code: 'rate_limited', message: 'Limit' } }, { 'Retry-After': '600' });
     await seedDocument('failed', 'network');
     await renderDocument();
 

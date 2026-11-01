@@ -20,6 +20,11 @@ export type DocumentRecord = {
   documentDate: string | null;
   status: DocumentStatus;
   errorCode: AnalyzeErrorCode | ClientErrorCode | null;
+  /**
+   * The analysis job on the server (SPEC §7.2): made before the upload, the current one while
+   * `analyzing`, then the latest.
+   */
+  analysisJobId: string | null;
   source: DocumentSource;
   mimeType: DocumentMimeType;
   pageCount: number | null;

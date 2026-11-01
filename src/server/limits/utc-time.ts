@@ -1,5 +1,5 @@
 // Limits and metrics count by UTC days and hours (SPEC §7.2: the daily limit resets at midnight
-// UTC), so every isolate in every region agrees on the bucket.
+// UTC), so the bucket doesn't depend on the server's time zone.
 
 const HOUR_MS = 60 * 60 * 1000;
 const DAY_MS = 24 * HOUR_MS;

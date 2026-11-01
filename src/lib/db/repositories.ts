@@ -1,4 +1,5 @@
 import { createActionsRepository } from './actions-repository';
+import { createAnalysisJobDeletionsRepository } from './analysis-job-deletions-repository';
 import type { SqlDatabase } from './database';
 import { createDeadlinesRepository } from './deadlines-repository';
 import { createDocumentsRepository } from './documents-repository';
@@ -14,6 +15,7 @@ export function createRepositories(db: SqlDatabase, now: Clock = systemClock) {
     deadlines: createDeadlinesRepository(db, now),
     actions: createActionsRepository(db, now),
     scheduledNotifications: createScheduledNotificationsRepository(db),
+    analysisJobDeletions: createAnalysisJobDeletionsRepository(db),
     settings: createSettingsRepository(db),
     /** «Delete all data» (STO-7, SET-3): see `wipeAllData()`. */
     wipeAll: () => wipeAllData(db),
@@ -56,6 +58,7 @@ export async function purgeTombstones(db: SqlDatabase, cutoff: Date): Promise<vo
 
 /** Children first, though `DELETE` of a parent would cascade anyway. */
 const ALL_TABLES = [
+  'analysis_job_deletions',
   'scheduled_notifications',
   'actions',
   'deadlines',
@@ -68,7 +71,8 @@ const ALL_TABLES = [
  * «Delete all data» (STO-7, SET-3): every row of every table, tombstones and settings included, as
  * on a fresh install; nothing is kept for sync. `VACUUM` then rebuilds the file without the freed
  * pages and the checkpoint empties the WAL, so the deleted content can't be read from either (or
- * from a backup taken later). Page files and the reminders in the OS are the caller's.
+ * from a backup taken later). Page files, the reminders in the OS and the analysis jobs on the
+ * server are the caller's.
  */
 export async function wipeAllData(db: SqlDatabase): Promise<void> {
   await db.transaction(async (tx) => {

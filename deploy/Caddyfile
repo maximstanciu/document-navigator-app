@@ -6,8 +6,6 @@
 	reverse_proxy api:3000 {
 		# The limits count the address Caddy sees, not one a client claims (SPEC §8.3).
 		header_up X-Real-IP {remote_host}
-		# Request ids come from the server itself; only EAS Hosting sets a genuine Cf-Ray.
-		header_up -Cf-Ray
 		transport http {
 			# Shorter than the server's keep-alive (65 s), so Caddy never reuses a closed connection.
 			keepalive 30s

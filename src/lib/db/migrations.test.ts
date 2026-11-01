@@ -18,6 +18,7 @@ describe('migrate', () => {
     expect(await getSchemaVersion(db)).toBe(LATEST_SCHEMA_VERSION);
     expect(await tableNames(db)).toEqual([
       'actions',
+      'analysis_job_deletions',
       'deadlines',
       'documents',
       'pages',
@@ -94,6 +95,23 @@ describe('migrate', () => {
     expect(
       await db.getAllAsync('SELECT id, source_quote, source_page, computation FROM deadlines')
     ).toEqual([{ id: 'd1', source_quote: null, source_page: null, computation: null }]);
+  });
+
+  it('gives documents of version 2 an empty job, so an analysis left running reads as interrupted (task 4.8)', async () => {
+    const db = createNodeDatabase();
+    await migrate(db, MIGRATIONS.slice(0, 2));
+    await db.runAsync(
+      `INSERT INTO documents (id, title, status, source, mime_type, file_size, created_at, updated_at)
+       VALUES ('doc-1', 'Счёт', 'analyzing', 'scan', 'image/jpeg', 10, 't', 't')`
+    );
+
+    await expect(migrate(db)).resolves.toEqual({ from: 2, to: LATEST_SCHEMA_VERSION });
+
+    expect(
+      await db.getAllAsync('SELECT id, status, analysis_job_id, analysis_job_locale FROM documents')
+    ).toEqual([
+      { id: 'doc-1', status: 'analyzing', analysis_job_id: null, analysis_job_locale: null },
+    ]);
   });
 
   it('refuses a database created by a newer app version', async () => {

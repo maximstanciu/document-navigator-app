@@ -76,12 +76,12 @@ async function seedDocument({
 /** A document analyzed as `analysis`, stored the way `analyzeDocument()` stores it. */
 async function seedAnalyzed(analysis: AnalysisResult) {
   await seedDocument();
-  await repositories.documents.startAnalysis('doc-1');
+  await repositories.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'ru' });
   let next = 0;
   await repositories.documents.saveAnalysis('doc-1', {
+    jobId: 'job-1',
     analysis,
     pageCount: 2,
-    analysisLocale: 'ru',
     ...analysisRecords('doc-1', analysis, () => `rec-${++next}`),
   });
 }
@@ -594,23 +594,23 @@ describe('DocumentDetailScreen', () => {
   describe('a new analysis of an analyzed document (ANL-8)', () => {
     it('shows the previous result while the new one is on its way', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
-      await repositories.documents.startAnalysis('doc-1');
+      await repositories.documents.startAnalysis('doc-1', { jobId: 'job-2', locale: 'ru' });
 
       await renderDocument();
 
-      expect(await screen.findByText('Reading the document…')).toBeOnTheScreen();
+      expect(await screen.findByText('Analyzing the document…')).toBeOnTheScreen();
       expect(screen.getByText(/The previous result stays below/)).toBeOnTheScreen();
       expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
     });
 
     it('keeps the previous result when the new one fails', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
-      await repositories.documents.startAnalysis('doc-1');
-      await repositories.documents.failAnalysis('doc-1', 'network');
+      await repositories.documents.startAnalysis('doc-1', { jobId: 'job-2', locale: 'ru' });
+      await repositories.documents.failAnalysis('doc-1', { jobId: 'job-2', code: 'network' });
 
       await renderDocument();
 
-      expect(await screen.findByRole('alert')).toHaveTextContent(/connection to the server/i);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/The upload broke off/);
       expect(screen.getByText('Below is the result of the previous analysis.')).toBeOnTheScreen();
       expect(screen.getByRole('button', { name: 'Try again' })).toBeOnTheScreen();
       expect(screen.getByRole('heading', { name: 'In short' })).toBeOnTheScreen();
@@ -661,11 +661,11 @@ describe('DocumentDetailScreen', () => {
       await seedDocument();
       let next = 0;
       jest.spyOn(analysisApi, 'analyzeDocument').mockImplementation(async (id) => {
-        await repositories.documents.startAnalysis(id);
+        await repositories.documents.startAnalysis(id, { jobId: 'job-1', locale: 'ru' });
         await repositories.documents.saveAnalysis(id, {
+          jobId: 'job-1',
           analysis: ANALYSIS_FIXTURES.officialNotice,
           pageCount: 2,
-          analysisLocale: 'ru',
           ...analysisRecords(id, ANALYSIS_FIXTURES.officialNotice, () => `rec-${++next}`),
         });
       });

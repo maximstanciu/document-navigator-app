@@ -35,7 +35,7 @@ const CODE_BY_STATUS: Partial<Record<number, AnalyzeErrorCode>> = {
 function codeOf(error: ApiError): AnalyzeErrorCode {
   const body = apiErrorBodySchema.safeParse(error.body);
   if (body.success && isAnalyzeErrorCode(body.data.error.code)) return body.data.error.code;
-  // EAS Hosting answers a crashed isolate (500) or the CPU limit (504) without our body.
+  // Caddy answers a server that is down or restarting (502) without our body.
   return (error.status < 500 && CODE_BY_STATUS[error.status]) || 'unavailable';
 }
 
