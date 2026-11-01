@@ -13,8 +13,15 @@ import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider
  * - `LLM_MOCK_FIXTURE`, `LLM_MOCK_DELAY_MS`: what the mock returns and how long it takes.
  * - `LLM_BASE_URL`, `LLM_MODEL`, `LLM_API_KEY` (optional), `LLM_REASONING_EFFORT` (optional),
  *   `PDF_RENDER_URL`: the OpenAI-compatible model and the service that renders PDF pages for it.
+ *
+ * `fetch` replaces the global one for the model and the renderer: the eval runner (scripts/eval/)
+ * passes one without the 5-minute header timeout of Node's fetch, which deploy/server.js lifts with
+ * undici for the server.
  */
-export function createLlmProvider(env: ServerEnv = process.env): LlmProvider {
+export function createLlmProvider(
+  env: ServerEnv = process.env,
+  { fetch }: { fetch?: typeof globalThis.fetch } = {}
+): LlmProvider {
   const id = env.LLM_PROVIDER || 'mock';
   if (id === 'openai-compatible') {
     return new OpenAiCompatibleProvider({
@@ -22,7 +29,8 @@ export function createLlmProvider(env: ServerEnv = process.env): LlmProvider {
       model: required(env, 'LLM_MODEL'),
       apiKey: env.LLM_API_KEY || null,
       reasoningEffort: env.LLM_REASONING_EFFORT || null,
-      pdfRenderer: new HttpPdfRenderer({ url: requiredUrl(env, 'PDF_RENDER_URL') }),
+      pdfRenderer: new HttpPdfRenderer({ url: requiredUrl(env, 'PDF_RENDER_URL'), fetch }),
+      fetch,
     });
   }
   if (id !== 'mock') throw new Error('LLM_PROVIDER names an unknown provider.');

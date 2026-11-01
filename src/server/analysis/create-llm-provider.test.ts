@@ -33,6 +33,28 @@ describe('createLlmProvider', () => {
     expect(provider.id).toBe('openai-compatible-qwen3.6:35b');
   });
 
+  it('sends the model and the PDF renderer through the fetch it is given', async () => {
+    const fetch = jest.fn(async (url: string | URL | Request) =>
+      String(url).endsWith('/render')
+        ? Response.json({ pages: ['cGFnZQ=='] })
+        : Response.json({
+            choices: [{ message: { content: '{}' }, finish_reason: 'stop' }],
+            usage: { prompt_tokens: 1, completion_tokens: 1 },
+          })
+    );
+    const provider = createLlmProvider(OPENAI_COMPATIBLE, { fetch });
+
+    await provider.analyze({
+      ...input,
+      files: [{ mimeType: 'application/pdf', bytes: new Uint8Array([1]) }],
+    });
+
+    expect(fetch.mock.calls.map(([url]) => String(url))).toEqual([
+      'http://pdf-render:8080/render',
+      'http://llm:11434/v1/chat/completions',
+    ]);
+  });
+
   it.each([
     [{ LLM_PROVIDER: 'gpt-0' }, 'LLM_PROVIDER'],
     [{ LLM_MOCK_FIXTURE: 'receipt' }, 'LLM_MOCK_FIXTURE'],

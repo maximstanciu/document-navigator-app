@@ -43,6 +43,7 @@ coverage/
 # analysis evaluation: Python environment and generated test documents
 scripts/eval/.venv/
 scripts/eval/out/
+scripts/eval/runs/
 
 # device smoke test: database backups and seeded copies
 scripts/smoke/out/
