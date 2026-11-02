@@ -1,4 +1,4 @@
-import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_IMAGE_PAGES } from '@/shared/limits';
 
 import type { CapturedMimeType, CapturedPage } from './types';
 
@@ -72,7 +72,7 @@ export function checkPickedFiles(
   source: 'gallery' | 'file',
   files: readonly PickedFile[],
   /** Pages the document still has room for: fewer when adding to a document (CAP-5). */
-  maxPages = MAX_DOCUMENT_PAGES
+  maxPages = MAX_IMAGE_PAGES
 ): PickedFilesCheck {
   const pdfAllowed = source === 'file' && files.length === 1;
   const pages: CapturedPage[] = [];

@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES } from '@/shared/limits';
 
 import type { CaptureNotice, CaptureProgress } from '../use-capture-pages';
 
@@ -17,7 +17,7 @@ function noticeText(notice: CaptureStatusNotice, t: TFunction): string {
   switch (notice) {
     case 'tooManyPages':
     case 'tooManyPhotos':
-      return t(`capture.${notice}`, { count: MAX_DOCUMENT_PAGES });
+      return t(`capture.${notice}`, { count: MAX_IMAGE_PAGES });
     case 'fileTooLarge':
     case 'pagesTooLarge':
       return t(`capture.${notice}`, { limit: MAX_DOCUMENT_BYTES / (1024 * 1024) });

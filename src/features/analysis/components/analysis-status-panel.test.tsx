@@ -53,16 +53,18 @@ const server: { PUT?: Respond; GET?: Respond; DELETE: Respond } = {
 const sent = (method: string) =>
   fetchSpy.mock.calls.filter(([, init]) => (init?.method ?? 'GET') === method);
 
-/** A one-page draft with its file, in the status the test needs (SPEC §6.3). */
+/** A one-page draft (a scan, or a PDF) with its file, in the status the test needs (SPEC §6.3). */
 async function seedDocument(
   status: 'draft' | 'analyzing' | 'failed' = 'draft',
-  errorCode: NonNullable<DocumentRecord['errorCode']> = 'network'
+  errorCode: NonNullable<DocumentRecord['errorCode']> = 'network',
+  mimeType: DocumentRecord['mimeType'] = 'image/jpeg'
 ) {
-  const relativePath = 'documents/doc-1/p1.jpg';
+  const isPdf = mimeType === 'application/pdf';
+  const relativePath = isPdf ? 'documents/doc-1/p1.pdf' : 'documents/doc-1/p1.jpg';
   fakeFileSystem.addFile(`${fakeFileSystem.documentRoot}/${relativePath}`);
   await repositories.documents.create(
-    { id: 'doc-1', title: '', source: 'scan', mimeType: 'image/jpeg', fileSize: 1000 },
-    [{ id: 'p1', relativePath, width: 1448, height: 2048 }]
+    { id: 'doc-1', title: '', source: isPdf ? 'file' : 'scan', mimeType, fileSize: 1000 },
+    [{ id: 'p1', relativePath, width: isPdf ? null : 1448, height: isPdf ? null : 2048 }]
   );
   if (status === 'draft') return;
   await repositories.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'en' });
@@ -237,5 +239,14 @@ describe('AnalysisStatusPanel on the document screen', () => {
         'Документ слишком большой для анализа: в нём может быть не больше 30 страниц и 20 МБ.'
       )
     ).toBeOnTheScreen();
+  });
+
+  it('names the PDF page limit for a PDF that is too large', async () => {
+    await seedDocument('failed', 'too_large', 'application/pdf');
+    await renderDocument();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The document is too large to analyze: it can have at most 50 pages and 20 MB.'
+    );
   });
 });

@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAnalyzeDocument } from '@/features/analysis/queries';
 import type { DocumentSource } from '@/lib/db/types';
-import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_IMAGE_PAGES } from '@/shared/limits';
 
 import { useCaptureSession } from '../capture-session';
 import { CaptureStatus } from '../components/capture-status';
@@ -94,7 +94,7 @@ export function CaptureReviewScreen() {
         onRemove={busy ? undefined : session.remove}
       />
       <View style={[styles.footer, { paddingBottom: Math.max(insets.bottom, Spacing.three) }]}>
-        {moreFrom && pages.length < MAX_DOCUMENT_PAGES && (
+        {moreFrom && pages.length < MAX_IMAGE_PAGES && (
           <Button
             label={t(moreFrom === 'scan' ? 'capture.scanMore' : 'capture.addMorePhotos')}
             variant="secondary"

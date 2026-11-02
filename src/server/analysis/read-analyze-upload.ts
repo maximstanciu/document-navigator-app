@@ -7,7 +7,7 @@ import {
 } from '@/shared/analysis/contract';
 import { isCalendarDate } from '@/shared/calendar-date';
 import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
-import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
 import { isUiLocale, type UiLocale } from '@/shared/ui-locales';
 
 import { ApiFailure } from '../http/api-failure';
@@ -81,10 +81,15 @@ export async function readAnalyzeUpload(request: Request): Promise<AnalyzeUpload
   return { kind, files, locale, today, timezone, uiLocale, pushToken };
 }
 
-/** Pages of the upload: of a PDF by its structure (D-4), else the images. 413 over 30, 422 for a bad PDF. */
+/**
+ * Pages of the upload: of a PDF by its structure (D-4), else the images. 413 over 50 PDF pages
+ * (30 images are checked before the files are read), 422 for a bad PDF.
+ */
 export async function countPages(upload: AnalyzeUpload): Promise<number> {
   let pageCount = upload.files.length;
+  let maxPages = MAX_IMAGE_PAGES;
   if (upload.kind === 'pdf') {
+    maxPages = MAX_PDF_PAGES;
     const pdf = await inspectPdf(upload.files[0].bytes);
     if (pdf.kind === 'encrypted') {
       throw new ApiFailure('encrypted_pdf', 'The PDF is protected with a password.');
@@ -94,8 +99,8 @@ export async function countPages(upload: AnalyzeUpload): Promise<number> {
     }
     pageCount = pdf.pageCount;
   }
-  if (pageCount > MAX_DOCUMENT_PAGES) {
-    throw new ApiFailure('too_large', `More than ${MAX_DOCUMENT_PAGES} pages.`);
+  if (pageCount > maxPages) {
+    throw new ApiFailure('too_large', `More than ${maxPages} pages.`);
   }
   return pageCount;
 }
@@ -114,8 +119,8 @@ function checkFiles(values: unknown[]): FormFile[] {
   if (pdfs > 0 && values.length > 1) {
     throw invalid('Send either one PDF or images, not several PDFs or a mix.');
   }
-  if (images > MAX_DOCUMENT_PAGES) {
-    throw new ApiFailure('too_large', `More than ${MAX_DOCUMENT_PAGES} pages.`);
+  if (images > MAX_IMAGE_PAGES) {
+    throw new ApiFailure('too_large', `More than ${MAX_IMAGE_PAGES} pages.`);
   }
   const totalBytes = values.reduce((sum, file) => sum + file.size, 0);
   if (totalBytes > MAX_DOCUMENT_BYTES) {

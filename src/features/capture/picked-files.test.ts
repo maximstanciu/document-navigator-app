@@ -1,4 +1,4 @@
-import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_IMAGE_PAGES } from '@/shared/limits';
 
 import { capturedMimeType, checkPickedFiles, type PickedFile } from './picked-files';
 
@@ -100,14 +100,14 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
   });
 
   it('allows as many photos as a document has pages, and no more', () => {
-    const photos = Array.from({ length: MAX_DOCUMENT_PAGES + 1 }, (_, i) =>
+    const photos = Array.from({ length: MAX_IMAGE_PAGES + 1 }, (_, i) =>
       file({ uri: `file:///p${i}.jpg` })
     );
 
-    expect(checkPickedFiles('gallery', photos.slice(0, MAX_DOCUMENT_PAGES)).status).toBe('ok');
+    expect(checkPickedFiles('gallery', photos.slice(0, MAX_IMAGE_PAGES)).status).toBe('ok');
     expect(checkPickedFiles('gallery', photos)).toEqual({
       status: 'too_many_pages',
-      pageCount: MAX_DOCUMENT_PAGES + 1,
+      pageCount: MAX_IMAGE_PAGES + 1,
     });
   });
 

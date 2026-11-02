@@ -80,7 +80,7 @@ src/
     api/client.ts               + поддержка FormData и таймаута, заголовки клиента
   shared/                       чистый TS без React/RN/Expo (клиент + сервер)
     analysis/                   zod-схема AnalysisResult, контракт ответа, JSON Schema, фикстуры
-    limits.ts                   30 страниц, 20 МБ, 10 анализов в день
+    limits.ts                   30 страниц фото, 50 PDF, 20 МБ, 10 анализов в день
     limits-contract.ts, api-headers.ts, calendar-date.ts, explanation-locales.ts
   server/                       ТОЛЬКО для src/app/api/**/*+api.ts
     analysis/                   обработчик, промпт, провайдеры (mock, <provider>), пост-обработка;

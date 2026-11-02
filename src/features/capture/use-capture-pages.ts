@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 
 import type { DocumentSource } from '@/lib/db/types';
-import { MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { MAX_IMAGE_PAGES } from '@/shared/limits';
 
 import { checkPickedFiles } from './picked-files';
 import { pickFile, pickPhotos } from './pickers';
@@ -76,7 +76,7 @@ export function useCapturePages() {
     existing: readonly CapturedPage[] = []
   ): Promise<CapturedPage[] | null> {
     setNotice(null);
-    const captured = await bringIn(source, MAX_DOCUMENT_PAGES - existing.length);
+    const captured = await bringIn(source, MAX_IMAGE_PAGES - existing.length);
     if (captured === null || typeof captured === 'string') {
       setNotice(captured);
       return null;

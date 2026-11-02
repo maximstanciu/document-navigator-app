@@ -9,7 +9,8 @@ import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { DocumentRecord } from '@/lib/db/types';
 import { formatTimestampDateTime } from '@/lib/i18n/format';
-import { MAX_DOCUMENT_BYTES, MAX_DOCUMENT_PAGES } from '@/shared/limits';
+import { PDF_MIME_TYPE } from '@/shared/analysis/contract';
+import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
 
 import { isRetryable, type AnalysisError, type AnalysisErrorCode } from '../errors';
 import {
@@ -20,10 +21,14 @@ import {
   useLastAnalysisError,
 } from '../queries';
 
-/** The text for a failed analysis (ANL-9). `lastError` adds when a `429` lets the person retry. */
+/**
+ * The text for a failed analysis (ANL-9). `lastError` adds when a `429` lets the person retry;
+ * `mimeType` picks the page limit that applies (CAP-7).
+ */
 function failureMessage(
   code: AnalysisErrorCode,
   lastError: AnalysisError | null,
+  mimeType: DocumentRecord['mimeType'],
   t: TFunction,
   language: string
 ): string {
@@ -33,7 +38,8 @@ function failureMessage(
   }
   if (code === 'too_large') {
     const limit = MAX_DOCUMENT_BYTES / (1024 * 1024);
-    return t('analysis.error.too_large', { count: MAX_DOCUMENT_PAGES, limit });
+    const count = mimeType === PDF_MIME_TYPE ? MAX_PDF_PAGES : MAX_IMAGE_PAGES;
+    return t('analysis.error.too_large', { count, limit });
   }
   return t(`analysis.error.${code}`);
 }
@@ -105,7 +111,7 @@ function AnalysisProgress({
 export function AnalysisStatusPanel({
   document,
 }: {
-  document: Pick<DocumentRecord, 'id' | 'status' | 'errorCode' | 'analyzedAt'>;
+  document: Pick<DocumentRecord, 'id' | 'status' | 'errorCode' | 'analyzedAt' | 'mimeType'>;
 }) {
   const { t, i18n } = useTranslation();
   const analyze = useAnalyzeDocument();
@@ -125,7 +131,7 @@ export function AnalysisStatusPanel({
       return (
         <ThemedView type="backgroundElement" style={styles.panel}>
           <ThemedText type="small" role="alert">
-            {failureMessage(code, lastError, t, i18n.language)}
+            {failureMessage(code, lastError, document.mimeType, t, i18n.language)}
           </ThemedText>
           {document.analyzedAt && (
             <ThemedText type="small" themeColor="textSecondary">

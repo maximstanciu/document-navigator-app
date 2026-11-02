@@ -698,11 +698,11 @@ def generate(out, today, timezone):
     def too_many_pages(b):
         writer = PdfWriter()
         source = PdfReader(io.BytesIO(clean)).pages
-        for i in range(31):
+        for i in range(51):
             writer.add_page(source[i % len(source)])
         writer.write(b)
 
-    path = downloads / "07-too-many-pages-31.pdf"
+    path = downloads / "07-too-many-pages-51.pdf"
     path.write_bytes(pdf_bytes(too_many_pages))
     add([path], "file", ["CAP-7"], {"outcome": "server_error", "status": 413, "code": "too_large"})
 

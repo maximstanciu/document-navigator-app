@@ -106,6 +106,13 @@ describe('handlePutAnalysis 202', () => {
     expect(await stateOf(await get())).toMatchObject({ status: 'done', pageCount: 3 });
   });
 
+  it('takes a PDF of 50 pages, more than the 30 images a scan may have (CAP-7)', async () => {
+    await put(uploadRequest({ files: [pdf(minimalPdf({ pages: 50 }))] }));
+    await deps.worker.idle();
+
+    expect(await stateOf(await get())).toMatchObject({ status: 'done', pageCount: 50 });
+  });
+
   it('gives the model the files in order with the locale, date and time zone', async () => {
     const { provider, calls } = gatedProvider();
     deps = testJobDeps({ provider });
@@ -262,8 +269,8 @@ describe('handlePutAnalysis 413 too_large', () => {
     await expectError(await put(uploadRequest({ files })), 413, 'too_large');
   });
 
-  it('for a PDF with more than 30 pages', async () => {
-    const files = [pdf(minimalPdf({ pages: 31 }))];
+  it('for a PDF with more than 50 pages', async () => {
+    const files = [pdf(minimalPdf({ pages: 51 }))];
     await expectError(await put(uploadRequest({ files })), 413, 'too_large');
   });
 

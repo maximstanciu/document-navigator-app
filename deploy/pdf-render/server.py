@@ -18,7 +18,7 @@ import pypdfium2 as pdfium
 PORT = int(os.environ.get("PORT", "8080"))
 # The analyze route takes 20 MB of files (CAP-7) and checks the page count itself (D-4).
 MAX_BYTES = 21 * 1024 * 1024
-MAX_PAGES = 30
+MAX_PAGES = 50
 # Long side of a page in pixels: small print stays legible, and a page stays around a thousand
 # image tokens, which matters for a model on a CPU.
 MAX_SIDE = int(os.environ.get("PAGE_MAX_SIDE", "1600"))

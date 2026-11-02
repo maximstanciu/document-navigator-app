@@ -1,7 +1,10 @@
 // Document limits (CAP-7, SPEC §1.5): the client checks them before upload, the server enforces them.
 
-/** Pages per document. The client can't count PDF pages, so for PDF the server checks this (D-4). */
-export const MAX_DOCUMENT_PAGES = 30;
+/** Pages of a scanned or photographed document, one image per page. */
+export const MAX_IMAGE_PAGES = 30;
+
+/** Pages of a PDF. The client can't count them, so the server checks this (D-4). */
+export const MAX_PDF_PAGES = 50;
 
 /**
  * Total size of a document's files: 20 MB passed spike 0.2. Drops to 10 MB if the analyze handler
