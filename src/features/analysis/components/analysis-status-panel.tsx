@@ -1,12 +1,12 @@
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
+import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
 import type { DocumentRecord } from '@/lib/db/types';
 import { formatTimestampDateTime } from '@/lib/i18n/format';
 import { PDF_MIME_TYPE } from '@/shared/analysis/contract';
@@ -56,7 +56,6 @@ function AnalysisProgress({
   documentId: string;
   hasPrevious: boolean;
 }) {
-  const theme = useTheme();
   const { t } = useTranslation();
   const uploading = useIsUploading(documentId);
   const progress = useJobProgress(documentId);
@@ -72,10 +71,9 @@ function AnalysisProgress({
   return (
     <ThemedView type="backgroundElement" style={styles.panel} aria-live="polite">
       <View style={styles.progress}>
-        <ActivityIndicator color={theme.textSecondary} />
-        <ThemedText type="smallBold" style={styles.status}>
-          {status}
-        </ThemedText>
+        <ThemedText type="smallBold">{status}</ThemedText>
+        {/* The status above says it in words; the bar only shows that the work goes on. */}
+        <ProgressBar aria-hidden />
       </View>
       <ThemedText type="small" themeColor="textSecondary">
         {uploading ? t('analysis.keepOpenWhileUploading') : t('analysis.canClose')}
@@ -162,12 +160,7 @@ const styles = StyleSheet.create({
     borderRadius: Spacing.three,
   },
   progress: {
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: Spacing.two,
-  },
-  status: {
-    flexShrink: 1,
   },
   actions: {
     alignItems: 'flex-start',
