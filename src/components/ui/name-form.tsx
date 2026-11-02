@@ -5,20 +5,36 @@ import { StyleSheet, TextInput, View } from 'react-native';
 import { Button } from '@/components/ui/button';
 import { MinTouchTarget, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 
-type RenameFormProps = {
-  title: string;
-  onSave: (title: string) => void;
+type NameFormProps = {
+  name: string;
+  /** The field's accessible name. */
+  label: string;
+  maxLength: number;
+  placeholder?: string;
+  /** «Save» unless given. */
+  saveLabel?: string;
+  /** While the name is being saved: both buttons wait. */
+  busy?: boolean;
+  onSave: (name: string) => void;
   onCancel: () => void;
 };
 
-/** «Rename» (DET-9) in place of the title: a blank title can't be saved. */
-export function RenameForm({ title, onSave, onCancel }: RenameFormProps) {
+/** A name typed in place of a title («Rename», «New case»): a blank name can't be saved. */
+export function NameForm({
+  name,
+  label,
+  maxLength,
+  placeholder,
+  saveLabel,
+  busy = false,
+  onSave,
+  onCancel,
+}: NameFormProps) {
   const theme = useTheme();
   const { t } = useTranslation();
-  const [value, setValue] = useState(title);
-  const canSave = value.trim() !== '';
+  const [value, setValue] = useState(name);
+  const canSave = value.trim() !== '' && !busy;
   const save = () => {
     if (canSave) onSave(value.trim());
   };
@@ -26,11 +42,13 @@ export function RenameForm({ title, onSave, onCancel }: RenameFormProps) {
   return (
     <View style={styles.form}>
       <TextInput
-        aria-label={t('documents.rename.label')}
+        aria-label={label}
         value={value}
         onChangeText={setValue}
         onSubmitEditing={save}
-        maxLength={ANALYSIS_BOUNDS.title}
+        maxLength={maxLength}
+        placeholder={placeholder}
+        placeholderTextColor={theme.textSecondary}
         autoFocus
         enterKeyHint="done"
         style={[
@@ -39,8 +57,8 @@ export function RenameForm({ title, onSave, onCancel }: RenameFormProps) {
         ]}
       />
       <View style={styles.buttons}>
-        <Button label={t('common.save')} disabled={!canSave} onPress={save} />
-        <Button label={t('common.cancel')} variant="secondary" onPress={onCancel} />
+        <Button label={saveLabel ?? t('common.save')} disabled={!canSave} onPress={save} />
+        <Button label={t('common.cancel')} variant="secondary" disabled={busy} onPress={onCancel} />
       </View>
     </View>
   );

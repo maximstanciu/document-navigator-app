@@ -24,6 +24,7 @@ describe('type filter (HOME-4)', () => {
         createdAt: '',
         analyzedAt: null,
         attentionDismissedAt: null,
+        caseId: null,
         hasFraudSignals: false,
         hasHighRisk: false,
       })

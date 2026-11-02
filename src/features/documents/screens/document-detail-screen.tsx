@@ -7,16 +7,18 @@ import { ScrollView, StyleSheet, type ScrollViewInstance } from 'react-native';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
+import { NameForm } from '@/components/ui/name-form';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { AnalysisStatusPanel } from '@/features/analysis/components/analysis-status-panel';
 import { useAnalyzeDocument } from '@/features/analysis/queries';
+import { DocumentCase } from '@/features/cases/components/document-case';
 import { useTheme } from '@/hooks/use-theme';
 import { formatCalendarDate, formatTimestampDate } from '@/lib/i18n/format';
+import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 
 import { DocumentActionsButton, DocumentActionsSheet } from '../components/document-actions';
 import { DocumentResult } from '../components/document-result';
 import { OriginalBlock } from '../components/original-block';
-import { RenameForm } from '../components/rename-form';
 import { displayTitle, formatDocumentType } from '../format';
 import { documentQueries, useDeleteDocument, useRenameDocument } from '../queries';
 import type { DocumentDetail } from '../types';
@@ -41,7 +43,7 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 /**
  * A document (SPEC §4.4): the title, where its analysis stands, the analysis itself in the order of
  * the four questions (DET-1…DET-10), the original and the disclaimer. «⋯» in the header renames,
- * analyzes again or deletes it (DET-9).
+ * analyzes again or deletes it (DET-9); under the title, the case it is filed in (CASE-2).
  */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -113,8 +115,11 @@ export function DocumentDetailScreen({ id }: { id: string }) {
         onDelete={() => remove.mutate(id, { onSuccess: leave })}
       />
       {renaming ? (
-        <RenameForm
-          title={data.title}
+        <NameForm
+          name={data.title}
+          label={t('documents.rename.label')}
+          maxLength={ANALYSIS_BOUNDS.title}
+          busy={rename.isPending}
           onSave={(newTitle) =>
             rename.mutate({ id, title: newTitle }, { onSuccess: () => setRenaming(false) })
           }
@@ -135,6 +140,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
           {meta}
         </ThemedText>
       )}
+      <DocumentCase documentId={data.id} caseId={data.caseId} />
       <AnalysisStatusPanel document={data} />
       {data.analysis && (
         <DocumentResult documentId={data.id} documentTitle={title} analysis={data.analysis} />

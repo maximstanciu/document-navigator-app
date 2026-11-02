@@ -1,8 +1,10 @@
 import { screen, userEvent, waitFor, within } from '@testing-library/react-native';
+import { Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
 import CaptureRoute from '@/app/capture';
 import CaptureLayout from '@/app/capture/_layout';
+import CaseRoute from '@/app/cases/[id]';
 import DocumentRoute from '@/app/documents/[id]';
 import { analysisRecords } from '@/features/analysis/analysis-records';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
@@ -30,7 +32,7 @@ afterEach(() => {
   jest.restoreAllMocks();
 });
 
-async function addDocument(id: string, title: string) {
+async function addDocument(id: string, title: string, caseId: string | null = null) {
   await repositories.documents.create({
     id,
     title,
@@ -38,6 +40,7 @@ async function addDocument(id: string, title: string) {
     mimeType: 'image/jpeg',
     pageCount: 2,
     fileSize: 1000,
+    caseId,
   });
   clock.advance(60_000);
 }
@@ -355,6 +358,84 @@ describe('DocumentListScreen', () => {
 
       expect(await screen.findByRole('heading', { name: 'All documents' })).toBeOnTheScreen();
       expect(screen.queryByLabelText('Document type')).not.toBeOnTheScreen();
+    });
+  });
+
+  describe('cases (CASE-3)', () => {
+    beforeEach(async () => {
+      await repositories.cases.create({ id: 'flat', name: 'Квартира' });
+      clock.advance(60_000);
+      await repositories.cases.create({ id: 'car', name: 'Машина' });
+    });
+
+    it('shows each case, newest first, with its number of documents, and the case on the cards', async () => {
+      await addDocument('rent', 'Договор аренды');
+      await addDocument('gas', 'Счёт за газ');
+      await addDocument('loose', 'Письмо из банка');
+      await repositories.documents.moveToCase(['rent', 'gas'], 'flat');
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('heading', { name: 'Cases' })).toBeOnTheScreen();
+      expect(
+        screen
+          .getAllByRole('link', { name: / documents?$/ })
+          .map((chip) => chip.props.accessibilityLabel)
+      ).toEqual(['Машина, 0 documents', 'Квартира, 2 documents']);
+      expect(screen.getByRole('button', { name: 'New case' })).toBeOnTheScreen();
+      expect(
+        screen.getByRole('link', { name: /^Счёт за газ, .* · Not analyzed, Case: Квартира$/ })
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByRole('link', { name: /^Письмо из банка, .* · Not analyzed$/ })
+      ).toBeOnTheScreen();
+    });
+
+    it('hides the cases while searching', async () => {
+      const user = userEvent.setup();
+      await addDocument('gas', 'Счёт за газ');
+      await renderWithProviders(<DocumentListScreen />);
+
+      await user.type(await screen.findByRole('searchbox'), 'газ');
+
+      expect(await screen.findByRole('heading', { name: 'Search results' })).toBeOnTheScreen();
+      expect(screen.queryByRole('heading', { name: 'Cases' })).not.toBeOnTheScreen();
+    });
+
+    it('opens a case from its chip', async () => {
+      const user = userEvent.setup();
+      await addDocument('gas', 'Счёт за газ', 'flat');
+      await renderRouter(
+        { _layout: () => <Stack />, index: DocumentListScreen, 'cases/[id]': CaseRoute },
+        { initialUrl: '/', wrapper: createTestProviders() }
+      );
+
+      await user.press(await screen.findByRole('link', { name: 'Квартира, 1 document' }));
+
+      expect(screen).toHavePathname('/cases/flat');
+      expect(
+        await screen.findByRole('heading', { name: '1 document in this case' })
+      ).toBeOnTheScreen();
+    });
+
+    it('keeps the cases in reach before the first document', async () => {
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Your documents will be here' })
+      ).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Квартира, 0 documents' })).toBeOnTheScreen();
+    });
+
+    it('shows no cases before the first document when there are none', async () => {
+      await repositories.cases.remove('flat');
+      await repositories.cases.remove('car');
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(
+        await screen.findByRole('heading', { name: 'Your documents will be here' })
+      ).toBeOnTheScreen();
+      expect(screen.queryByRole('heading', { name: 'Cases' })).not.toBeOnTheScreen();
     });
   });
 

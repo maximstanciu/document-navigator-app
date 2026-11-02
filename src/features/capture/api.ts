@@ -12,11 +12,16 @@ import type { CapturedPage } from './types';
  */
 
 /**
- * Saves prepared pages as a new `draft` document (CAP-5, SPEC §6.3) and returns its id. The files are
- * copied out of the cache into the document's folder first (STO-2); if that or the database write
- * fails, the copied files are deleted, so nothing half-saved remains.
+ * Saves prepared pages as a new `draft` document (CAP-5, SPEC §6.3) and returns its id, filed in the
+ * case `caseId` if given (CASE-4). The files are copied out of the cache into the document's folder
+ * first (STO-2); if that or the database write fails, the copied files are deleted, so nothing
+ * half-saved remains.
  */
-export async function saveDraft(source: DocumentSource, pages: readonly CapturedPage[]) {
+export async function saveDraft(
+  source: DocumentSource,
+  pages: readonly CapturedPage[],
+  caseId: string | null = null
+) {
   if (pages.length === 0) throw new Error('A draft needs at least one page');
   const documentId = randomUUID();
   const isPdf = pages[0].mimeType === 'application/pdf';
@@ -41,6 +46,7 @@ export async function saveDraft(source: DocumentSource, pages: readonly Captured
         // The client can't count PDF pages: the server reports them after the analysis (D-4).
         pageCount: isPdf ? null : pages.length,
         fileSize: pages.reduce((total, page) => total + (page.size ?? 0), 0),
+        caseId,
       },
       savedPages
     );

@@ -19,6 +19,7 @@ describe('migrate', () => {
     expect(await tableNames(db)).toEqual([
       'actions',
       'analysis_job_deletions',
+      'cases',
       'deadlines',
       'documents',
       'pages',
@@ -111,6 +112,34 @@ describe('migrate', () => {
       await db.getAllAsync('SELECT id, status, analysis_job_id, analysis_job_locale FROM documents')
     ).toEqual([
       { id: 'doc-1', status: 'analyzing', analysis_job_id: null, analysis_job_locale: null },
+    ]);
+  });
+
+  it('leaves documents of version 3 out of any case, and a case takes them in (CASE-2)', async () => {
+    const db = createNodeDatabase();
+    await db.execAsync('PRAGMA foreign_keys = ON');
+    await migrate(db, MIGRATIONS.slice(0, 3));
+    await db.runAsync(
+      `INSERT INTO documents (id, title, status, source, mime_type, file_size, created_at, updated_at)
+       VALUES ('doc-1', 'Счёт', 'ready', 'scan', 'image/jpeg', 10, 't', 't')`
+    );
+
+    await expect(migrate(db)).resolves.toEqual({ from: 3, to: LATEST_SCHEMA_VERSION });
+
+    expect(await db.getAllAsync('SELECT id, case_id FROM documents')).toEqual([
+      { id: 'doc-1', case_id: null },
+    ]);
+    await db.runAsync(
+      "INSERT INTO cases (id, name, created_at, updated_at) VALUES ('case-1', 'Квартира', 't', 't')"
+    );
+    await db.runAsync("UPDATE documents SET case_id = 'case-1' WHERE id = 'doc-1'");
+    // A case that doesn't exist is refused, and a purged one lets its documents go.
+    await expect(
+      db.runAsync("UPDATE documents SET case_id = 'missing' WHERE id = 'doc-1'")
+    ).rejects.toThrow();
+    await db.runAsync("DELETE FROM cases WHERE id = 'case-1'");
+    expect(await db.getAllAsync('SELECT id, case_id FROM documents')).toEqual([
+      { id: 'doc-1', case_id: null },
     ]);
   });
 

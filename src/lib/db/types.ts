@@ -25,6 +25,8 @@ export type DocumentRecord = {
    * `analyzing`, then the latest.
    */
   analysisJobId: string | null;
+  /** The case the document is filed in (CASE-2), `null` — none. */
+  caseId: string | null;
   source: DocumentSource;
   mimeType: DocumentMimeType;
   pageCount: number | null;
@@ -34,6 +36,15 @@ export type DocumentRecord = {
   analyzedAt: string | null;
   searchText: string;
   attentionDismissedAt: string | null;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt: string | null;
+};
+
+/** Documents about one matter, grouped by the person: «Квартира», «Налоги 2026» (CASE-1). */
+export type CaseRecord = {
+  id: string;
+  name: string;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;

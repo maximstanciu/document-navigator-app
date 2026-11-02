@@ -29,9 +29,10 @@ const SOURCES = [
 /**
  * Where a new document comes from (CAP-1): the scanner, photos from the gallery or a file (CAP-3).
  * Web has no scanner, so it offers only photos and files (CAP-10). The captured pages are prepared
- * for upload (CAP-4, CAP-7) before the review opens.
+ * for upload (CAP-4, CAP-7) before the review opens. Opened from a case (`caseId`), the review files
+ * the new document there (CASE-4).
  */
-export function CaptureSourceScreen() {
+export function CaptureSourceScreen({ caseId }: { caseId?: string }) {
   const { t } = useTranslation();
   const session = useCaptureSession();
   const { notice, progress, capture } = useCapturePages();
@@ -41,7 +42,7 @@ export function CaptureSourceScreen() {
     const pages = await capture(source);
     if (!pages) return;
     session.start(source, pages);
-    router.push('/capture/review');
+    router.push({ pathname: '/capture/review', params: caseId ? { caseId } : {} });
   }
 
   // Opened by a direct URL (web preview), the modal has nothing to go back to.

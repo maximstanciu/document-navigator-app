@@ -1,5 +1,6 @@
 import { insertAction, type NewAction } from './actions-repository';
 import { queueJobDeletion } from './analysis-job-deletions-repository';
+import { fileDocuments } from './cases-repository';
 import type { SqlDatabase } from './database';
 import { insertDeadline, type NewDeadline } from './deadlines-repository';
 import type { NewPage } from './pages-repository';
@@ -24,6 +25,7 @@ type DocumentRow = {
   status: DocumentRecord['status'];
   error_code: DocumentRecord['errorCode'];
   analysis_job_id: string | null;
+  case_id: string | null;
   source: DocumentRecord['source'];
   mime_type: DocumentRecord['mimeType'];
   page_count: number | null;
@@ -39,7 +41,7 @@ type DocumentRow = {
 };
 
 const COLUMNS = `id, title, document_type, sender_name, document_date, status, error_code,
-  analysis_job_id, source, mime_type, page_count, file_size, analysis, analysis_locale, analyzed_at,
+  analysis_job_id, case_id, source, mime_type, page_count, file_size, analysis, analysis_locale, analyzed_at,
   search_text, attention_dismissed_at, created_at, updated_at, deleted_at`;
 
 function toRecord(row: DocumentRow): DocumentRecord {
@@ -52,6 +54,7 @@ function toRecord(row: DocumentRow): DocumentRecord {
     status: row.status,
     errorCode: row.error_code,
     analysisJobId: row.analysis_job_id,
+    caseId: row.case_id,
     source: row.source,
     mimeType: row.mime_type,
     pageCount: row.page_count,
@@ -80,7 +83,7 @@ export type NewDocument = Pick<
   DocumentRecord,
   'id' | 'title' | 'source' | 'mimeType' | 'fileSize'
 > &
-  Partial<Pick<DocumentRecord, 'status' | 'pageCount'>>;
+  Partial<Pick<DocumentRecord, 'status' | 'pageCount' | 'caseId'>>;
 
 /** Fields a feature may change. `searchText` is derived from title, sender and analysis, never set directly. */
 export type DocumentPatch = Partial<
@@ -174,19 +177,22 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
 
     /**
      * Creates a document together with its pages in order, in one transaction: a draft never exists
-     * without its pages (CAP-5). The page files must already be saved.
+     * without its pages (CAP-5). The page files must already be saved. A document added from a case
+     * is filed in it (CASE-4), unless the case was deleted meanwhile.
      */
     async create(input: NewDocument, pages: readonly NewPage[] = []): Promise<DocumentRecord> {
       const timestamp = now().toISOString();
       const row = await db.transaction(async (tx) => {
         await tx.runAsync(
-          `INSERT INTO documents (id, title, status, source, mime_type, page_count, file_size,
-            search_text, created_at, updated_at)
-           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO documents (id, title, status, case_id, source, mime_type, page_count,
+            file_size, search_text, created_at, updated_at)
+           VALUES (?, ?, ?, (SELECT id FROM cases WHERE id = ? AND deleted_at IS NULL), ?, ?, ?, ?,
+             ?, ?, ?)`,
           [
             input.id,
             input.title,
             input.status ?? 'draft',
+            input.caseId ?? null,
             input.source,
             input.mimeType,
             input.pageCount ?? null,
@@ -258,6 +264,14 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         );
         return toRecord(updated as DocumentRow);
       });
+    },
+
+    /**
+     * Files the documents `ids` in the case `caseId`, or takes them out of any case with `null`
+     * (CASE-2, CASE-4). `false`, with nothing filed, if the case is gone.
+     */
+    async moveToCase(ids: readonly string[], caseId: string | null): Promise<boolean> {
+      return db.transaction((tx) => fileDocuments(tx, ids, caseId, now().toISOString()));
     },
 
     /**
@@ -522,7 +536,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         await tx.runAsync(
           `UPDATE documents SET title = '', document_type = NULL, sender_name = NULL,
              document_date = NULL, error_code = NULL, analysis_job_id = NULL,
-             analysis_job_locale = NULL, analysis = NULL, analysis_locale = NULL,
+             analysis_job_locale = NULL, case_id = NULL, analysis = NULL, analysis_locale = NULL,
              search_text = '', updated_at = ?, deleted_at = ?
            WHERE id = ?`,
           [timestamp, timestamp, id]

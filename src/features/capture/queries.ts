@@ -10,8 +10,15 @@ import type { CapturedPage } from './types';
 export function useSaveDraft() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ source, pages }: { source: DocumentSource; pages: readonly CapturedPage[] }) =>
-      saveDraft(source, pages),
+    mutationFn: ({
+      source,
+      pages,
+      caseId = null,
+    }: {
+      source: DocumentSource;
+      pages: readonly CapturedPage[];
+      caseId?: string | null;
+    }) => saveDraft(source, pages, caseId),
     onSuccess: () =>
       Promise.all([
         queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),

@@ -108,6 +108,23 @@ export const MIGRATIONS: readonly Migration[] = [
       )`,
     ],
   },
+  {
+    // Cases (CASE-1…CASE-6): a document is filed in at most one. A deleted case keeps a tombstone
+    // like a document (STO-6) and leaves its documents out of any case, never deletes them.
+    version: 4,
+    statements: [
+      `CREATE TABLE cases (
+        id TEXT PRIMARY KEY NOT NULL,
+        name TEXT NOT NULL,
+        created_at TEXT NOT NULL,
+        updated_at TEXT NOT NULL,
+        deleted_at TEXT
+      )`,
+      `CREATE INDEX cases_deleted_created ON cases (deleted_at, created_at)`,
+      `ALTER TABLE documents ADD COLUMN case_id TEXT REFERENCES cases (id) ON DELETE SET NULL`,
+      `CREATE INDEX documents_case ON documents (case_id)`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

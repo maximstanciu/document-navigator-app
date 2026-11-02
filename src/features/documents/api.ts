@@ -22,6 +22,7 @@ function toSummary(document: DocumentRecord): DocumentSummary {
     createdAt: document.createdAt,
     analyzedAt: document.analyzedAt,
     attentionDismissedAt: document.attentionDismissedAt,
+    caseId: document.caseId,
     hasFraudSignals: (document.analysis?.fraudSignals.length ?? 0) > 0,
     hasHighRisk: document.analysis?.risks.some((risk) => risk.severity === 'high') ?? false,
   };

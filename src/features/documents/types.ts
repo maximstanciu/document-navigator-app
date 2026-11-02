@@ -15,6 +15,7 @@ export type DocumentSummary = Pick<
   | 'createdAt'
   | 'analyzedAt'
   | 'attentionDismissedAt'
+  | 'caseId'
 > & {
   /** The analysis found signs of fraud (ANL-11). */
   hasFraudSignals: boolean;

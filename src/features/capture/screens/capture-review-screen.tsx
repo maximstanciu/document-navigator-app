@@ -28,10 +28,11 @@ const MORE_PAGES_FROM: Partial<Record<DocumentSource, 'scan' | 'gallery'>> = {
 /**
  * The pages of the document being added, or the PDF file (CAP-5): remove a page, add more, drag a
  * page to change the order (CAP-6), then
- * «Analyze the document» saves a draft (SPEC §6.3), starts its analysis (ANL-1) and opens it in
- * place of the capture modal. The analysis goes on there, or wherever the person goes next (ANL-3).
+ * «Analyze the document» saves a draft (SPEC §6.3), filed in the case `caseId` when the capture
+ * started from one (CASE-4), starts its analysis (ANL-1) and opens it in place of the capture
+ * modal. The analysis goes on there, or wherever the person goes next (ANL-3).
  */
-export function CaptureReviewScreen() {
+export function CaptureReviewScreen({ caseId }: { caseId?: string }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const session = useCaptureSession();
@@ -53,7 +54,7 @@ export function CaptureReviewScreen() {
   function analyze() {
     if (!source) return;
     saveDraft.mutate(
-      { source, pages },
+      { source, pages, caseId: caseId ?? null },
       {
         onSuccess: (id) => {
           analysis.mutate(id);

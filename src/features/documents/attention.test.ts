@@ -27,6 +27,7 @@ function document(id: string, overrides: Partial<DocumentSummary> = {}): Documen
     createdAt: daysAgo(30),
     analyzedAt: daysAgo(1),
     attentionDismissedAt: null,
+    caseId: null,
     hasFraudSignals: false,
     hasHighRisk: false,
     ...overrides,

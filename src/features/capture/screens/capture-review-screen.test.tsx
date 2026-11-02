@@ -187,6 +187,37 @@ describe('CaptureReviewScreen (CAP-5)', () => {
     expect(screen).toHavePathname('/');
   });
 
+  it('files the draft in the case the capture was opened from (CASE-4)', async () => {
+    await repositories.cases.create({ id: 'flat', name: 'Квартира' });
+    scan.mockResolvedValue({ status: 'scanned', pages: ['file:///p1.jpg'] });
+    const user = userEvent.setup();
+    await renderRouter(
+      {
+        index: () => (
+          <Button
+            label="Open capture"
+            onPress={() => router.push({ pathname: '/capture', params: { caseId: 'flat' } })}
+          />
+        ),
+        'capture/_layout': CaptureLayout,
+        'capture/index': CaptureRoute,
+        'capture/review': ReviewRoute,
+        'documents/[id]': DocumentRoute,
+      },
+      { initialUrl: '/', wrapper: createTestProviders() }
+    );
+
+    await user.press(await screen.findByRole('button', { name: 'Open capture' }));
+    await user.press(await screen.findByRole('button', { name: 'Scan' }));
+    await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
+
+    expect(await screen.findByRole('button', { name: 'Case: Квартира. Change' })).toBeOnTheScreen();
+    expect(await repositories.documents.get('uuid-1')).toMatchObject({
+      status: 'draft',
+      caseId: 'flat',
+    });
+  });
+
   it('saves a PDF without offering more pages', async () => {
     fakeFileSystem.addFile('file:///cache/letter.pdf');
     pickedFile.mockResolvedValue(

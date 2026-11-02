@@ -14,6 +14,11 @@ export const dbKeys = {
     titles: () => [...dbKeys.documents.all(), 'titles'] as const,
     detail: (id: string) => [...dbKeys.documents.all(), 'detail', id] as const,
   },
+  cases: {
+    all: () => ['db', 'cases'] as const,
+    list: () => [...dbKeys.cases.all(), 'list'] as const,
+    detail: (id: string) => [...dbKeys.cases.all(), 'detail', id] as const,
+  },
   pages: {
     all: () => ['db', 'pages'] as const,
     byDocument: (documentId: string) => [...dbKeys.pages.all(), 'document', documentId] as const,

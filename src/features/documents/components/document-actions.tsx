@@ -1,34 +1,15 @@
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal, Pressable, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
+import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
-import { MaxContentWidth, MinTouchTarget, Spacing } from '@/constants/theme';
-import { useTheme } from '@/hooks/use-theme';
+import { HeaderMenuButton } from '@/components/ui/header-menu-button';
 
 /** «⋯» in the header of the document screen: opens the document's actions (DET-9). */
 export function DocumentActionsButton({ onPress }: { onPress: () => void }) {
-  const theme = useTheme();
   const { t } = useTranslation();
-
-  return (
-    <Pressable
-      role="button"
-      aria-label={t('documents.actions.open')}
-      hitSlop={Spacing.two}
-      onPress={onPress}
-      style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}>
-      <SymbolView
-        name={{ ios: 'ellipsis.circle', android: 'more_vert', web: 'more_horiz' }}
-        size={24}
-        tintColor={theme.tint}
-      />
-    </Pressable>
-  );
+  return <HeaderMenuButton label={t('documents.actions.open')} onPress={onPress} />;
 }
 
 type Confirmation = 'reanalyze' | 'delete';
@@ -62,9 +43,7 @@ export function DocumentActionsSheet({
   onReanalyze,
   onDelete,
 }: DocumentActionsSheetProps) {
-  const theme = useTheme();
   const { t } = useTranslation();
-  const insets = useSafeAreaInsets();
   const [confirmation, setConfirmation] = useState<Confirmation | null>(null);
 
   const close = () => {
@@ -128,49 +107,8 @@ export function DocumentActionsSheet({
   }
 
   return (
-    <Modal visible={visible} transparent animationType="fade" onRequestClose={close}>
-      <View style={[styles.overlay, { backgroundColor: theme.scrim }]}>
-        <Pressable
-          role="button"
-          aria-label={t('documents.actions.close')}
-          style={StyleSheet.absoluteFill}
-          onPress={close}
-        />
-        <ThemedView
-          aria-modal
-          style={[
-            styles.sheet,
-            { borderColor: theme.border, paddingBottom: insets.bottom + Spacing.three },
-          ]}>
-          {content}
-        </ThemedView>
-      </View>
-    </Modal>
+    <BottomSheet visible={visible} onClose={close} closeLabel={t('documents.actions.close')}>
+      {content}
+    </BottomSheet>
   );
 }
-
-const styles = StyleSheet.create({
-  trigger: {
-    minWidth: MinTouchTarget,
-    minHeight: MinTouchTarget,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  pressed: {
-    opacity: 0.7,
-  },
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    alignItems: 'center',
-  },
-  sheet: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderTopLeftRadius: Spacing.four,
-    borderTopRightRadius: Spacing.four,
-    borderWidth: StyleSheet.hairlineWidth,
-  },
-});

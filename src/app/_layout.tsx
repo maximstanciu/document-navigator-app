@@ -14,6 +14,9 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="documents/[id]" options={{ title: '' }} />
+        <Stack.Screen name="cases/[id]" options={{ title: '' }} />
+        <Stack.Screen name="cases/new" options={{ presentation: 'modal' }} />
+        <Stack.Screen name="cases/[id]/add" options={{ presentation: 'modal' }} />
         <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />
       </Stack>
     </AppProviders>

@@ -1,6 +1,7 @@
 import { Link } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
-import { Pressable, StyleSheet } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
@@ -17,10 +18,20 @@ type DocumentListItemProps = {
   nearestDeadline?: DeadlineSummary;
   /** The device's calendar date, to tell an overdue deadline. */
   today: string;
+  /** The name of the case it is filed in (CASE-3); left out on the case's own screen. */
+  caseName?: string;
 };
 
-/** A document in the list (HOME-2): title, type, sender, nearest deadline and analysis status. */
-export function DocumentListItem({ document, nearestDeadline, today }: DocumentListItemProps) {
+/**
+ * A document in the list (HOME-2): title, type, sender, nearest deadline, analysis status, and its
+ * case (CASE-3).
+ */
+export function DocumentListItem({
+  document,
+  nearestDeadline,
+  today,
+  caseName,
+}: DocumentListItemProps) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const title = displayTitle(document.title, t);
@@ -37,10 +48,13 @@ export function DocumentListItem({ document, nearestDeadline, today }: DocumentL
     dueLine = overdue ? `${due} · ${t('documents.deadline.overdue')}` : due;
   }
   const meta = formatMeta(document, t, i18n.language);
+  const inCase = caseName ? t('cases.document.inCase', { name: caseName }) : null;
 
   return (
     <Link href={{ pathname: '/documents/[id]', params: { id: document.id } }} asChild>
-      <Pressable role="link" aria-label={[title, from, dueLine, meta].filter(Boolean).join(', ')}>
+      <Pressable
+        role="link"
+        aria-label={[title, from, dueLine, meta, inCase].filter(Boolean).join(', ')}>
         {({ pressed }) => (
           <ThemedView
             type={pressed ? 'backgroundSelected' : 'backgroundElement'}
@@ -61,6 +75,18 @@ export function DocumentListItem({ document, nearestDeadline, today }: DocumentL
             <ThemedText type="small" themeColor="textSecondary">
               {meta}
             </ThemedText>
+            {caseName && (
+              <View style={styles.case}>
+                <SymbolView
+                  name={{ ios: 'folder', android: 'folder', web: 'folder' }}
+                  size={16}
+                  tintColor={theme.textSecondary}
+                />
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                  {caseName}
+                </ThemedText>
+              </View>
+            )}
           </ThemedView>
         )}
       </Pressable>
@@ -74,6 +100,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.three,
     borderRadius: Spacing.three,
+    gap: Spacing.one,
+  },
+  case: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: Spacing.one,
   },
 });
