@@ -3,9 +3,11 @@ import { CLIENT_PLATFORMS, type ClientPlatform } from '@/shared/api-headers';
 import {
   JOB_END_CODES,
   METRICS_RETENTION_DAYS,
+  PUSH_OUTCOMES,
   UPLOAD_END_CODES,
   USAGE_KEYS as K,
   type JobEndCode,
+  type PushOutcome,
   type UploadEndCode,
 } from '../limits/usage-keys';
 import { daysBefore, utcDay } from '../limits/utc-time';
@@ -33,6 +35,8 @@ export type DayMetrics = {
   expired: number;
   /** Successful analyses that found a deadline. */
   withDeadline: number;
+  /** How the pushes about the jobs went (ANL-12). */
+  pushes: Record<PushOutcome, number>;
   /** Devices that tried an analysis, and those of them seen 7 or more days earlier too. */
   devices: number;
   returningDevices: number;
@@ -81,6 +85,7 @@ export async function readBetaReport(
     read(['GET', K.delivered(day)]);
     read(['GET', K.expired(day)]);
     read(['GET', K.withDeadline(day)]);
+    for (const outcome of PUSH_OUTCOMES) read(['GET', K.push(day, outcome)]);
     read(['GET', K.spend(day)]);
   }
   for (const day of setDays) read(['SMEMBERS', K.devices(day)]);
@@ -139,6 +144,9 @@ export async function readBetaReport(
       delivered: count(K.delivered(day)),
       expired,
       withDeadline,
+      pushes: Object.fromEntries(
+        PUSH_OUTCOMES.map((outcome) => [outcome, count(K.push(day, outcome))])
+      ) as Record<PushOutcome, number>,
       devices: devices.size,
       returningDevices: [...devices].filter((device) => earlier.has(device)).length,
       costUsd: count(K.spend(day)) / 1_000_000,

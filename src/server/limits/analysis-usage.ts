@@ -9,7 +9,13 @@ import {
   type CounterStore,
   type StoreCommand,
 } from '../store/counter-store';
-import { TTL_SECONDS, USAGE_KEYS as K, type JobEndCode, type UploadEndCode } from './usage-keys';
+import {
+  TTL_SECONDS,
+  USAGE_KEYS as K,
+  type JobEndCode,
+  type PushOutcome,
+  type UploadEndCode,
+} from './usage-keys';
 import {
   nextUtcMidnight,
   secondsUntilNextDay,
@@ -63,6 +69,7 @@ export type JobOutcome = {
  *   whenever the model answered.
  * - `delivered()` charges the device, once per job, when the app first gets a result: a refused
  *   upload, a failed, cancelled or lost job and a result nobody fetched cost the device nothing.
+ * - `expired()` and `pushSent()` count results nobody fetched and how the pushes went.
  *
  * If the store can't be reached the analysis goes ahead (fail open) and `limits.unavailable` is
  * logged; the spending cap in the provider's console still holds (SPEC §8.3).
@@ -168,6 +175,11 @@ export class AnalysisUsage {
   /** Nobody fetched the result in time. */
   async expired(session: UsageSession): Promise<void> {
     await this.run(session, 'expired', retained(['INCR', K.expired(session.day)]));
+  }
+
+  /** The push about the job's end went out, or why not (ANL-12). */
+  async pushSent(session: UsageSession, outcome: PushOutcome): Promise<void> {
+    await this.run(session, 'push', retained(['INCR', K.push(session.day, outcome)]));
   }
 
   /**

@@ -205,6 +205,7 @@ describe('AnalysisUsage', () => {
     await analyses(deps, 1);
     const { session } = await attempt(deps);
     await deps.usage.expired(session);
+    await deps.usage.pushSent(session, 'ok');
 
     const commands = run.mock.calls.flatMap(([batch]) => batch);
     const expiry = Object.fromEntries(
@@ -224,6 +225,7 @@ describe('AnalysisUsage', () => {
       'm:2026-10-18:deadline': retained,
       'm:2026-10-18:delivered': retained,
       'm:2026-10-18:expired': retained,
+      'm:2026-10-18:push:ok': retained,
     });
   });
 });

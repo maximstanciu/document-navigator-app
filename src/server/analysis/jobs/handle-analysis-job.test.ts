@@ -3,6 +3,7 @@ import { ANALYZE_FIELDS, analysisJobStateSchema } from '@/shared/analysis/contra
 import { ANALYSIS_FIXTURES, llmOutputFixture } from '@/shared/analysis/fixtures';
 import { API_HEADERS } from '@/shared/api-headers';
 
+import type { PushOutcome } from '../../limits/usage-keys';
 import { readBetaReport } from '../../metrics/beta-report';
 import { hashDeviceId } from '../../privacy/pseudonyms';
 import {
@@ -18,6 +19,7 @@ import { TEST_RESULT_TTL_MS, testJobDeps, type TestJobDeps } from '../../testing
 import * as finalizeModule from '../finalize-analysis';
 import { LlmProviderError, type LlmProvider } from '../llm-provider';
 import { MockLlmProvider } from '../providers/mock-llm-provider';
+import { analysisPushMessage, type AnalysisPushMessage } from './analysis-push';
 import {
   handleDeleteAnalysis,
   handleGetAnalysis,
@@ -483,6 +485,137 @@ describe('PATCH /api/v1/analyses/{jobId}', () => {
   ])('400 invalid_request for %s', async (_label, body) => {
     await put();
     await expectError(await patch(body), 400, 'invalid_request');
+  });
+});
+
+describe('the push about the end of a job (ANL-12)', () => {
+  const withToken = { fields: { [ANALYZE_FIELDS.pushToken]: TEST_PUSH_TOKEN } };
+
+  /** A push sender that records the messages and answers with `outcome` once `release` resolves. */
+  function pushing(outcome: PushOutcome = 'ok', release: Promise<void> = Promise.resolve()) {
+    const messages: AnalysisPushMessage[] = [];
+    const push = jest.fn(async (message: AnalysisPushMessage) => {
+      messages.push(message);
+      await release;
+      return outcome;
+    });
+    return { push, messages };
+  }
+
+  it('goes out once the result is ready, in the interface language', async () => {
+    const { push, messages } = pushing();
+    const statusWhenSent: (string | undefined)[] = [];
+    push.mockImplementationOnce(async (message) => {
+      messages.push(message);
+      statusWhenSent.push(deps.jobs.get(await testDevice(), TEST_JOB_ID)?.result?.status);
+      return 'ok';
+    });
+    deps = testJobDeps({ push });
+
+    await put({ fields: { ...withToken.fields, [ANALYZE_FIELDS.uiLocale]: 'en' } });
+    await deps.worker.idle();
+
+    expect(messages).toEqual([
+      analysisPushMessage({
+        to: TEST_PUSH_TOKEN,
+        jobId: TEST_JOB_ID,
+        uiLocale: 'en',
+        status: 'done',
+      }),
+    ]);
+    expect(statusWhenSent).toEqual(['done']);
+    expect(await stateOf(await get())).toMatchObject({ status: 'done' });
+  });
+
+  it('tells about a failed job too', async () => {
+    const { push, messages } = pushing();
+    deps = testJobDeps({ push, provider: failing(new LlmProviderError('analysis_failed', 'x')) });
+
+    await put(withToken);
+    await deps.worker.idle();
+
+    expect(messages).toEqual([
+      analysisPushMessage({
+        to: TEST_PUSH_TOKEN,
+        jobId: TEST_JOB_ID,
+        uiLocale: 'ru',
+        status: 'failed',
+      }),
+    ]);
+  });
+
+  it('goes to the token the app gave last (PATCH)', async () => {
+    const { provider, calls } = gatedProvider();
+    const { push, messages } = pushing();
+    deps = testJobDeps({ provider, push });
+    const token = 'ExponentPushToken[yyyyyyyyyyyyyyyyyyyyyy]';
+    await put();
+    await patch(JSON.stringify({ pushToken: token }));
+
+    calls[0].answer();
+    await deps.worker.idle();
+
+    expect(messages.map((message) => message.to)).toEqual([token]);
+  });
+
+  it('isn’t sent without a token, without EXPO_ACCESS_TOKEN or for a cancelled job', async () => {
+    const { push } = pushing();
+    deps = testJobDeps({ push });
+    await put();
+    await deps.worker.idle();
+    expect(push).not.toHaveBeenCalled();
+
+    deps = testJobDeps({ push: null });
+    await put(withToken);
+    await deps.worker.idle();
+    expect(await stateOf(await get())).toMatchObject({ status: 'done' });
+
+    const { provider, calls } = gatedProvider();
+    deps = testJobDeps({ provider, push });
+    await put(withToken);
+    await remove();
+    await deps.worker.idle();
+    expect(calls[0].aborted()).toBe(true);
+    expect(push).not.toHaveBeenCalled();
+    expect(ofType('push.sent')).toEqual([]);
+  });
+
+  it('logs and counts how it went, never the token, and the result stays', async () => {
+    const { push } = pushing('DeviceNotRegistered');
+    deps = testJobDeps({ push });
+
+    await put(withToken);
+    await deps.worker.idle();
+
+    const [end] = ofType('analysis.end');
+    expect(ofType('push.sent')).toEqual([
+      { event: 'push.sent', job: end.job, outcome: 'DeviceNotRegistered' },
+    ]);
+    expect(JSON.stringify(deps.events)).not.toContain(TEST_PUSH_TOKEN);
+    const [today] = await readBetaReport(deps.store, deps.now(), 1);
+    expect(today.pushes).toMatchObject({ DeviceNotRegistered: 1, ok: 0 });
+    expect(await stateOf(await get())).toMatchObject({ status: 'done' });
+  });
+
+  it('doesn’t hold up the next job', async () => {
+    const { provider, calls } = gatedProvider();
+    let release!: () => void;
+    const { push } = pushing('ok', new Promise((resolve) => (release = resolve)));
+    deps = testJobDeps({ provider, push });
+    await put(withToken);
+    await put({ jobId: JOB_B });
+
+    calls[0].answer();
+    await settle();
+
+    expect(push).toHaveBeenCalledTimes(1);
+    expect(calls).toHaveLength(2);
+    expect(ofType('push.sent')).toEqual([]);
+
+    release();
+    calls[1].answer();
+    await deps.worker.idle();
+    expect(ofType('push.sent')).toHaveLength(1);
   });
 });
 

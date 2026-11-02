@@ -1,7 +1,7 @@
 import type { ClientPlatform } from '@/shared/api-headers';
 
 import type { JobOutcome } from '../limits/analysis-usage';
-import type { UploadEndCode } from '../limits/usage-keys';
+import type { PushOutcome, UploadEndCode } from '../limits/usage-keys';
 import { testServerDeps } from '../testing/server-deps';
 import { readBetaReport } from './beta-report';
 
@@ -11,7 +11,8 @@ type Deps = ReturnType<typeof testServerDeps>;
 
 /**
  * One upload and what came of it: `upload: null` broke off; an accepted job ends with `job`
- * (`null`: lost on a restart) and its result is `fetched`, `expired` or neither.
+ * (`null`: lost on a restart), the push about it goes as `push` says, and its result is `fetched`,
+ * `expired` or neither.
  */
 async function analysis(
   deps: Deps,
@@ -20,12 +21,14 @@ async function analysis(
     platform = 'android' as ClientPlatform,
     upload = 'accepted',
     job = null,
+    push = null,
     result = null,
   }: {
     device?: string;
     platform?: ClientPlatform;
     upload?: UploadEndCode | null;
     job?: JobOutcome | null;
+    push?: PushOutcome | null;
     result?: 'fetched' | 'expired' | null;
   }
 ) {
@@ -33,6 +36,7 @@ async function analysis(
   if (!upload) return;
   await deps.usage.uploadEnded(session, upload);
   if (job) await deps.usage.jobEnded(session, job);
+  if (push) await deps.usage.pushSent(session, push);
   if (result === 'fetched') await deps.usage.delivered(session);
   if (result === 'expired') await deps.usage.expired(session);
 }
@@ -51,9 +55,15 @@ const failed = (code: JobOutcome['code']): JobOutcome => ({
 describe('readBetaReport', () => {
   it('reports a day of uploads and jobs with the SPEC §8.7 shares', async () => {
     const deps = testServerDeps();
-    await analysis(deps, { job: ok(true), result: 'fetched' });
-    await analysis(deps, { job: ok(false), result: 'expired' });
-    await analysis(deps, { device: 'd2', platform: 'ios', job: ok(true), result: 'fetched' });
+    await analysis(deps, { job: ok(true), push: 'ok', result: 'fetched' });
+    await analysis(deps, { job: ok(false), push: 'DeviceNotRegistered', result: 'expired' });
+    await analysis(deps, {
+      device: 'd2',
+      platform: 'ios',
+      job: ok(true),
+      push: 'ok',
+      result: 'fetched',
+    });
     await analysis(deps, { device: 'd2', platform: 'ios', upload: null });
     await analysis(deps, { device: 'd3', platform: 'ios', upload: 'rate_limited' });
     await analysis(deps, { device: 'd3', upload: 'too_many_jobs' });
@@ -86,6 +96,7 @@ describe('readBetaReport', () => {
       delivered: 2,
       expired: 1,
       withDeadline: 2,
+      pushes: expect.objectContaining({ ok: 2, DeviceNotRegistered: 1, network: 0 }),
       devices: 3,
       returningDevices: 0,
       costUsd: 0.06,

@@ -1,6 +1,7 @@
 import { DAILY_ANALYSES_PER_DEVICE } from '@/shared/limits';
 
 import { onJobExpired } from '../analysis/jobs/analysis-job';
+import type { PushSender } from '../analysis/jobs/analysis-push';
 import { AnalysisWorker } from '../analysis/jobs/analysis-worker';
 import type { AnalysisJobDeps } from '../analysis/jobs/job-deps';
 import { MemoryAnalysisJobStore } from '../analysis/jobs/job-store';
@@ -70,15 +71,17 @@ export type TestJobDeps = TestServerDeps & AnalysisJobDeps & { worker: AnalysisW
 
 /**
  * `testServerDeps()` with the upload handler's own: a worker over the test jobs with `provider`
- * (by default `MockLlmProvider` without a delay) and the queue's size.
+ * (by default `MockLlmProvider` without a delay) and `push` (by default none), and the queue's size.
  */
 export function testJobDeps({
   provider = new MockLlmProvider(),
+  push = null,
   concurrency = 1,
   queueMax = 20,
   ...server
 }: Parameters<typeof testServerDeps>[0] & {
   provider?: LlmProvider;
+  push?: PushSender | null;
   concurrency?: number;
   queueMax?: number;
 } = {}): TestJobDeps {
@@ -90,6 +93,7 @@ export function testJobDeps({
     log: deps.log,
     now: deps.now,
     concurrency,
+    push,
   });
   return { ...deps, worker, queueMax };
 }

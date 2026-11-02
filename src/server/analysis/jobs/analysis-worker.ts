@@ -12,6 +12,7 @@ import {
   type JobResult,
   type ModelFacts,
 } from './analysis-job';
+import { analysisPushMessage, type PushSender } from './analysis-push';
 import type { AnalysisJobStore } from './job-store';
 
 export type AnalysisWorkerOptions = {
@@ -22,6 +23,8 @@ export type AnalysisWorkerOptions = {
   now: () => number;
   /** Jobs analyzed at once (`ANALYSIS_CONCURRENCY`): 1 for a model on a CPU, which answers one by one. */
   concurrency: number;
+  /** Sends the push about a finished job (ANL-12); `null` sends none (no `EXPO_ACCESS_TOKEN`). */
+  push: PushSender | null;
 };
 
 type Ending = { code: JobEndCode; result: JobResult; error: string | null };
@@ -31,9 +34,11 @@ type Ending = { code: JobEndCode; result: JobResult; error: string | null };
  * to the model, checks and post-processes its answer (SPEC §7.4) and records the result in the
  * store. Each job logs `analysis.start` and `analysis.end`. A job removed while the model works is
  * cancelled: its model call is aborted (`AbortSignal`) and its result, if any, dropped (ANL-13).
+ * A job that ended otherwise sends the push about it, if the app gave a token (ANL-12).
  */
 export class AnalysisWorker {
   private readonly running = new Set<Promise<void>>();
+  private readonly pushes = new Set<Promise<void>>();
 
   constructor(private readonly options: AnalysisWorkerOptions) {}
 
@@ -50,9 +55,11 @@ export class AnalysisWorker {
     }
   }
 
-  /** Resolves once no job is running and none waits to start. */
+  /** Resolves once no job is running, none waits to start and every push has gone out. */
   async idle(): Promise<void> {
-    while (this.running.size > 0) await Promise.all(this.running);
+    while (this.running.size > 0 || this.pushes.size > 0) {
+      await Promise.all([...this.running, ...this.pushes]);
+    }
   }
 
   /** Never rejects: nobody awaits a job, and an unhandled rejection would stop the server. */
@@ -77,8 +84,12 @@ export class AnalysisWorker {
     } catch (error) {
       ending = endingOf(error, job.controller.signal);
     }
-    // Removed while the model worked: the app cancelled the analysis (ANL-13).
-    if (!store.finish(job, ending.result)) ending = { ...ending, code: 'cancelled', error: null };
+    if (store.finish(job, ending.result)) {
+      this.notify(job, ending.result);
+    } else {
+      // Removed while the model worked: the app cancelled the analysis (ANL-13).
+      ending = { ...ending, code: 'cancelled', error: null };
+    }
 
     log(
       analysisEndEvent(job, {
@@ -94,6 +105,30 @@ export class AnalysisWorker {
       costUsd: facts.costUsd,
       hasDeadline: ending.code === 'ok' && (facts.deadlines ?? 0) > 0,
     });
+  }
+
+  /**
+   * Sends the push about the job's end to the token the app gave last, if any (ANL-12), and logs
+   * `push.sent` without the token. The queue doesn't wait for it; `idle()` does.
+   */
+  private notify(job: AnalysisJob, result: JobResult) {
+    const { push, log, usage } = this.options;
+    const to = job.pushToken;
+    if (!push || !to) return;
+    const sending: Promise<void> = (async () => {
+      const message = analysisPushMessage({
+        to,
+        jobId: job.jobId,
+        uiLocale: job.uiLocale,
+        status: result.status,
+      });
+      const outcome = await push(message);
+      log({ event: 'push.sent', job: job.job, outcome });
+      await usage.pushSent(job.usage, outcome);
+    })()
+      .catch(reportError)
+      .finally(() => this.pushes.delete(sending));
+    this.pushes.add(sending);
   }
 
   /**

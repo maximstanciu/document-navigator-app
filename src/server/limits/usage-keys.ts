@@ -41,6 +41,34 @@ export const JOB_END_CODES = [
 
 export type JobEndCode = (typeof JOB_END_CODES)[number];
 
+/**
+ * Error codes of Expo Push Service kept as they are (SPEC §7.1): of the whole request, then of the
+ * push ticket. Any other code is `unexpected`.
+ */
+export const EXPO_PUSH_ERRORS = [
+  'UNAUTHORIZED',
+  'TOO_MANY_REQUESTS',
+  'DeviceNotRegistered',
+  'MessageTooBig',
+  'MessageRateExceeded',
+  'MismatchSenderId',
+  'InvalidCredentials',
+] as const;
+
+/**
+ * How the push about a finished job went, as `push.sent` logs it (ANL-12, SPEC §7.1): `ok` once
+ * Expo took it, `network` and `server_error` when even the retry got no answer or a `5xx`.
+ */
+export const PUSH_OUTCOMES = [
+  'ok',
+  'network',
+  'server_error',
+  ...EXPO_PUSH_ERRORS,
+  'unexpected',
+] as const;
+
+export type PushOutcome = (typeof PUSH_OUTCOMES)[number];
+
 export const METRICS_RETENTION_DAYS = 90;
 
 export const TTL_SECONDS = {
@@ -66,6 +94,8 @@ export const USAGE_KEYS = {
   expired: (day: string) => `m:${day}:expired`,
   /** Successful analyses that found at least one deadline. */
   withDeadline: (day: string) => `m:${day}:deadline`,
+  /** How the pushes about that day's jobs went. */
+  push: (day: string, outcome: PushOutcome) => `m:${day}:push:${outcome}`,
   /** Pseudonyms of the devices that tried an analysis that day. */
   devices: (day: string) => `m:${day}:devices`,
 };

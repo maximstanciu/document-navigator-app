@@ -25,7 +25,7 @@ git clone <репозиторий> docnavigator && cd docnavigator/deploy
 cp .env.example .env
 ```
 
-Заполните в `deploy/.env` три обязательные переменные: `API_DOMAIN`, `DEVICE_ID_HASH_KEY`, `COUNTER_STORE_TOKEN` (секреты — `openssl rand -hex 32`). `DEVICE_ID_HASH_KEY` после запуска не меняйте: новый ключ обнуляет дневные лимиты и разрывает метрики беты.
+Заполните в `deploy/.env` три обязательные переменные: `API_DOMAIN`, `DEVICE_ID_HASH_KEY`, `COUNTER_STORE_TOKEN` (секреты — `openssl rand -hex 32`). `DEVICE_ID_HASH_KEY` после запуска не меняйте: новый ключ обнуляет дневные лимиты и разрывает метрики беты. Для push о готовности анализа (ANL-12) нужен ещё `EXPO_ACCESS_TOKEN` — токен доступа аккаунта Expo при включённой защите push в проекте EAS; без него push не отправляется, и приложение получает результат, когда его откроют.
 
 ```bash
 docker compose up -d --build
@@ -60,7 +60,7 @@ adb install -r app/build/outputs/apk/release/app-release.apk
 
 ```bash
 git pull && docker compose up -d --build   # пересобрать и заменить api; анализу в работе даётся 95 с, более долгий обрывается
-docker compose logs -f api                 # события analyze.start / analyze.end, одна строка JSON (modelMs — сколько думала модель)
+docker compose logs -f api                 # события upload.*, analysis.*, push.sent, одна строка JSON (modelMs — сколько думала модель)
 curl -H "Authorization: Bearer $METRICS_TOKEN" https://api.example.com/api/v1/metrics   # отчёт беты, если задан METRICS_TOKEN
 ```
 

@@ -5,6 +5,7 @@ import {
   type ServerEnv,
 } from '../../server-deps';
 import { createLlmProvider } from '../create-llm-provider';
+import { createPushSender } from './analysis-push';
 import { AnalysisWorker } from './analysis-worker';
 
 /** What the upload handler needs on top of the server's dependencies. */
@@ -36,7 +37,8 @@ const shared = globalThis as typeof globalThis & { __docnavigatorAnalysisWorker?
 
 /**
  * The upload handler's dependencies: the server's, the queue's size and the worker with the model
- * (`createLlmProvider()`). The worker is made with the first upload and lives as long as the process.
+ * (`createLlmProvider()`) and the push sender (`createPushSender()`). The worker is made with the
+ * first upload and lives as long as the process.
  */
 export function createAnalysisJobDeps(env: ServerEnv = process.env): AnalysisJobDeps {
   const deps = createServerDeps(env);
@@ -48,6 +50,7 @@ export function createAnalysisJobDeps(env: ServerEnv = process.env): AnalysisJob
     log: deps.log,
     now: deps.now,
     concurrency,
+    push: createPushSender(env),
   });
   return { ...deps, worker: shared.__docnavigatorAnalysisWorker, queueMax };
 }
