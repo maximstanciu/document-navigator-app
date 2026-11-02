@@ -28,6 +28,7 @@ import { scoreCase, type CaseRun } from './score';
 
 const EVAL_DIR = import.meta.dirname;
 const PYTHON = join(EVAL_DIR, '.venv/bin/python');
+const MAX_UNAVAILABLE_IN_A_ROW = 3;
 
 type RunMeta = { provider: string; locale: string; startedAt: string; set: string };
 
@@ -71,15 +72,33 @@ async function main() {
   );
 
   if (!options['report-only']) {
+    // A server that went away (a redeploy, a dropped tunnel) fails every case left in seconds. An
+    // `unavailable` case is saved only once the model answers after it; after a few in a row the
+    // run stops unsaved, so `--run` resumes there.
+    const save = (file: string, run: CaseRun) =>
+      writeFileSync(file, JSON.stringify(run, null, 2) + '\n');
+    const unavailable: { file: string; run: CaseRun }[] = [];
     for (const [index, evalCase] of cases.entries()) {
       const file = join(runDir, 'cases', `${evalCase.id}.json`);
       if (existsSync(file)) continue;
       const position = `[${index + 1}/${cases.length}] ${evalCase.id} ${evalCase.name}`;
       process.stdout.write(`${position} ... `);
       const run = await runCase(provider, evalCase, locale, join(runDir, 'pages', evalCase.id));
-      writeFileSync(file, JSON.stringify(run, null, 2) + '\n');
       const ms = run.ms === null ? '' : ` in ${(run.ms / 1000).toFixed(0)} s`;
       console.log(`${run.outcome.kind === 'analysis' ? 'done' : run.outcome.code}${ms}`);
+      if (run.outcome.kind === 'failed' && run.outcome.code === 'unavailable') {
+        unavailable.push({ file, run });
+        if (unavailable.length === MAX_UNAVAILABLE_IN_A_ROW) break;
+        continue;
+      }
+      for (const pending of unavailable.splice(0)) save(pending.file, pending.run);
+      save(file, run);
+    }
+    if (unavailable.length > 0) {
+      console.log(
+        `${unavailable.length} cases not saved: the model was unavailable. ` +
+          `Resume with --run ${relative(process.cwd(), runDir)}.`
+      );
     }
   }
 
