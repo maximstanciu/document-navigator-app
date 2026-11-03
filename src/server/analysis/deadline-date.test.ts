@@ -27,7 +27,13 @@ function computed(
   confidence: 'high' | 'medium' | 'low' = 'medium'
 ) {
   return deadlineDate(
-    { date: MODEL_DATE, dateSource: 'computed', rule: ruleOrNull, confidence },
+    {
+      date: MODEL_DATE,
+      dateSource: 'computed',
+      rule: ruleOrNull,
+      confidence,
+      sourceQuote: 'Innerhalb von zwei Wochen nach Zustellung.',
+    },
     { ...CONTEXT, ...context }
   );
 }
@@ -41,13 +47,17 @@ describe('deadlineDate', () => {
       ['document_date', '2026-10-23'],
       ['receipt', '2026-10-23'],
     ] as const)('counts "%s" from the document date', (from, expected) => {
-      expect(computed(rule({ from }))).toEqual({ date: expected, confidence: 'medium' });
+      expect(computed(rule({ from }))).toEqual({
+        date: expected,
+        dateSource: 'computed',
+        confidence: 'medium',
+      });
     });
 
     it('counts "date_in_text" from the date the text gives', () => {
       expect(
         computed(rule({ from: 'date_in_text', fromDate: '2027-01-31', direction: 'before' }))
-      ).toEqual({ date: '2027-01-17', confidence: 'medium' });
+      ).toEqual({ date: '2027-01-17', dateSource: 'computed', confidence: 'medium' });
     });
 
     it('ignores a date from the text unless the rule starts from it', () => {
@@ -59,6 +69,7 @@ describe('deadlineDate', () => {
       (from) => {
         expect(computed(rule({ from }), { documentDate: null })).toEqual({
           date: '2026-11-01',
+          dateSource: 'computed',
           confidence: 'low',
         });
       }
@@ -67,7 +78,7 @@ describe('deadlineDate', () => {
     it('keeps the confidence of a count from a date in the text without a document date', () => {
       expect(
         computed(rule({ from: 'date_in_text', fromDate: '2026-11-01' }), { documentDate: null })
-      ).toEqual({ date: '2026-11-15', confidence: 'medium' });
+      ).toEqual({ date: '2026-11-15', dateSource: 'computed', confidence: 'medium' });
     });
   });
 
@@ -151,7 +162,73 @@ describe('deadlineDate', () => {
       ['a negative amount', rule({ amount: -2 })],
       ['a fractional amount', rule({ amount: 1.5 })],
     ])('keeps the model date with low confidence for %s', (_case, ruleOrNull) => {
-      expect(computed(ruleOrNull, {}, 'high')).toEqual({ date: MODEL_DATE, confidence: 'low' });
+      expect(computed(ruleOrNull, {}, 'high')).toEqual({
+        date: MODEL_DATE,
+        dateSource: 'computed',
+        confidence: 'low',
+      });
+    });
+  });
+
+  describe('a date the quote writes out', () => {
+    const quoted = (
+      date: string,
+      sourceQuote: string,
+      ruleOrNull: DeadlineRule = rule(),
+      confidence: 'high' | 'medium' | 'low' = 'high'
+    ) =>
+      deadlineDate(
+        { date, dateSource: 'computed', rule: ruleOrNull, confidence, sourceQuote },
+        CONTEXT
+      );
+
+    it('keeps the model date and confidence as an explicit deadline', () => {
+      // The rule would give 2026-10-23.
+      expect(quoted(MODEL_DATE, 'Bitte zahlen Sie bis zum 01.12.2026.')).toEqual({
+        date: MODEL_DATE,
+        dateSource: 'explicit',
+        confidence: 'high',
+      });
+    });
+
+    it('keeps it with a rule that lacks what the count needs', () => {
+      expect(quoted(MODEL_DATE, 'Bitte zahlen Sie bis zum 01.12.2026.', null).dateSource).toBe(
+        'explicit'
+      );
+    });
+
+    it('counts by the rule when the quote writes another date', () => {
+      expect(quoted(MODEL_DATE, 'Bescheid vom 09.10.2026, Einspruch binnen zwei Wochen.')).toEqual({
+        date: '2026-10-23',
+        dateSource: 'computed',
+        confidence: 'medium',
+      });
+    });
+
+    it('counts back from the quoted date when the rule starts there', () => {
+      const ending = rule({
+        from: 'date_in_text',
+        fromDate: '2027-01-31',
+        direction: 'before',
+        amount: 3,
+        unit: 'month',
+      });
+      expect(
+        quoted('2027-01-31', 'Kündigung bis drei Monate vor Ablauf am 31.01.2027.', ending)
+      ).toEqual({ date: '2026-10-31', dateSource: 'computed', confidence: 'medium' });
+    });
+
+    it('keeps the quoted date when the rule counts forward from it', () => {
+      // The model can't send `amount: 0`, so it says "1 day after" the date itself.
+      const sameDay = rule({
+        from: 'date_in_text',
+        fromDate: '2026-11-11',
+        amount: 1,
+        unit: 'day',
+      });
+      expect(quoted('2026-11-11', 'Wir buchen am 11.11.2026 per Lastschrift ab.', sameDay)).toEqual(
+        { date: '2026-11-11', dateSource: 'explicit', confidence: 'high' }
+      );
     });
   });
 
@@ -167,10 +244,16 @@ describe('deadlineDate', () => {
     it('keeps the date and confidence of an explicit deadline, rule or not', () => {
       expect(
         deadlineDate(
-          { date: MODEL_DATE, dateSource: 'explicit', rule: rule(), confidence: 'high' },
+          {
+            date: MODEL_DATE,
+            dateSource: 'explicit',
+            rule: rule(),
+            confidence: 'high',
+            sourceQuote: 'Innerhalb von zwei Wochen nach Zustellung.',
+          },
           CONTEXT
         )
-      ).toEqual({ date: MODEL_DATE, confidence: 'high' });
+      ).toEqual({ date: MODEL_DATE, dateSource: 'explicit', confidence: 'high' });
     });
   });
 });

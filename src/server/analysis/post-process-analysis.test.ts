@@ -26,10 +26,14 @@ function deadline(changes: Partial<ShapeDeadline> = {}): ShapeDeadline {
   return { ...notice().deadlines[0], ...changes };
 }
 
-/** A computed deadline: two weeks from receipt, which the server counts from the document date. */
+/**
+ * A computed deadline: two weeks from receipt, which the server counts from the document date. Its
+ * quote, the notice's appeal deadline, writes no date out.
+ */
 function computed(rule: Partial<Rule> | null = {}, changes: Partial<ShapeDeadline> = {}) {
   return deadline({
     dateSource: 'computed',
+    sourceQuote: notice().deadlines[1].sourceQuote,
     rule:
       rule === null
         ? null
@@ -149,6 +153,30 @@ describe('postProcessAnalysis', () => {
     it('takes the rule out of every deadline', () => {
       const result = run(notice({ deadlines: [computed(), deadline({ rule: computed().rule })] }));
       for (const counted of result.deadlines) expect(counted).not.toHaveProperty('rule');
+    });
+
+    it('makes a computed deadline explicit when its quote writes out the date', () => {
+      // The notice's deadline "bis zum 06.11.2026", which the model called computed.
+      const result = run(
+        notice({
+          deadlines: [
+            computed(
+              { amount: 47, unit: 'day' },
+              {
+                sourceQuote: deadline().sourceQuote,
+                computation: '47 дней от даты письма',
+                confidence: 'high',
+              }
+            ),
+          ],
+        })
+      );
+      expect(result.deadlines[0]).toMatchObject({
+        date: '2026-11-06',
+        dateSource: 'explicit',
+        computation: null,
+        confidence: 'high',
+      });
     });
 
     it('ignores the rule of an explicit deadline', () => {
@@ -316,7 +344,7 @@ describe('postProcessAnalysis', () => {
       const base = notice();
       const result = run(
         notice({
-          deadlines: [deadline({ sourceQuote: long, computation: long, description: long })],
+          deadlines: [computed({}, { sourceQuote: long, computation: long, description: long })],
           risks: [{ ...base.risks[0], explanation: long, sourceQuote: long, title: long }],
         })
       );

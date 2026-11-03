@@ -1,6 +1,8 @@
 import type { Level, LlmAnalysisShape } from '@/shared/analysis/schema';
 import { addDays, addMonths, endOfPeriod, isCalendarDate } from '@/shared/calendar-date';
 
+import { quoteWritesDate } from './quoted-date';
+
 type ShapeDeadline = LlmAnalysisShape['deadlines'][number];
 
 export type DeadlineDateContext = {
@@ -11,8 +13,14 @@ export type DeadlineDateContext = {
 };
 
 /**
- * The date of a deadline and how sure it is (SPEC §7.4, rule 3). An explicit deadline keeps the
- * model's date. A computed one is counted by its `rule` so that it is never later than the real
+ * The date of a deadline, whether it is explicit or computed, and how sure it is (SPEC §7.4,
+ * rule 3). An explicit deadline keeps the model's date. So does a computed one whose quote writes
+ * that date out: the model often calls a date from the text computed and makes up a rule that
+ * gives it. Such a deadline becomes explicit, unless its rule counts back from that very date
+ * ("3 months before 31.01.2027"): then the date in the text isn't the deadline, and keeping it
+ * would make the deadline later than the real one.
+ *
+ * Any other computed deadline is counted by its `rule` so that it is never later than the real
  * deadline:
  *
  * - "From the document date" and "from receipt" start at the document date, since a letter can't
@@ -29,23 +37,22 @@ export type DeadlineDateContext = {
  * A computed date is never `high` confidence. The range check comes after this.
  */
 export function deadlineDate(
-  deadline: Pick<ShapeDeadline, 'date' | 'dateSource' | 'rule' | 'confidence'>,
+  deadline: Pick<ShapeDeadline, 'date' | 'dateSource' | 'rule' | 'confidence' | 'sourceQuote'>,
   { documentDate, today }: DeadlineDateContext
-): { date: string; confidence: Level } {
-  if (deadline.dateSource === 'explicit') {
-    return { date: deadline.date, confidence: deadline.confidence };
-  }
-  const { rule } = deadline;
-  if (rule === null || !Number.isInteger(rule.amount) || rule.amount < 1) {
-    return { date: deadline.date, confidence: 'low' };
-  }
+): { date: string; dateSource: ShapeDeadline['dateSource']; confidence: Level } {
+  const explicit = {
+    date: deadline.date,
+    dateSource: 'explicit',
+    confidence: deadline.confidence,
+  } as const;
+  if (deadline.dateSource === 'explicit') return explicit;
 
-  let start: string;
-  if (rule.from === 'date_in_text') {
-    if (!isCalendarDate(rule.fromDate)) return { date: deadline.date, confidence: 'low' };
-    start = rule.fromDate;
-  } else {
-    start = documentDate ?? today;
+  const { rule } = deadline;
+  const start = countStart(rule, documentDate ?? today);
+  const countsBack = rule?.direction === 'before' && deadline.date === start;
+  if (!countsBack && quoteWritesDate(deadline.sourceQuote, deadline.date)) return explicit;
+  if (rule === null || start === null) {
+    return { date: deadline.date, dateSource: 'computed', confidence: 'low' };
   }
 
   const amount = rule.direction === 'after' ? rule.amount : -rule.amount;
@@ -64,5 +71,12 @@ export function deadlineDate(
     : deadline.confidence === 'high'
       ? 'medium'
       : deadline.confidence;
-  return { date, confidence };
+  return { date, dateSource: 'computed', confidence };
+}
+
+/** Where the rule's count starts, or `null` when the rule lacks what the count needs. */
+function countStart(rule: ShapeDeadline['rule'], documentDateOrToday: string): string | null {
+  if (rule === null || !Number.isInteger(rule.amount) || rule.amount < 1) return null;
+  if (rule.from !== 'date_in_text') return documentDateOrToday;
+  return isCalendarDate(rule.fromDate) ? rule.fromDate : null;
 }

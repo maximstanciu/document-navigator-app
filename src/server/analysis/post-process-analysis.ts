@@ -21,8 +21,9 @@ export type PostProcessContext = {
  * passes `analysisResultSchema` (SPEC §7.4). Nothing here is a reason to ask the model again.
  *
  * - Dates: `documentDate` that isn't a calendar date or is more than 10 years ahead becomes `null`.
- *   A computed deadline is counted by its `rule` and is never `high` confidence (rule 3,
- *   `deadlineDate()`); the rule itself doesn't reach the client. Then deadlines outside
+ *   A computed deadline whose quote writes out its date becomes explicit; any other is counted by
+ *   its `rule` and is never `high` confidence (rule 3, `deadlineDate()`). The rule doesn't reach
+ *   the client, nor does `computation` of an explicit deadline. Then deadlines outside
  *   `(documentDate ?? today) − 1 year … today + 10 years` are dropped; a document date in the
  *   future anchors the range on `today`. A time that isn't `HH:mm` becomes `null`.
  * - Ids are renumbered `d1…`, `a1…`; an action whose deadline was dropped or never existed loses
@@ -63,7 +64,10 @@ export function postProcessAnalysis(
         date: deadline.date,
         time: isClockTime(deadline.time) ? deadline.time : null,
         dateSource: deadline.dateSource,
-        computation: clipOrNull(deadline.computation, B.computation),
+        computation:
+          deadline.dateSource === 'computed'
+            ? clipOrNull(deadline.computation, B.computation)
+            : null,
         sourceQuote: clip(deadline.sourceQuote, B.quote),
         page: toPage(deadline.page),
         confidence: deadline.confidence,
