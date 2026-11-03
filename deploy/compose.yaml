@@ -88,6 +88,11 @@ services:
       OLLAMA_CONTEXT_LENGTH: ${LLM_CONTEXT_LENGTH:-32768}
       OLLAMA_NUM_PARALLEL: '1'
       OLLAMA_MAX_LOADED_MODELS: '1'
+      # Ollama's llama-server reads its flags from LLAMA_ARG_* too. Its prompt cache in RAM (8 GB by
+      # default) copies every finished prompt when the next one starts: a 50-page PDF adds about
+      # 2.5 GB at once, more than the model leaves free, and the kernel kills the runner. The one
+      # slot keeps the system prompt read without it (deploy/README.md, «Модель»).
+      LLAMA_ARG_CACHE_RAM: '0'
     volumes:
       - ollama-models:/root/.ollama
     healthcheck:
