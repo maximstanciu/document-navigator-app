@@ -1,3 +1,4 @@
+import { useQuery } from '@tanstack/react-query';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { StyleSheet, View } from 'react-native';
@@ -7,6 +8,8 @@ import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Spacing } from '@/constants/theme';
+import { openNotificationSettings } from '@/features/reminders/notifications';
+import { reminderQueries } from '@/features/reminders/queries';
 import type { DocumentRecord } from '@/lib/db/types';
 import { formatTimestampDateTime } from '@/lib/i18n/format';
 import { PDF_MIME_TYPE } from '@/shared/analysis/contract';
@@ -19,6 +22,7 @@ import {
   useIsUploading,
   useJobProgress,
   useLastAnalysisError,
+  useTurnOnAnalysisPush,
 } from '../queries';
 
 /**
@@ -45,9 +49,51 @@ function failureMessage(
 }
 
 /**
+ * «Notify me when ready» while a job waits without the permission for notifications (ANL-12,
+ * REM-5): asks for it, and explains how to allow notifications if it is denied. Nothing on web.
+ */
+function NotifyWhenAnalyzed() {
+  const { t } = useTranslation();
+  const { data: permission } = useQuery(reminderQueries.permission());
+  const turnOn = useTurnOnAnalysisPush();
+
+  if (!permission || permission === 'unavailable' || permission === 'granted') return null;
+  // Only after the person pressed the button, and only while the permission is still missing.
+  const denied = turnOn.isSuccess;
+  return (
+    <View style={styles.actions}>
+      <Button
+        label={t('analysis.notify.turnOn')}
+        variant="plain"
+        disabled={turnOn.isPending}
+        onPress={() => turnOn.mutate()}
+      />
+      {denied && (
+        <>
+          <ThemedText type="small" role="alert">
+            {t('analysis.notify.denied')}
+          </ThemedText>
+          <Button
+            label={t('analysis.notify.openSettings')}
+            variant="plain"
+            onPress={() => void openNotificationSettings()}
+          />
+        </>
+      )}
+      {turnOn.isError && (
+        <ThemedText type="small" role="alert">
+          {t('analysis.notify.failed')}
+        </ThemedText>
+      )}
+    </View>
+  );
+}
+
+/**
  * An analysis in progress (ANL-3): while the pages upload, the app must stay open; then the job
- * waits on the server, in the queue or being analyzed, and the app may be closed. Either way it
- * can be cancelled (ANL-13).
+ * waits on the server, in the queue or being analyzed, and the app may be closed: with
+ * notifications allowed, a push tells when it ends (ANL-12). Either way it can be cancelled
+ * (ANL-13).
  */
 function AnalysisProgress({
   documentId,
@@ -60,6 +106,7 @@ function AnalysisProgress({
   const uploading = useIsUploading(documentId);
   const progress = useJobProgress(documentId);
   const cancel = useCancelAnalysis();
+  const { data: permission } = useQuery(reminderQueries.permission());
 
   const queuedBehind = progress?.status === 'queued' && progress.ahead > 0 ? progress.ahead : 0;
   const status = uploading
@@ -76,8 +123,13 @@ function AnalysisProgress({
         <ProgressBar aria-hidden />
       </View>
       <ThemedText type="small" themeColor="textSecondary">
-        {uploading ? t('analysis.keepOpenWhileUploading') : t('analysis.canClose')}
+        {uploading
+          ? t('analysis.keepOpenWhileUploading')
+          : permission === 'granted'
+            ? t('analysis.canCloseNotified')
+            : t('analysis.canClose')}
       </ThemedText>
+      {!uploading && <NotifyWhenAnalyzed />}
       {hasPrevious && (
         <ThemedText type="small" themeColor="textSecondary">
           {t('analysis.previousShown')}
@@ -164,5 +216,6 @@ const styles = StyleSheet.create({
   },
   actions: {
     alignItems: 'flex-start',
+    gap: Spacing.one,
   },
 });

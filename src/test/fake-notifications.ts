@@ -2,16 +2,25 @@
 // Every test gets it (src/test/setup-native-modules.ts) with notifications unavailable, as on web;
 // a test that needs them sets `fakeNotifications.permission`.
 import type {
+  NotificationChannel,
   NotificationPermission,
-  OpenedReminder,
+  OpenedNotification,
   ReminderNotification,
 } from '@/features/reminders/notifications';
 
-export type { NotificationPermission, OpenedReminder, ReminderNotification };
+export type {
+  NotificationChannel,
+  NotificationPermission,
+  OpenedNotification,
+  ReminderNotification,
+};
 
-const openedListeners = new Set<(reminder: OpenedReminder) => void>();
+const openedListeners = new Set<(opened: OpenedNotification) => void>();
+const analysisPushListeners = new Set<(jobId: string) => void>();
+const tokenListeners = new Set<(token: string) => void>();
 
 export const DEADLINES_CHANNEL_ID = 'deadlines';
+export const ANALYSIS_CHANNEL_ID = 'analysis';
 
 export const fakeNotifications = {
   /** What `getNotificationPermission()` reports. */
@@ -21,23 +30,40 @@ export const fakeNotifications = {
   /** Pending notifications by identifier, as the OS holds them. */
   scheduled: new Map<string, ReminderNotification>(),
 
-  /** The last tap on a reminder, kept until cleared: set it before rendering for a cold start. */
-  lastOpened: null as OpenedReminder | null,
+  /** The last tap on a notification, kept until cleared: set it before rendering for a cold start. */
+  lastOpened: null as OpenedNotification | null,
+
+  /**
+   * What `getPushToken()` gives: the Expo push token, or `null` when the OS gives none (no FCM in
+   * the build, no Google Play services, no network).
+   */
+  pushToken: 'ExponentPushToken[fake-device]' as string | null,
 
   /** The pending notifications, soonest first. */
   pending(): ReminderNotification[] {
     return [...this.scheduled.values()].sort((a, b) => (a.fireAt < b.fireAt ? -1 : 1));
   },
 
-  /** The person taps a reminder while the app runs: the OS keeps it and tells the listeners. */
-  tap(reminder: OpenedReminder) {
-    this.lastOpened = reminder;
-    for (const listener of openedListeners) listener(reminder);
+  /** The person taps a notification while the app runs: the OS keeps it and tells the listeners. */
+  tap(opened: OpenedNotification) {
+    this.lastOpened = opened;
+    for (const listener of openedListeners) listener(opened);
+  },
+
+  /** A push about a finished analysis comes while the app is open (ANL-12). */
+  receiveAnalysisPush(jobId: string) {
+    for (const listener of analysisPushListeners) listener(jobId);
+  },
+
+  /** The push service gives the device a new token while the app runs. */
+  changePushToken(token: string) {
+    this.pushToken = token;
+    for (const listener of tokenListeners) listener(token);
   },
 };
 
 export const setUpNotifications = jest.fn(
-  async (_channel: { name: string; description: string }) => {}
+  async (_channels: { deadlines: NotificationChannel; analysis: NotificationChannel }) => {}
 );
 
 export const getNotificationPermission = jest.fn(async () => fakeNotifications.permission);
@@ -63,16 +89,37 @@ export const cancelNotification = jest.fn(async (id: string) => {
 
 export const dismissShownNotifications = jest.fn(async () => {});
 
-export const getLastOpenedReminder = jest.fn(() => fakeNotifications.lastOpened);
+export const getLastOpenedNotification = jest.fn(() => fakeNotifications.lastOpened);
 
-export const clearLastOpenedReminder = jest.fn(() => {
+export const clearLastOpenedNotification = jest.fn(() => {
   fakeNotifications.lastOpened = null;
 });
 
-export const addReminderOpenedListener = jest.fn((listener: (reminder: OpenedReminder) => void) => {
-  openedListeners.add(listener);
+export const addNotificationOpenedListener = jest.fn(
+  (listener: (opened: OpenedNotification) => void) => {
+    openedListeners.add(listener);
+    return () => {
+      openedListeners.delete(listener);
+    };
+  }
+);
+
+export const addAnalysisPushListener = jest.fn((listener: (jobId: string) => void) => {
+  analysisPushListeners.add(listener);
   return () => {
-    openedListeners.delete(listener);
+    analysisPushListeners.delete(listener);
+  };
+});
+
+export const getPushToken = jest.fn(async () => {
+  if (fakeNotifications.pushToken === null) throw new Error('No push token');
+  return fakeNotifications.pushToken;
+});
+
+export const addPushTokenChangeListener = jest.fn((listener: (token: string) => void) => {
+  tokenListeners.add(listener);
+  return () => {
+    tokenListeners.delete(listener);
   };
 });
 
@@ -84,7 +131,10 @@ export function resetFakeNotifications() {
   fakeNotifications.answer = 'granted';
   fakeNotifications.scheduled.clear();
   fakeNotifications.lastOpened = null;
+  fakeNotifications.pushToken = 'ExponentPushToken[fake-device]';
   openedListeners.clear();
+  analysisPushListeners.clear();
+  tokenListeners.clear();
   for (const fn of [
     setUpNotifications,
     getNotificationPermission,
@@ -93,9 +143,12 @@ export function resetFakeNotifications() {
     scheduleNotification,
     cancelNotification,
     dismissShownNotifications,
-    getLastOpenedReminder,
-    clearLastOpenedReminder,
-    addReminderOpenedListener,
+    getLastOpenedNotification,
+    clearLastOpenedNotification,
+    addNotificationOpenedListener,
+    addAnalysisPushListener,
+    getPushToken,
+    addPushTokenChangeListener,
     openNotificationSettings,
   ]) {
     fn.mockClear();

@@ -9,6 +9,11 @@ import { i18n } from '@/lib/i18n/i18n';
 import { isOnline } from '@/lib/network';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import { fakeFileSystem } from '@/test/fake-file-system';
+import {
+  fakeNotifications,
+  openNotificationSettings,
+  requestNotificationPermission,
+} from '@/test/fake-notifications';
 import { createTestProviders } from '@/test/render';
 import { installTestRepositories } from '@/test/sqlite';
 
@@ -46,7 +51,7 @@ const hang: Respond = (init) =>
   );
 
 /** The analysis server, by method; `DELETE` answers `204`. */
-const server: { PUT?: Respond; GET?: Respond; DELETE: Respond } = {
+const server: { PUT?: Respond; GET?: Respond; PATCH?: Respond; DELETE: Respond } = {
   DELETE: () => new Response(null, { status: 204 }),
 };
 
@@ -95,6 +100,7 @@ beforeEach(async () => {
   online.mockResolvedValue(true);
   delete server.PUT;
   delete server.GET;
+  delete server.PATCH;
   fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
     const respond = server[(init?.method ?? 'GET') as keyof typeof server];
     if (!respond) throw new TypeError(`Network request failed: ${String(url)}`);
@@ -106,6 +112,76 @@ afterEach(() => {
   setRepositories(null);
   jest.restoreAllMocks();
   focusManager.setFocused(undefined);
+});
+
+describe('AnalysisStatusPanel: the push about the end of the job (ANL-12)', () => {
+  const notifyButton = () => screen.queryByRole('button', { name: 'Notify me when ready' });
+
+  it('offers to notify while the job waits, and with the permission says a notification will come', async () => {
+    const user = userEvent.setup();
+    fakeNotifications.permission = 'undetermined';
+    server.GET = () => json(200, { status: 'queued', ahead: 1 });
+    server.PATCH = () => new Response(null, { status: 204 });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(
+      await screen.findByText(/the result will be here when you open it again/)
+    ).toBeOnTheScreen();
+    await user.press(await screen.findByRole('button', { name: 'Notify me when ready' }));
+
+    expect(
+      await screen.findByText(/you'll get a notification when the document is analyzed/)
+    ).toBeOnTheScreen();
+    expect(notifyButton()).not.toBeOnTheScreen();
+    expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
+    expect(sent('PATCH').map(([url, init]) => [url, init?.body])).toEqual([
+      ['/api/v1/analyses/job-1', JSON.stringify({ pushToken: 'ExponentPushToken[fake-device]' })],
+    ]);
+  });
+
+  it('explains how to allow notifications when they are denied (REM-5)', async () => {
+    const user = userEvent.setup();
+    fakeNotifications.permission = 'denied';
+    server.GET = () => json(200, { status: 'processing' });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    await user.press(await screen.findByRole('button', { name: 'Notify me when ready' }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "Notifications are off for this app. To hear when the document is analyzed, allow them in your phone's settings."
+    );
+    await user.press(screen.getByRole('button', { name: 'Open settings' }));
+    expect(openNotificationSettings).toHaveBeenCalledTimes(1);
+    expect(sent('PATCH')).toHaveLength(0);
+  });
+
+  it('does not offer it with notifications allowed', async () => {
+    fakeNotifications.permission = 'granted';
+    server.GET = () => json(200, { status: 'processing' });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(
+      await screen.findByText(/you'll get a notification when the document is analyzed/)
+    ).toBeOnTheScreen();
+    expect(notifyButton()).not.toBeOnTheScreen();
+  });
+
+  it('does not offer it during the upload, when the app must stay open', async () => {
+    const user = userEvent.setup();
+    fakeNotifications.permission = 'undetermined';
+    server.PUT = hang;
+    await seedDocument('draft');
+    await renderDocument();
+
+    await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
+
+    expect(await screen.findByText('Uploading the document…')).toBeOnTheScreen();
+    expect(notifyButton()).not.toBeOnTheScreen();
+    await user.press(screen.getByRole('button', { name: 'Cancel the analysis' }));
+  });
 });
 
 describe('AnalysisStatusPanel on the document screen', () => {

@@ -94,7 +94,7 @@
         {
           "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#208AEF",
-          "enableRemoteNotifications": false
+          "enableRemoteNotifications": true
         }
       ],
       [

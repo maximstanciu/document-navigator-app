@@ -3,7 +3,7 @@ import { currentLanguage, i18n } from '@/lib/i18n/i18n';
 
 import {
   cancelNotification,
-  clearLastOpenedReminder,
+  clearLastOpenedNotification,
   dismissShownNotifications,
   getNotificationPermission,
   listScheduledNotificationIds,
@@ -93,5 +93,5 @@ export function syncRemindersInBackground(): void {
 export async function clearAllReminders(): Promise<void> {
   await syncReminders();
   await dismissShownNotifications();
-  clearLastOpenedReminder();
+  clearLastOpenedNotification();
 }

@@ -1,12 +1,27 @@
-import type { NotificationPermission, OpenedReminder, ReminderNotification } from './notifications';
+import type {
+  NotificationChannel,
+  NotificationPermission,
+  OpenedNotification,
+  ReminderNotification,
+} from './notifications';
 
-export type { NotificationPermission, OpenedReminder, ReminderNotification } from './notifications';
+export type {
+  NotificationChannel,
+  NotificationPermission,
+  OpenedNotification,
+  ReminderNotification,
+} from './notifications';
 
-// Web is a development preview without notifications: reminders are neither offered nor scheduled.
+// Web is a development preview without notifications: reminders are neither offered nor scheduled,
+// and the result of an analysis comes by polling, without a push (ANL-12).
 
 export const DEADLINES_CHANNEL_ID = 'deadlines';
+export const ANALYSIS_CHANNEL_ID = 'analysis';
 
-export async function setUpNotifications(_channel: { name: string; description: string }) {}
+export async function setUpNotifications(_channels: {
+  deadlines: NotificationChannel;
+  analysis: NotificationChannel;
+}) {}
 
 export async function getNotificationPermission(): Promise<NotificationPermission> {
   return 'unavailable';
@@ -27,13 +42,26 @@ export async function cancelNotification(_id: string): Promise<void> {}
 
 export async function dismissShownNotifications(): Promise<void> {}
 
-export function getLastOpenedReminder(): OpenedReminder | null {
+export function getLastOpenedNotification(): OpenedNotification | null {
   return null;
 }
 
-export function clearLastOpenedReminder(): void {}
+export function clearLastOpenedNotification(): void {}
 
-export function addReminderOpenedListener(_listener: (reminder: OpenedReminder) => void) {
+export function addNotificationOpenedListener(_listener: (opened: OpenedNotification) => void) {
+  return () => {};
+}
+
+export function addAnalysisPushListener(_listener: (jobId: string) => void) {
+  return () => {};
+}
+
+/** Never called: nothing asks for a token without permission. */
+export async function getPushToken(): Promise<string> {
+  throw new Error('No push notifications on web');
+}
+
+export function addPushTokenChangeListener(_listener: (token: string) => void) {
   return () => {};
 }
 

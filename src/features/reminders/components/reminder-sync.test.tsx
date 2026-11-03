@@ -56,7 +56,7 @@ function bodies() {
 }
 
 describe('ReminderSync', () => {
-  it('sets up the channel and syncs at start without asking for the permission (REM-4, REM-5)', async () => {
+  it('sets up the channels and syncs at start without asking for the permission (REM-4, REM-5, ANL-12)', async () => {
     fakeNotifications.permission = 'granted';
     await addDeadline('pay');
 
@@ -64,8 +64,11 @@ describe('ReminderSync', () => {
 
     await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(3));
     expect(setUpNotifications).toHaveBeenCalledWith({
-      name: 'Deadlines',
-      description: 'Reminders about document deadlines',
+      deadlines: { name: 'Deadlines', description: 'Reminders about document deadlines' },
+      analysis: {
+        name: 'Document analysis',
+        description: 'When a document you sent has been analyzed',
+      },
     });
     expect(requestNotificationPermission).not.toHaveBeenCalled();
   });
@@ -81,7 +84,7 @@ describe('ReminderSync', () => {
     expect(fakeNotifications.scheduled.size).toBe(0);
   });
 
-  it('renames the channel and rewrites the reminders when the language changes', async () => {
+  it('renames the channels and rewrites the reminders when the language changes', async () => {
     fakeNotifications.permission = 'granted';
     await addDeadline('pay');
     await renderWithProviders(<ReminderSync />);
@@ -91,8 +94,11 @@ describe('ReminderSync', () => {
 
     await waitFor(() =>
       expect(setUpNotifications).toHaveBeenLastCalledWith({
-        name: 'Сроки',
-        description: 'Напоминания о сроках по документам',
+        deadlines: { name: 'Сроки', description: 'Напоминания о сроках по документам' },
+        analysis: {
+          name: 'Анализ документов',
+          description: 'Когда отправленный документ разобран',
+        },
       })
     );
     await waitFor(() =>

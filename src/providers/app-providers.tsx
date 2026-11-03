@@ -6,7 +6,7 @@ import { useState, type PropsWithChildren } from 'react';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AnalysisJobsSync } from '@/features/analysis/components/analysis-jobs-sync';
-import { ReminderOpener } from '@/features/reminders/components/reminder-opener';
+import { NotificationOpener } from '@/features/reminders/components/notification-opener';
 import { ReminderSync } from '@/features/reminders/components/reminder-sync';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { createQueryClient, useAppStateFocusManager } from '@/lib/query-client';
@@ -31,7 +31,7 @@ export function AppProviders({ children }: PropsWithChildren) {
             <AnalysisJobsSync />
             {children}
             {/* After the navigator, so its effect runs once the root stack is mounted (REM-6). */}
-            <ReminderOpener />
+            <NotificationOpener />
           </DatabaseGate>
         </ThemeProvider>
       </QueryClientProvider>

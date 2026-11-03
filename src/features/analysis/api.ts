@@ -1,6 +1,11 @@
 import { randomUUID } from 'expo-crypto';
 import { getCalendars } from 'expo-localization';
 
+import {
+  getNotificationPermission,
+  requestNotificationPermission,
+  type NotificationPermission,
+} from '@/features/reminders/notifications';
 import { ApiError, apiClient } from '@/lib/api/client';
 import { getRepositories } from '@/lib/db/repositories';
 import type { DocumentMimeType, DocumentRecord } from '@/lib/db/types';
@@ -22,6 +27,7 @@ import type { UiLocale } from '@/shared/ui-locales';
 import { analysisRecords } from './analysis-records';
 import { AnalysisError, toAnalysisError } from './errors';
 import { keepScreenAwake } from './keep-awake';
+import { pushTokenIfAllowed } from './push-token';
 import { appendUploadFile, type UploadFile } from './upload-file';
 
 /**
@@ -30,6 +36,8 @@ import { appendUploadFile, type UploadFile } from './upload-file';
  *
  * An analysis runs in two stages (ANL-3, D-1): the upload (`PUT`) creates a job on the server, and
  * the app then asks about it (`GET`) until it ends, saves the result and deletes the job (`DELETE`).
+ * With notifications allowed, the job has the push token (in the upload, or later by `PATCH`), and
+ * the server sends a push when it ends (ANL-12).
  */
 
 const JOBS_PATH = '/api/v1/analyses';
@@ -54,6 +62,8 @@ export type UploadRequest = {
   timezone: string;
   /** The interface language, for the push about the finished job (ANL-12). */
   uiLocale: UiLocale;
+  /** The Expo push token for that push, if notifications are allowed (ANL-12). */
+  pushToken: string | null;
 };
 
 /** A state the shared schema rejects counts as `analysis_failed` (SPEC §7.2). */
@@ -80,6 +90,7 @@ export async function uploadDocument(
   form.append(ANALYZE_FIELDS.today, request.today);
   form.append(ANALYZE_FIELDS.timezone, request.timezone);
   form.append(ANALYZE_FIELDS.uiLocale, request.uiLocale);
+  if (request.pushToken) form.append(ANALYZE_FIELDS.pushToken, request.pushToken);
 
   const body = await apiClient.put<unknown>(jobPath(jobId), {
     body: form,
@@ -93,6 +104,17 @@ export async function uploadDocument(
 export async function fetchJobState(jobId: string): Promise<AnalysisJobState> {
   const body = await apiClient.get<unknown>(jobPath(jobId), { timeoutMs: JOB_REQUEST_TIMEOUT_MS });
   return parseJobState(body);
+}
+
+/**
+ * Gives a job the token for the push about its end (`PATCH`, ANL-12): `204`, or `404 job_not_found`
+ * for a job that is gone. Fails like `uploadDocument()`.
+ */
+export async function sendPushToken(jobId: string, pushToken: string): Promise<void> {
+  await apiClient.patch<unknown>(jobPath(jobId), {
+    body: { pushToken },
+    timeoutMs: JOB_REQUEST_TIMEOUT_MS,
+  });
 }
 
 /** Deletes a job on the server (`DELETE`): `204` even for one it doesn't know (SPEC §7.2). */
@@ -209,14 +231,19 @@ export async function analyzeDocument(
       if (!(await isOnline())) throw new AnalysisError('offline');
       const others = (await documents.listAnalyzing()).filter(({ id }) => id !== documentId);
       if (others.length >= ACTIVE_JOBS_PER_DEVICE) throw new AnalysisError('too_many_jobs');
+      const [files, pushToken] = await Promise.all([
+        filesToUpload(documentId, document.mimeType),
+        pushTokenIfAllowed(),
+      ]);
       state = await uploadDocument(
         job.jobId,
         {
-          files: await filesToUpload(documentId, document.mimeType),
+          files,
           locale: job.locale,
           today: localCalendarDate(new Date()),
           timezone: deviceTimeZone(),
           uiLocale: currentLanguage(),
+          pushToken,
         },
         controller.signal
       );
@@ -313,6 +340,41 @@ export function sendJobDeletions(): Promise<void> {
 
 export function sendJobDeletionsInBackground(): void {
   void sendJobDeletions().catch(() => undefined);
+}
+
+/**
+ * Gives every job that hasn't ended the push token (`PATCH`, ANL-12): `token` when the push service
+ * has just changed it, otherwise the current one if notifications are allowed. Jobs still uploading
+ * are left out: the server doesn't know them yet, and their upload carries the token. A job the
+ * server couldn't be told about is told the next time: at the next start, return to the foreground
+ * or change of the token. Asks for no permission (REM-5).
+ */
+export async function sendPushTokenToJobs(token?: string): Promise<void> {
+  const jobs = (await getRepositories().documents.listAnalyzing()).filter(
+    ({ id }) => !uploads.has(id)
+  );
+  if (jobs.length === 0) return;
+  const pushToken = token ?? (await pushTokenIfAllowed());
+  if (!pushToken) return;
+  await Promise.all(
+    jobs.map(({ jobId }) => sendPushToken(jobId, pushToken).catch(() => undefined))
+  );
+}
+
+export function sendPushTokenToJobsInBackground(token?: string): void {
+  void sendPushTokenToJobs(token).catch(() => undefined);
+}
+
+/**
+ * «Notify me when ready» while a job waits (ANL-12, REM-5): asks for the permission when the OS
+ * still lets it, and with it gives every waiting job the push token. Returns the permission; when
+ * it isn't granted, the panel explains how to allow notifications.
+ */
+export async function turnOnAnalysisPush(): Promise<NotificationPermission> {
+  const current = await getNotificationPermission();
+  const permission = current === 'granted' ? current : await requestNotificationPermission();
+  if (permission === 'granted') await sendPushTokenToJobs();
+  return permission;
 }
 
 /** Where a job that hasn't ended stands, for the status panel (ANL-3). */

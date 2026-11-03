@@ -344,6 +344,19 @@ export const en = {
     processing: 'Analyzing the document…',
     canClose:
       'This takes a few minutes. You can close the app: the result will be here when you open it again.',
+    canCloseNotified:
+      "This takes a few minutes. You can close the app: you'll get a notification when the document is analyzed.",
+    notify: {
+      turnOn: 'Notify me when ready',
+      denied:
+        "Notifications are off for this app. To hear when the document is analyzed, allow them in your phone's settings.",
+      openSettings: 'Open settings',
+      failed: "Couldn't turn on the notification. Try again.",
+    },
+    channel: {
+      name: 'Document analysis',
+      description: 'When a document you sent has been analyzed',
+    },
     cancel: 'Cancel the analysis',
     cancelFailed: "Couldn't cancel the analysis. Try again.",
     previousShown: 'The previous result stays below until the new one is ready.',

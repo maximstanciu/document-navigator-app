@@ -7,6 +7,7 @@ import {
   type QueryClient,
 } from '@tanstack/react-query';
 
+import { reminderKeys } from '@/features/reminders/queries';
 import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
 
@@ -16,6 +17,7 @@ import {
   checkAnalysisJobs,
   fetchLimits,
   POLL_INTERVAL_MS,
+  turnOnAnalysisPush,
   type AnalysisJobsCheck,
   type JobProgress,
 } from './api';
@@ -147,6 +149,22 @@ export function useCancelAnalysis() {
         queryClient.invalidateQueries({ queryKey: analysisKeys.jobs() }),
         queryClient.invalidateQueries({ queryKey: analysisKeys.limits() }),
       ]),
+  });
+}
+
+/**
+ * «Notify me when ready» while a job waits (ANL-12): resolves to the permission (REM-5). Granted,
+ * it lets the reminders through too.
+ */
+export function useTurnOnAnalysisPush() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: turnOnAnalysisPush,
+    networkMode: 'always',
+    onSuccess: (permission) => {
+      queryClient.setQueryData(reminderKeys.permission(), permission);
+      syncRemindersInBackground();
+    },
   });
 }
 

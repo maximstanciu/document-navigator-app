@@ -26,3 +26,11 @@ export async function turnOnReminders(
 export async function turnOffReminders(deadlineId: string): Promise<void> {
   await getRepositories().deadlines.update(deadlineId, { reminderOffsetsDays: [] });
 }
+
+/**
+ * The document a tap on the push about a finished analysis opens (ANL-12): the one analyzed under
+ * `jobId`, or `null` when it is gone.
+ */
+export async function documentOfAnalysisJob(jobId: string): Promise<string | null> {
+  return getRepositories().documents.findIdByAnalysisJob(jobId);
+}

@@ -478,6 +478,21 @@ describe('documents repository', () => {
       ]);
     });
 
+    it('finds the document of a job once it ended, but not once deleted (ANL-12)', async () => {
+      await repos.documents.create(newDocument('doc-1', ''));
+      await repos.documents.create(newDocument('doc-2', ''));
+      await repos.documents.startAnalysis('doc-1', job('job-1'));
+      await repos.documents.startAnalysis('doc-2', job('job-2'));
+      await repos.documents.saveAnalysis('doc-1', outcome('doc-1', 'job-1'));
+
+      expect(await repos.documents.findIdByAnalysisJob('job-1')).toBe('doc-1');
+      expect(await repos.documents.findIdByAnalysisJob('job-2')).toBe('doc-2');
+      expect(await repos.documents.findIdByAnalysisJob('job-3')).toBeNull();
+
+      await repos.documents.remove('doc-1');
+      expect(await repos.documents.findIdByAnalysisJob('job-1')).toBeNull();
+    });
+
     describe('cancel (ANL-13)', () => {
       it('returns a draft to draft and queues its job for deletion', async () => {
         await repos.documents.create(newDocument('doc-1', ''));

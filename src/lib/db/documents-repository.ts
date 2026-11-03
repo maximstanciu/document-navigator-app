@@ -316,6 +316,18 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
+     * The document last analyzed under `jobId`, whatever its status now, for a tap on the push
+     * about the job (ANL-12); `null` when it was deleted or analyzed again since.
+     */
+    async findIdByAnalysisJob(jobId: string): Promise<string | null> {
+      const row = await db.getFirstAsync<{ id: string }>(
+        'SELECT id FROM documents WHERE deleted_at IS NULL AND analysis_job_id = ?',
+        [jobId]
+      );
+      return row?.id ?? null;
+    },
+
+    /**
      * Stores a finished analysis (ANL-2): the document takes its type, sender and date from it,
      * and its title unless the person named it, and becomes `ready`. A re-analysis merges by ANL-8
      * (`mergeReanalysis()`): what the person did to deadlines stays, the rest is replaced; replaced

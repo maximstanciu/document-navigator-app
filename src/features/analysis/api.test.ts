@@ -3,6 +3,7 @@ import { isOnline } from '@/lib/network';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import { localCalendarDate } from '@/shared/calendar-date';
 import { fakeFileSystem } from '@/test/fake-file-system';
+import { fakeNotifications, requestNotificationPermission } from '@/test/fake-notifications';
 import { installTestRepositories } from '@/test/sqlite';
 
 import {
@@ -12,6 +13,8 @@ import {
   deleteAllAnalysisJobs,
   forgetDocumentAnalysis,
   sendJobDeletions,
+  sendPushTokenToJobs,
+  turnOnAnalysisPush,
   UPLOAD_TIMEOUT_MS,
 } from './api';
 import { AnalysisError } from './errors';
@@ -93,7 +96,7 @@ type Respond = (url: string, init: RequestInit | undefined) => Response | Promis
  * The analysis server: each method answers with what its handler returns. `DELETE` answers `204`
  * unless told otherwise; a method without a handler fails the test.
  */
-const server: Partial<Record<'PUT' | 'GET' | 'DELETE', Respond>> = {};
+const server: Partial<Record<'PUT' | 'GET' | 'PATCH' | 'DELETE', Respond>> = {};
 
 function requests(method?: string) {
   return fetchSpy.mock.calls
@@ -135,7 +138,7 @@ beforeEach(async () => {
   ({ repositories } = await installTestRepositories());
   online.mockResolvedValue(true);
   keepAwake.mockReturnValue(releaseAwake);
-  for (const method of ['PUT', 'GET', 'DELETE'] as const) delete server[method];
+  for (const method of ['PUT', 'GET', 'PATCH', 'DELETE'] as const) delete server[method];
   server.DELETE = noContent;
   fetchSpy = jest.spyOn(globalThis, 'fetch').mockImplementation(async (url, init) => {
     const method = (init?.method ?? 'GET') as keyof typeof server;
@@ -660,5 +663,148 @@ describe('deleteAllAnalysisJobs (STO-7)', () => {
       '/api/v1/analyses/uuid-1',
       '/api/v1/analyses/uuid-2',
     ]);
+  });
+});
+
+describe('the push about a finished job (ANL-12)', () => {
+  const TOKEN = 'ExponentPushToken[fake-device]';
+
+  /** What each `PATCH` sent: the job and the body. */
+  function patches() {
+    return requests('PATCH').map(({ url, init }) => [url, JSON.parse(String(init?.body))]);
+  }
+
+  /** A document whose job waits on the server, uploaded without a token. */
+  async function seedWaiting(id: string, jobId: string) {
+    await seedDraft(id);
+    await repositories.documents.startAnalysis(id, { jobId, locale: 'en' });
+  }
+
+  it('sends the push token with the upload when notifications are allowed', async () => {
+    fakeNotifications.permission = 'granted';
+    await seedDraft();
+    server.PUT = () => queued();
+
+    await analyzeDocument('doc-1');
+
+    expect(sentForm().get('pushToken')).toBe(TOKEN);
+  });
+
+  it('uploads without a token, and asks for nothing, when notifications are not allowed (REM-5)', async () => {
+    fakeNotifications.permission = 'undetermined';
+    await seedDraft();
+    server.PUT = () => queued();
+
+    await analyzeDocument('doc-1');
+
+    expect(sentForm().get('pushToken')).toBeNull();
+    expect(requestNotificationPermission).not.toHaveBeenCalled();
+  });
+
+  it('uploads without a token when the OS gives none (no FCM, no Google Play services)', async () => {
+    fakeNotifications.permission = 'granted';
+    fakeNotifications.pushToken = null;
+    await seedDraft();
+    server.PUT = () => queued();
+
+    await analyzeDocument('doc-1');
+
+    expect(sentForm().get('pushToken')).toBeNull();
+    expect((await documentOf())?.status).toBe('analyzing');
+  });
+
+  it('gives every waiting job the token, but not one still uploading', async () => {
+    fakeNotifications.permission = 'granted';
+    await seedWaiting('doc-1', 'job-1');
+    await seedWaiting('doc-2', 'job-2');
+    await seedDraft('doc-3');
+    const uploadSent = uploadHangs();
+    const upload = analyzeDocument('doc-3').catch(() => undefined);
+    await uploadSent;
+    server.PATCH = noContent;
+
+    await sendPushTokenToJobs();
+
+    expect(patches()).toEqual([
+      ['/api/v1/analyses/job-1', { pushToken: TOKEN }],
+      ['/api/v1/analyses/job-2', { pushToken: TOKEN }],
+    ]);
+    expect(requests('PATCH')[0].init).toMatchObject({
+      headers: { 'Content-Type': 'application/json' },
+    });
+    await cancelAnalysis('doc-3');
+    await upload;
+  });
+
+  it('gives the jobs a token the push service has just changed', async () => {
+    await seedWaiting('doc-1', 'job-1');
+    server.PATCH = noContent;
+
+    await sendPushTokenToJobs('ExponentPushToken[new]');
+
+    expect(patches()).toEqual([
+      ['/api/v1/analyses/job-1', { pushToken: 'ExponentPushToken[new]' }],
+    ]);
+  });
+
+  it('sends nothing without the permission, or without jobs', async () => {
+    fakeNotifications.permission = 'denied';
+    await seedWaiting('doc-1', 'job-1');
+
+    await sendPushTokenToJobs();
+    fakeNotifications.permission = 'granted';
+    await repositories.documents.cancelAnalysis('doc-1', 'job-1');
+    await sendPushTokenToJobs();
+
+    expect(requests('PATCH')).toEqual([]);
+  });
+
+  it('tells the other jobs when one can not be told now, and does not fail', async () => {
+    fakeNotifications.permission = 'granted';
+    await seedWaiting('doc-1', 'job-1');
+    await seedWaiting('doc-2', 'job-2');
+    server.PATCH = (url) =>
+      url.endsWith('job-1') ? Promise.reject(new TypeError('Network request failed')) : noContent();
+
+    await expect(sendPushTokenToJobs()).resolves.toBeUndefined();
+
+    expect(patches().map(([url]) => url)).toEqual([
+      '/api/v1/analyses/job-1',
+      '/api/v1/analyses/job-2',
+    ]);
+  });
+
+  describe('turnOnAnalysisPush: «Notify me when ready» (REM-5)', () => {
+    it('asks for the permission and, granted, gives the waiting jobs the token', async () => {
+      fakeNotifications.permission = 'undetermined';
+      await seedWaiting('doc-1', 'job-1');
+      server.PATCH = noContent;
+
+      await expect(turnOnAnalysisPush()).resolves.toBe('granted');
+
+      expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
+      expect(patches()).toEqual([['/api/v1/analyses/job-1', { pushToken: TOKEN }]]);
+    });
+
+    it('sends nothing when the person refuses', async () => {
+      fakeNotifications.permission = 'undetermined';
+      fakeNotifications.answer = 'denied';
+      await seedWaiting('doc-1', 'job-1');
+
+      await expect(turnOnAnalysisPush()).resolves.toBe('denied');
+
+      expect(requests('PATCH')).toEqual([]);
+    });
+
+    it('does not ask again when notifications are already allowed', async () => {
+      fakeNotifications.permission = 'granted';
+      await seedWaiting('doc-1', 'job-1');
+      server.PATCH = noContent;
+
+      await expect(turnOnAnalysisPush()).resolves.toBe('granted');
+
+      expect(requestNotificationPermission).not.toHaveBeenCalled();
+      expect(requests('PATCH')).toHaveLength(1);
+    });
   });
 });
