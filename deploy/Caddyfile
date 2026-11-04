@@ -1,14 +1,35 @@
 # HTTPS in front of the API server. With a domain name in API_DOMAIN, Caddy gets a Let's Encrypt
 # certificate by itself (ports 80 and 443 must reach this machine); `:80` serves plain HTTP for
 # tests on the local network. No access log: client IP addresses stay out of the logs (SPEC §7.1).
+{
+	# Only the tailscale service reaches the Funnel listener (below). It replaces X-Forwarded-For
+	# with the address of the client on the internet, so that address counts there; everywhere else
+	# the client is the TCP peer.
+	servers 127.0.0.1:8081 {
+		trusted_proxies static 127.0.0.1/32
+		client_ip_headers X-Forwarded-For
+	}
+}
 
-{$API_DOMAIN} {
+(api) {
 	reverse_proxy api:3000 {
 		# The limits count the address Caddy sees, not one a client claims (SPEC §8.3).
-		header_up X-Real-IP {remote_host}
+		header_up X-Real-IP {client_ip}
 		transport http {
 			# Shorter than the server's keep-alive (65 s), so Caddy never reuses a closed connection.
 			keepalive 30s
 		}
 	}
+}
+
+{$API_DOMAIN} {
+	import api
+}
+
+# Tailscale Funnel (the tailscale service in compose.yaml, profile `funnel`): it shares this
+# container's network, ends TLS for https://<TS_HOSTNAME>.<tailnet>.ts.net and proxies here.
+# Bound to 127.0.0.1, so no other container or machine reaches it.
+http://:8081 {
+	bind 127.0.0.1
+	import api
 }

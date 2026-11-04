@@ -161,8 +161,35 @@ services:
         condition: service_healthy
     logging: *logging
 
+  # Tailscale Funnel: the API on https://<TS_HOSTNAME>.<tailnet>.ts.net from the internet, without a
+  # domain or ports open on the router. Starts only with COMPOSE_PROFILES=funnel (deploy/.env).
+  # It joins Caddy's network and proxies to Caddy's Funnel listener on 127.0.0.1:8081
+  # (tailscale/serve.json); TLS ends here, so Tailscale's relays carry only encrypted traffic.
+  tailscale:
+    image: tailscale/tailscale:v1.104.1
+    profiles: [funnel]
+    restart: unless-stopped
+    network_mode: service:caddy
+    environment:
+      TS_HOSTNAME: ${TS_HOSTNAME:-docnavigator}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/serve.json
+      # Logged in once (deploy/README.md, «Tailscale Funnel»): the state volume keeps it.
+      TS_AUTH_ONCE: 'true'
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale:/config:ro
+    depends_on:
+      - caddy
+    read_only: true
+    # The daemon's socket, linked from /var/run/tailscale so `tailscale` commands find it.
+    tmpfs: [/tmp, /var/run/tailscale]
+    security_opt: ['no-new-privileges:true']
+    logging: *logging
+
 volumes:
   ollama-models:
   redis-data:
   caddy-data:
   caddy-config:
+  tailscale-state:
