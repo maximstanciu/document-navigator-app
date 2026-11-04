@@ -166,7 +166,7 @@ export function AnalysisStatusPanel({
   const { t, i18n } = useTranslation();
   const analyze = useAnalyzeDocument();
   const lastError = useLastAnalysisError(document.id);
-  const start = () => analyze.mutate(document.id);
+  const start = () => analyze.mutate({ documentId: document.id });
 
   switch (document.status) {
     case 'ready':

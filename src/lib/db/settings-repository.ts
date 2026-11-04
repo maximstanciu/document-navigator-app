@@ -1,5 +1,6 @@
 import { isClockTime } from '@/shared/calendar-date';
 import { isExplanationLocale } from '@/shared/explanation-locales';
+import { isMemoCountry } from '@/shared/legal-memo-countries';
 
 import type { SqlDatabase } from './database';
 import { fromJson } from './sql';
@@ -9,6 +10,7 @@ import { DEFAULT_SETTINGS, type Settings } from './types';
 const KEYS: { [K in keyof Settings]: string } = {
   locale: 'locale',
   explanationLocale: 'explanation_locale',
+  documentCountry: 'document_country',
   reminderOffsetsDays: 'reminder_offsets_days',
   reminderTime: 'reminder_time',
   notificationDetails: 'notification_details',
@@ -23,6 +25,8 @@ function isValid<K extends keyof Settings>(key: K, value: unknown): value is Set
       return value === 'system' || value === 'ru' || value === 'en';
     case 'explanationLocale':
       return value === null || isExplanationLocale(value);
+    case 'documentCountry':
+      return value === null || value === 'other' || isMemoCountry(value);
     case 'reminderOffsetsDays':
       return Array.isArray(value) && value.every((item) => Number.isInteger(item) && item >= 0);
     case 'reminderTime':

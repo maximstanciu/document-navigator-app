@@ -40,6 +40,19 @@ jest.mock('./upload-file', () => ({
 }));
 let mockUuidCounter = 0;
 jest.mock('expo-crypto', () => ({ randomUUID: () => `uuid-${++mockUuidCounter}` }));
+// The phone's region, for the default «Country of documents» (ANL-14); `null` keeps the mock's.
+const mockRegion: { code: string | null } = { code: null };
+jest.mock('expo-localization', () => {
+  const actual = jest.requireActual('expo-localization');
+  return {
+    ...actual,
+    getLocales: () =>
+      actual.getLocales().map((locale: { regionCode: string | null }) => ({
+        ...locale,
+        regionCode: mockRegion.code ?? locale.regionCode,
+      })),
+  };
+});
 
 const online = jest.mocked(isOnline);
 const keepAwake = jest.mocked(keepScreenAwake);
@@ -86,8 +99,8 @@ function json(status: number, body: unknown, headers?: Record<string, string>) {
 
 const errorBody = (code: string) => ({ error: { code, message: 'Server text' } });
 const queued = (ahead = 0) => json(202, { status: 'queued', ahead });
-const done = (analysis = ANALYSIS_FIXTURES.invoice, pageCount = 2) =>
-  json(200, { status: 'done', analysis, pageCount });
+const done = (analysis = ANALYSIS_FIXTURES.invoice, pageCount = 2, legalMemo: unknown = null) =>
+  json(200, { status: 'done', analysis, pageCount, legalMemo });
 const noContent = () => new Response(null, { status: 204 });
 
 type Respond = (url: string, init: RequestInit | undefined) => Response | Promise<Response>;
@@ -195,6 +208,71 @@ describe('analyzeDocument: the upload (task 4.8)', () => {
     expect(form.get('today')).toBe(localCalendarDate(new Date()));
     expect(form.get('timezone')).toBe('America/New_York');
     expect(form.get('pushToken')).toBeNull();
+  });
+
+  describe('the country of the legal memo (ANL-14)', () => {
+    beforeEach(() => {
+      server.PUT = () => queued();
+    });
+    afterEach(() => {
+      mockRegion.code = null;
+    });
+
+    it.each([
+      ['Portugal', 'PT', 'PT'],
+      ['Germany', 'DE', 'DE'],
+      ['a country without a memo', 'US', null],
+    ])('by default asks for the memo of the phone’s region: %s', async (_, region, sent) => {
+      mockRegion.code = region;
+      await seedDraft();
+
+      await analyzeDocument('doc-1');
+
+      expect(sentForm().get('country')).toBe(sent);
+    });
+
+    it.each([
+      ['DE', 'DE'],
+      ['other', null],
+    ] as const)('asks for the one in «Country of documents»: %s', async (choice, sent) => {
+      mockRegion.code = 'PT';
+      await repositories.settings.update({ documentCountry: choice });
+      await seedDraft();
+
+      await analyzeDocument('doc-1');
+
+      expect(sentForm().get('country')).toBe(sent);
+    });
+
+    it('asks for the country picked for this analysis over settings (DET-9)', async () => {
+      await repositories.settings.update({ documentCountry: 'DE' });
+      await seedDraft();
+
+      await analyzeDocument('doc-1', undefined, 'PT');
+
+      expect(sentForm().get('country')).toBe('PT');
+    });
+
+    it('stores the country of the memo the result was made with', async () => {
+      await seedDraft();
+      await analyzeDocument('doc-1');
+      server.GET = () =>
+        done(ANALYSIS_FIXTURES.invoice, 2, { country: 'DE', version: '2026-10-20' });
+
+      await checkAnalysisJobs();
+
+      expect(await documentOf()).toMatchObject({ status: 'ready', legalMemoCountry: 'DE' });
+    });
+
+    it('stores no memo when the result was made without one', async () => {
+      await seedDraft();
+      await analyzeDocument('doc-1');
+      server.GET = () => done();
+
+      await checkAnalysisJobs();
+
+      expect(await documentOf()).toMatchObject({ status: 'ready', legalMemoCountry: null });
+    });
   });
 
   it('explains in the language chosen in settings and stores the result in it (D-5)', async () => {

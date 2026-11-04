@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import { COUNTRY_CODE } from '../legal-memo-countries';
 import { isUuidV4 } from '../uuid';
 import { analysisResultSchema } from './schema';
 
@@ -16,6 +17,8 @@ export const ANALYZE_FIELDS = {
   uiLocale: 'uiLocale',
   /** Optional: an Expo push token, when notifications are allowed (ANL-12). */
   pushToken: 'pushToken',
+  /** Optional: the country whose legal memo to start with, ISO 3166-1 alpha-2 (ANL-14). */
+  country: 'country',
 } as const;
 
 /** What a document is uploaded as: one PDF as it is, or pages the app made JPEG (CAP-4, D-4). */
@@ -46,11 +49,17 @@ export type AnalysisJobPatch = z.infer<typeof analysisJobPatchSchema>;
 
 /**
  * The analysis of a done job. `pageCount` is what the server counted: pages of a PDF, or the
- * number of images. Metadata wraps the analysis so it stays out of the model's JSON Schema.
+ * number of images. `legalMemo` is the memo the analysis was made with (ANL-14), `null` for none;
+ * a server older than SPEC v0.40 doesn't send it. Metadata wraps the analysis so it stays out of
+ * the model's JSON Schema.
  */
 export const analyzeResponseSchema = z.object({
   analysis: analysisResultSchema,
   pageCount: z.number().int().min(1),
+  legalMemo: z
+    .object({ country: z.string().regex(COUNTRY_CODE), version: z.string() })
+    .nullable()
+    .default(null),
 });
 
 export type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>;

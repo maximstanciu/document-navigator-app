@@ -17,6 +17,7 @@ import {
 import { gatedProvider, settle } from '../../testing/gated-provider';
 import { TEST_RESULT_TTL_MS, testJobDeps, type TestJobDeps } from '../../testing/server-deps';
 import * as finalizeModule from '../finalize-analysis';
+import { LEGAL_MEMOS } from '../legal-memos';
 import { LlmProviderError, type LlmProvider } from '../llm-provider';
 import { MockLlmProvider } from '../providers/mock-llm-provider';
 import { analysisPushMessage, type AnalysisPushMessage } from './analysis-push';
@@ -105,9 +106,113 @@ describe('an analysis job', () => {
       status: 'done',
       analysis: ANALYSIS_FIXTURES.contract,
       pageCount: 4,
+      legalMemo: { country: 'DE', version: LEGAL_MEMOS.DE.version },
     });
     expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({ status: 'processing' });
     expect(calls).toHaveLength(2);
+  });
+
+  describe('the legal memo of the document’s country (ANL-14)', () => {
+    const fromPortugal = () => ({ ...llmOutputFixture('contract'), documentCountry: 'PT' });
+
+    it('starts with the memo the app asked for, and keeps it when the country matches', async () => {
+      const { provider, calls } = gatedProvider();
+      deps = testJobDeps({ provider });
+      await put({ files: Array.from({ length: 4 }, () => jpeg()) });
+
+      expect(calls[0].input.country).toBe('DE');
+      calls[0].answer();
+      await settle();
+
+      expect(calls).toHaveLength(1);
+      expect(await stateOf(await get())).toMatchObject({ legalMemo: { country: 'DE' } });
+      expect(ofType('analysis.end')[0]).toMatchObject({ memo: 'DE', memoRetried: false });
+    });
+
+    it('analyzes again with the memo of the country the model found, with the same files', async () => {
+      const { provider, calls } = gatedProvider();
+      deps = testJobDeps({ provider });
+      await put({ files: Array.from({ length: 4 }, () => jpeg()) });
+
+      calls[0].answer(fromPortugal(), 0.01);
+      await settle();
+      expect(await stateOf(await get())).toEqual({ status: 'processing' });
+      expect(calls).toHaveLength(2);
+      expect(calls[1].input.country).toBe('PT');
+      expect(calls[1].input.files).toHaveLength(4);
+
+      calls[1].answer(fromPortugal(), 0.02);
+      await settle();
+      expect(await stateOf(await get())).toMatchObject({
+        status: 'done',
+        analysis: { documentCountry: 'PT' },
+        legalMemo: { country: 'PT', version: LEGAL_MEMOS.PT.version },
+      });
+      // Both calls count: tokens and cost go to the logs and the daily budget.
+      expect(ofType('analysis.end')[0]).toMatchObject({
+        code: 'ok',
+        memo: 'PT',
+        memoRetried: true,
+        inputTokens: 200,
+        outputTokens: 100,
+        costUsd: 0.03,
+      });
+    });
+
+    it('asks for no memo without a country, then takes the memo of the country found', async () => {
+      const { provider, calls } = gatedProvider();
+      deps = testJobDeps({ provider });
+      await put({ files: Array.from({ length: 4 }, () => jpeg()), fields: { country: undefined } });
+
+      expect(calls[0].input.country).toBeNull();
+      calls[0].answer();
+      await settle();
+      expect(calls[1].input.country).toBe('DE');
+    });
+
+    it('keeps the first analysis when the second call fails', async () => {
+      const { provider, calls } = gatedProvider();
+      deps = testJobDeps({ provider });
+      await put({ files: Array.from({ length: 4 }, () => jpeg()) });
+
+      calls[0].answer(fromPortugal());
+      await settle();
+      calls[1].fail(new LlmProviderError('unavailable', 'down'));
+      await settle();
+
+      expect(await stateOf(await get())).toMatchObject({
+        status: 'done',
+        analysis: { documentCountry: 'PT' },
+        legalMemo: { country: 'DE' },
+      });
+      expect(ofType('analysis.end')[0]).toMatchObject({
+        code: 'ok',
+        memo: 'DE',
+        memoRetried: false,
+      });
+    });
+
+    it.each([
+      ['a country without a memo', 'FR'],
+      ['no country', null],
+    ])('makes no second call for %s', async (_, documentCountry) => {
+      const { provider, calls } = gatedProvider();
+      deps = testJobDeps({ provider });
+      await put({ files: Array.from({ length: 4 }, () => jpeg()) });
+
+      calls[0].answer({ ...llmOutputFixture('contract'), documentCountry });
+      await settle();
+
+      expect(calls).toHaveLength(1);
+      expect(await stateOf(await get())).toMatchObject({
+        analysis: { documentCountry },
+        legalMemo: { country: 'DE' },
+      });
+    });
+
+    it('refuses a country that isn’t an ISO code with 400', async () => {
+      await expectError(await put({ fields: { country: 'Portugal' } }), 400, 'invalid_request');
+    });
   });
 
   it('runs as many jobs at once as ANALYSIS_CONCURRENCY allows', async () => {
@@ -265,6 +370,8 @@ describe('an analysis job', () => {
       kind: 'images',
       pages: 1,
       locale: 'en',
+      memo: 'DE',
+      memoRetried: false,
       provider: 'gated',
       modelMs: 5000,
       inputTokens: 100,

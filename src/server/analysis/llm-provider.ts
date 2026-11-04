@@ -1,5 +1,6 @@
 import type { UploadMimeType } from '@/shared/analysis/contract';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import type { MemoCountry } from '@/shared/legal-memo-countries';
 
 // The model behind the analysis (SPEC §7.5). `MockLlmProvider` serves tests and development
 // without a key; `OpenAiCompatibleProvider` talks to a model behind an OpenAI-compatible API.
@@ -18,6 +19,8 @@ export type LlmAnalyzeInput = {
   today: string;
   /** IANA time zone of the device. */
   timezone: string;
+  /** Whose legal memo opens the prompt (ANL-14); `null` for none. */
+  country: MemoCountry | null;
   signal?: AbortSignal;
   /**
    * Checks the shape of an answer: `null` if it fits, else what is wrong with it. A provider that

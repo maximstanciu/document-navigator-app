@@ -74,7 +74,7 @@ async function seedDocument({
 }
 
 /** A document analyzed as `analysis`, stored the way `analyzeDocument()` stores it. */
-async function seedAnalyzed(analysis: AnalysisResult) {
+async function seedAnalyzed(analysis: AnalysisResult, legalMemoCountry: string | null = null) {
   await seedDocument();
   await repositories.documents.startAnalysis('doc-1', { jobId: 'job-1', locale: 'ru' });
   let next = 0;
@@ -82,6 +82,7 @@ async function seedAnalyzed(analysis: AnalysisResult) {
     jobId: 'job-1',
     analysis,
     pageCount: 2,
+    legalMemoCountry,
     ...analysisRecords('doc-1', analysis, () => `rec-${++next}`),
   });
 }
@@ -120,6 +121,35 @@ describe('DocumentDetailScreen', () => {
       expect(await screen.findByText('PDF')).toBeOnTheScreen();
       expect(screen.getByText('1.1 MB')).toBeOnTheScreen();
       expect(screen.queryByLabelText('Page 1')).not.toBeOnTheScreen();
+    });
+  });
+
+  describe('the document’s language, country and legal memo (DET-11, ANL-14)', () => {
+    it('names them under the title', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice, 'DE');
+      await renderDocument();
+
+      expect(
+        await screen.findByText('German · Germany · with the guide to German law')
+      ).toBeOnTheScreen();
+    });
+
+    it('says when the analysis had no memo, and shows a country without a name as its code', async () => {
+      await seedAnalyzed({ ...ANALYSIS_FIXTURES.invoice, documentCountry: 'SE' });
+      await renderDocument();
+
+      expect(
+        await screen.findByText('German · SE · without a guide to local law')
+      ).toBeOnTheScreen();
+    });
+
+    it('shows only the language of an analysis stored before the country was asked for', async () => {
+      const { documentCountry: _country, ...older } = ANALYSIS_FIXTURES.invoice;
+      await seedAnalyzed(older);
+      await renderDocument();
+
+      expect(await screen.findByText('German')).toBeOnTheScreen();
+      expect(screen.queryByText(/guide/)).not.toBeOnTheScreen();
     });
   });
 
@@ -537,7 +567,31 @@ describe('DocumentDetailScreen', () => {
       expect(analyze).not.toHaveBeenCalled();
       await user.press(screen.getByRole('button', { name: 'Analyze again' }));
 
-      expect(analyze).toHaveBeenCalledWith('doc-1', expect.any(Function));
+      expect(analyze).toHaveBeenCalledWith('doc-1', expect.any(Function), undefined);
+    });
+
+    it('analyzes it again for the country picked, once asked (ANL-14)', async () => {
+      const analyze = jest.spyOn(analysisApi, 'analyzeDocument').mockResolvedValue();
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice, 'DE');
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Analyze for another country' }));
+      expect(
+        screen.getByRole('heading', { name: "Which country's law should the analysis follow?" })
+      ).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Germany' })).toBeOnTheScreen();
+      expect(screen.getByRole('button', { name: 'Another country' })).toBeOnTheScreen();
+      await user.press(screen.getByRole('button', { name: 'Portugal' }));
+
+      // The same question as for analyzing again: the result is replaced.
+      expect(
+        screen.getByRole('heading', { name: 'Analyze the document again?' })
+      ).toBeOnTheScreen();
+      expect(analyze).not.toHaveBeenCalled();
+      await user.press(screen.getByRole('button', { name: 'Analyze again' }));
+
+      expect(analyze).toHaveBeenCalledWith('doc-1', expect.any(Function), 'PT');
     });
 
     it('offers no second analysis before the first one', async () => {

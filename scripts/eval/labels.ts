@@ -63,7 +63,8 @@ type LabelledCase = {
 
 type LabelsFile = {
   kit: string;
-  request: { today: string; timezone: string };
+  /** `country`: the «Страна документов» setting the requests carry (ANL-14); none when absent. */
+  request: { today: string; timezone: string; country?: string | null };
   documents: LabelledCase[];
 };
 
@@ -76,6 +77,8 @@ export type EvalCase = {
   files: string[];
   today: string;
   timezone: string;
+  /** The country the request asks a memo for (ANL-14). */
+  country: string | null;
   expect: AnalysisExpectation;
 };
 
@@ -106,6 +109,7 @@ export function readEvalSet(setDir: string): { cases: EvalCase[]; skipped: numbe
         files: document.files.map((file) => join(setDir, kit, file)),
         today: labels.request.today,
         timezone: labels.request.timezone,
+        country: labels.request.country ?? null,
         expect: document.expect,
       });
     });

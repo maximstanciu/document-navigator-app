@@ -52,6 +52,29 @@ describe('settings repository', () => {
     expect((await settings.get()).explanationLocale).toBeNull();
   });
 
+  it('stores the country of documents, by default the phone’s region (SET-6, ANL-14)', async () => {
+    expect(DEFAULT_SETTINGS.documentCountry).toBeNull();
+
+    await settings.update({ documentCountry: 'PT' });
+    expect((await settings.get()).documentCountry).toBe('PT');
+    expect(
+      await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM settings WHERE key = 'document_country'"
+      )
+    ).toEqual({ value: '"PT"' });
+
+    await settings.update({ documentCountry: 'other' });
+    expect((await settings.get()).documentCountry).toBe('other');
+    await settings.update({ documentCountry: null });
+    expect((await settings.get()).documentCountry).toBeNull();
+  });
+
+  it('refuses a country without a memo', async () => {
+    await expect(
+      settings.update({ documentCountry: 'FR' } as unknown as Parameters<typeof settings.update>[0])
+    ).rejects.toThrow(/documentCountry/);
+  });
+
   it('rejects invalid values without writing anything', async () => {
     await expect(
       settings.update({ locale: 'ru', reminderTime: '25:00' } as Parameters<

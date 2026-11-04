@@ -6,6 +6,7 @@ import {
   type LlmAnalysisShape,
 } from '@/shared/analysis/schema';
 import { addYears, isCalendarDate, isClockTime } from '@/shared/calendar-date';
+import { isCountryCode } from '@/shared/legal-memo-countries';
 
 import { deadlineDate } from './deadline-date';
 
@@ -104,6 +105,7 @@ export function postProcessAnalysis(
   }));
 
   const language = analysis.documentLanguage.trim();
+  const country = analysis.documentCountry?.trim().toUpperCase() ?? null;
   const senderName = analysis.sender ? clip(analysis.sender.name, B.senderName) : '';
 
   return {
@@ -111,6 +113,7 @@ export function postProcessAnalysis(
     title: clip(analysis.title, B.title),
     documentLanguage:
       LANGUAGE_TAG.test(language) && language.length <= B.languageTag ? language : 'und',
+    documentCountry: isCountryCode(country) ? country : null,
     sender: analysis.sender && senderName ? { name: senderName, kind: analysis.sender.kind } : null,
     documentDate,
     summary: clip(analysis.summary, B.summary),

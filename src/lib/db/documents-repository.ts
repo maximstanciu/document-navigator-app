@@ -32,6 +32,7 @@ type DocumentRow = {
   file_size: number;
   analysis: string | null;
   analysis_locale: string | null;
+  legal_memo_country: string | null;
   analyzed_at: string | null;
   search_text: string;
   attention_dismissed_at: string | null;
@@ -41,7 +42,7 @@ type DocumentRow = {
 };
 
 const COLUMNS = `id, title, document_type, sender_name, document_date, status, error_code,
-  analysis_job_id, case_id, source, mime_type, page_count, file_size, analysis, analysis_locale, analyzed_at,
+  analysis_job_id, case_id, source, mime_type, page_count, file_size, analysis, analysis_locale, legal_memo_country, analyzed_at,
   search_text, attention_dismissed_at, created_at, updated_at, deleted_at`;
 
 function toRecord(row: DocumentRow): DocumentRecord {
@@ -62,6 +63,7 @@ function toRecord(row: DocumentRow): DocumentRecord {
     // Only an analysis that passed the shared schema is written; a new shape bumps `schemaVersion`.
     analysis: fromJson(row.analysis) as DocumentRecord['analysis'],
     analysisLocale: row.analysis_locale,
+    legalMemoCountry: row.legal_memo_country,
     analyzedAt: row.analyzed_at,
     searchText: row.search_text,
     attentionDismissedAt: row.attention_dismissed_at,
@@ -135,6 +137,8 @@ export type AnalysisOutcome = {
   analysis: NonNullable<DocumentRecord['analysis']>;
   /** What the server counted (D-4). */
   pageCount: number;
+  /** The country of the legal memo the server used (ANL-14); none when `null` or left out. */
+  legalMemoCountry?: string | null;
   deadlines: readonly NewDeadline[];
   actions: readonly NewAction[];
 };
@@ -362,7 +366,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         await tx.runAsync(
           `UPDATE documents SET title = ?, document_type = ?, sender_name = ?, document_date = ?,
              status = 'ready', error_code = NULL, page_count = ?, analysis = ?,
-             analysis_locale = analysis_job_locale, analyzed_at = ?, search_text = ?, updated_at = ?
+             analysis_locale = analysis_job_locale, legal_memo_country = ?, analyzed_at = ?,
+             search_text = ?, updated_at = ?
            WHERE id = ?`,
           [
             named.title,
@@ -371,6 +376,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             analysis.documentDate,
             outcome.pageCount,
             toJson(analysis),
+            outcome.legalMemoCountry ?? null,
             timestamp,
             searchTextOf({ ...named, analysis }),
             timestamp,
@@ -549,7 +555,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
           `UPDATE documents SET title = '', document_type = NULL, sender_name = NULL,
              document_date = NULL, error_code = NULL, analysis_job_id = NULL,
              analysis_job_locale = NULL, case_id = NULL, analysis = NULL, analysis_locale = NULL,
-             search_text = '', updated_at = ?, deleted_at = ?
+             legal_memo_country = NULL, search_text = '', updated_at = ?, deleted_at = ?
            WHERE id = ?`,
           [timestamp, timestamp, id]
         );

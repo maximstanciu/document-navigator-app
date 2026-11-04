@@ -30,6 +30,7 @@ function document(id: string, overrides: Partial<DocumentSummary> = {}): Documen
     caseId: null,
     hasFraudSignals: false,
     hasHighRisk: false,
+    country: null,
     ...overrides,
   };
 }

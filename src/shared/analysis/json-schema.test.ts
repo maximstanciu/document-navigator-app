@@ -72,6 +72,21 @@ describe('toLlmJsonSchema', () => {
     expect(properties.deadlines.description).toBe(`At most ${ANALYSIS_BOUNDS.deadlines} items.`);
   });
 
+  it('keeps the array bounds as maxItems when asked, and nothing else', () => {
+    const bounded = walk(toLlmJsonSchema({ maxItems: true }));
+    const keywords = new Set(bounded.flatMap(({ node }) => Object.keys(node)));
+    expect([...keywords].filter((keyword) => !PORTABLE_KEYWORDS.includes(keyword))).toEqual([
+      'maxItems',
+    ]);
+    const properties = bounded[0].node.properties as Record<string, JsonSchema>;
+    for (const name of ['actions', 'deadlines', 'risks', 'keyFacts', 'fraudSignals'] as const) {
+      expect(properties[name].maxItems).toBe(ANALYSIS_BOUNDS[name]);
+    }
+    expect(bounded.filter(({ node }) => node.type === 'array').length).toBe(
+      bounded.filter(({ node }) => typeof node.maxItems === 'number').length
+    );
+  });
+
   it('gives each deadline a nullable rule the server counts computed dates by (SPEC §7.3)', () => {
     const properties = schema.properties as Record<string, JsonSchema>;
     const deadline = (properties.deadlines.items as JsonSchema).properties as Record<

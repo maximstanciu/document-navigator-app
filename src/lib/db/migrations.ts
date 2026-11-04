@@ -125,6 +125,12 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX documents_case ON documents (case_id)`,
     ],
   },
+  {
+    // ANL-14 (D-7): the country of the legal memo the analysis was made with, from the server's
+    // answer; `NULL` for none and for analyses stored before.
+    version: 5,
+    statements: [`ALTER TABLE documents ADD COLUMN legal_memo_country TEXT`],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

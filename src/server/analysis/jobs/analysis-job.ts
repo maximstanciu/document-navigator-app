@@ -4,6 +4,7 @@ import type {
   JOB_FAILURE_CODES,
 } from '@/shared/analysis/contract';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import type { MemoCountry } from '@/shared/legal-memo-countries';
 import type { UiLocale } from '@/shared/ui-locales';
 
 import type { AnalysisUsage, UsageSession } from '../../limits/analysis-usage';
@@ -25,6 +26,8 @@ export type JobInput = {
   locale: ExplanationLocale;
   today: string;
   timezone: string;
+  /** The memo the app asked for (ANL-14). */
+  country: MemoCountry | null;
 };
 
 /**
@@ -115,6 +118,10 @@ export type ModelFacts = {
   deadlines: number | null;
   fraudSignals: number | null;
   readable: boolean | null;
+  /** The memo the analysis ended with (ANL-14), from a closed list. */
+  memo: MemoCountry | null;
+  /** Analyzed again with the memo of the country the model found (ANL-14). */
+  memoRetried: boolean | null;
 };
 
 export const NO_MODEL_FACTS: ModelFacts = {
@@ -125,6 +132,8 @@ export const NO_MODEL_FACTS: ModelFacts = {
   deadlines: null,
   fraudSignals: null,
   readable: null,
+  memo: null,
+  memoRetried: null,
 };
 
 /**

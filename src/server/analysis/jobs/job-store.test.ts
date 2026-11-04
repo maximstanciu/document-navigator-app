@@ -5,7 +5,7 @@ import { MemoryAnalysisJobStore } from './job-store';
 const TTL_MS = 24 * 60 * 60 * 1000;
 const DONE: JobResult = {
   status: 'done',
-  response: { analysis: {} as never, pageCount: 1 },
+  response: { analysis: {} as never, pageCount: 1, legalMemo: null },
 };
 const FAILED: JobResult = { status: 'failed', code: 'unavailable' };
 
@@ -32,7 +32,13 @@ function job(device: string, jobId: string): AnalysisJob {
     uiLocale: 'ru',
     pushToken: null,
     queuedAt: time,
-    input: { files: [], locale: 'ru', today: '2026-10-18', timezone: 'Europe/Berlin' },
+    input: {
+      files: [],
+      locale: 'ru',
+      today: '2026-10-18',
+      timezone: 'Europe/Berlin',
+      country: null,
+    },
   });
 }
 

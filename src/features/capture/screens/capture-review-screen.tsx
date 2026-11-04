@@ -57,7 +57,7 @@ export function CaptureReviewScreen({ caseId }: { caseId?: string }) {
       { source, pages, caseId: caseId ?? null },
       {
         onSuccess: (id) => {
-          analysis.mutate(id);
+          analysis.mutate({ documentId: id });
           // The document replaces the modal, so «Back» from it leads to the documents list.
           router.replace({ pathname: '/documents/[id]', params: { id } });
         },

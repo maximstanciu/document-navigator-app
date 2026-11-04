@@ -21,6 +21,7 @@ import {
   type AnalysisJobsCheck,
   type JobProgress,
 } from './api';
+import type { DocumentCountryChoice } from './document-country';
 import { AnalysisError } from './errors';
 
 export const analysisKeys = {
@@ -102,11 +103,18 @@ export function useJobProgress(documentId: string): JobProgress | null {
   return data ?? null;
 }
 
+export type AnalyzeVariables = { documentId: string; country?: DocumentCountryChoice };
+
+/** The mutations of `useAnalyzeDocument()` for this document. */
+const analyzing = (documentId: string) => (mutation: { state: { variables: unknown } }) =>
+  (mutation.state.variables as AnalyzeVariables | undefined)?.documentId === documentId;
+
 /**
  * Starts the analysis of a document (ANL-1): resolves once the upload is done, and runs to the end
  * even if the screen that started it goes away (ANL-3). No retries, and it runs offline too, so
  * that a missing network fails as `offline` (ANL-10) instead of the mutation waiting for one. Then
- * the jobs are checked at once, which starts their polling.
+ * the jobs are checked at once, which starts their polling. `country` is the one picked for this
+ * analysis (DET-9); without it, «Country of documents» decides (ANL-14).
  */
 export function useAnalyzeDocument() {
   const queryClient = useQueryClient();
@@ -114,7 +122,8 @@ export function useAnalyzeDocument() {
     queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() });
   return useMutation({
     mutationKey: analysisKeys.analyze(),
-    mutationFn: (documentId: string) => analyzeDocument(documentId, refreshDocuments),
+    mutationFn: ({ documentId, country }: AnalyzeVariables) =>
+      analyzeDocument(documentId, refreshDocuments, country),
     retry: false,
     networkMode: 'always',
     onSettled: () => {
@@ -131,7 +140,7 @@ export function useIsUploading(documentId: string): boolean {
     filters: {
       mutationKey: analysisKeys.analyze(),
       status: 'pending',
-      predicate: (mutation) => mutation.state.variables === documentId,
+      predicate: analyzing(documentId),
     },
   });
   return pending.length > 0;
@@ -176,7 +185,7 @@ export function useLastAnalysisError(documentId: string): AnalysisError | null {
   const errors = useMutationState({
     filters: {
       mutationKey: analysisKeys.analyze(),
-      predicate: (mutation) => mutation.state.variables === documentId,
+      predicate: analyzing(documentId),
     },
     select: (mutation) => mutation.state.error,
   });

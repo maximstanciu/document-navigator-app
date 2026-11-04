@@ -1,14 +1,18 @@
 import type { AnalyzeResponse } from '@/shared/analysis/contract';
+import type { AnalysisResult } from '@/shared/analysis/schema';
+import { memoCountryToRetry, type MemoCountry } from '@/shared/legal-memo-countries';
 
 import type { AnalysisUsage } from '../../limits/analysis-usage';
 import type { JobEndCode } from '../../limits/usage-keys';
 import { redactError, reportError, type ServerLog } from '../../logs/server-log';
 import { finalizeAnalysis } from '../finalize-analysis';
-import { LlmProviderError, type LlmProvider } from '../llm-provider';
+import { LEGAL_MEMOS } from '../legal-memos';
+import { LlmProviderError, type LlmFile, type LlmProvider } from '../llm-provider';
 import {
   analysisEndEvent,
   NO_MODEL_FACTS,
   type AnalysisJob,
+  type JobInput,
   type JobResult,
   type ModelFacts,
 } from './analysis-job';
@@ -132,14 +136,52 @@ export class AnalysisWorker {
   }
 
   /**
-   * Hands the files over to the model: the job lets go of them first, so once the provider has
-   * encoded and dropped them, nothing holds them in memory (SPEC §7.1).
+   * Hands the files over to the model with the memo the app asked for, and once more with the memo
+   * of the country the model found, if that is another country with a memo (ANL-14); when that
+   * second call fails, the first analysis stands. The job lets go of the files first, and the worker
+   * keeps them only for the second call, so once the provider has encoded and dropped them, nothing
+   * holds them in memory (SPEC §7.1).
    */
   private async callModel(job: AnalysisJob, facts: ModelFacts): Promise<AnalyzeResponse> {
-    const { provider, now } = this.options;
     const input = job.input;
     if (!input) throw new Error('A started job has no files.');
     job.input = null;
+    const files = input.files.splice(0);
+    try {
+      let memo = input.country;
+      let analysis = await this.analyzeOnce(job, input, files.slice(), memo, facts);
+      const retry = memoCountryToRetry(memo, analysis.documentCountry);
+      facts.memoRetried = false;
+      if (retry) {
+        try {
+          analysis = await this.analyzeOnce(job, input, files.splice(0), retry, facts);
+          memo = retry;
+          facts.memoRetried = true;
+        } catch (error) {
+          if (job.controller.signal.aborted) throw error;
+          if (!(error instanceof LlmProviderError)) reportError(error);
+        }
+      }
+      facts.memo = memo;
+      facts.deadlines = analysis.deadlines.length;
+      facts.fraudSignals = analysis.fraudSignals.length;
+      facts.readable = analysis.quality.readable;
+      const legalMemo = memo ? { country: memo, version: LEGAL_MEMOS[memo].version } : null;
+      return { analysis, pageCount: job.pageCount, legalMemo };
+    } finally {
+      files.length = 0;
+    }
+  }
+
+  /** One call to the model with `country`'s memo, its answer checked and post-processed. */
+  private async analyzeOnce(
+    job: AnalysisJob,
+    input: JobInput,
+    files: LlmFile[],
+    country: MemoCountry | null,
+    facts: ModelFacts
+  ): Promise<AnalysisResult> {
+    const { provider, now } = this.options;
     const { signal } = job.controller;
     const context = { today: input.today, pageCount: job.pageCount };
 
@@ -147,10 +189,11 @@ export class AnalysisWorker {
     let output;
     try {
       output = await provider.analyze({
-        files: input.files.splice(0),
+        files,
         locale: input.locale,
         today: input.today,
         timezone: input.timezone,
+        country,
         signal,
         checkShape: (result) => {
           const checked = finalizeAnalysis(result, context);
@@ -161,22 +204,18 @@ export class AnalysisWorker {
       if (signal.aborted || error instanceof LlmProviderError) throw error;
       throw new LlmProviderError('unavailable', 'The analysis service is unavailable.');
     } finally {
-      facts.modelMs = now() - modelStartedAt;
+      facts.modelMs = (facts.modelMs ?? 0) + now() - modelStartedAt;
     }
-    facts.inputTokens = output.usage.inputTokens;
-    facts.outputTokens = output.usage.outputTokens;
-    facts.costUsd = output.costUsd;
+    facts.inputTokens = (facts.inputTokens ?? 0) + output.usage.inputTokens;
+    facts.outputTokens = (facts.outputTokens ?? 0) + output.usage.outputTokens;
+    facts.costUsd = (facts.costUsd ?? 0) + output.costUsd;
 
     // The provider has already asked once more with the error (`checkShape`, SPEC §7.4).
     const finalized = finalizeAnalysis(output.result, context);
     if (!finalized.ok) {
       throw new LlmProviderError('analysis_failed', 'The model returned an invalid analysis.');
     }
-    const { analysis } = finalized;
-    facts.deadlines = analysis.deadlines.length;
-    facts.fraudSignals = analysis.fraudSignals.length;
-    facts.readable = analysis.quality.readable;
-    return { analysis, pageCount: job.pageCount };
+    return finalized.analysis;
   }
 }
 

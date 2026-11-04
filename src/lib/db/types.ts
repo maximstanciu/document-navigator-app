@@ -1,6 +1,7 @@
 import type { AnalyzeErrorCode } from '@/shared/analysis/contract';
 import type { AnalysisResult, DeadlineKind, DocumentType, Level } from '@/shared/analysis/schema';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import type { MemoCountry } from '@/shared/legal-memo-countries';
 
 // Records stored on the device (SPEC §6.1). Timestamps are ISO 8601 strings, calendar dates YYYY-MM-DD.
 // The analysis, its enums and the server error codes come from the shared schema in src/shared.
@@ -33,6 +34,8 @@ export type DocumentRecord = {
   fileSize: number;
   analysis: AnalysisResult | null;
   analysisLocale: string | null;
+  /** The country of the legal memo the analysis was made with (ANL-14); `null` — none, or older. */
+  legalMemoCountry: string | null;
   analyzedAt: string | null;
   searchText: string;
   attentionDismissedAt: string | null;
@@ -108,6 +111,11 @@ export type Settings = {
   locale: InterfaceLocale;
   /** `null` — same as the interface language (D-5). */
   explanationLocale: ExplanationLocale | null;
+  /**
+   * «Country of documents» (SET-6, ANL-14): whose legal memo an analysis starts with. `null` — the
+   * phone's region, `other` — none.
+   */
+  documentCountry: MemoCountry | 'other' | null;
   /** Default reminder offsets in days before the deadline (REM-2, SET-2). */
   reminderOffsetsDays: number[];
   /** Local time for reminders, HH:mm (REM-2, SET-2). */
@@ -122,6 +130,7 @@ export type Settings = {
 export const DEFAULT_SETTINGS: Settings = {
   locale: 'system',
   explanationLocale: null,
+  documentCountry: null,
   reminderOffsetsDays: [7, 1, 0],
   reminderTime: '09:00',
   notificationDetails: false,

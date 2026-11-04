@@ -20,6 +20,7 @@ import { inspectPdf } from '@/server/analysis/inspect-pdf';
 import { LlmProviderError, type LlmFile, type LlmProvider } from '@/server/analysis/llm-provider';
 import { IMAGE_MIME_TYPE, PDF_MIME_TYPE } from '@/shared/analysis/contract';
 import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
+import { isMemoCountry, memoCountryToRetry, type MemoCountry } from '@/shared/legal-memo-countries';
 import { MAX_DOCUMENT_BYTES } from '@/shared/limits';
 
 import { readEvalSet, type EvalCase } from './labels';
@@ -172,26 +173,46 @@ async function runCase(
   const context = { today: evalCase.today, pageCount };
   let retried = false;
   const startedAt = performance.now();
-  try {
-    const output = await provider.analyze({
-      files,
+  const call = (country: MemoCountry | null, pages: LlmFile[]) =>
+    provider.analyze({
+      files: pages,
       locale,
       today: evalCase.today,
       timezone: evalCase.timezone,
+      country,
       checkShape: (result) => {
         const checked = finalizeAnalysis(result, context);
         if (!checked.ok) retried = true;
         return checked.ok ? null : checked.error;
       },
     });
-    const finalized = finalizeAnalysis(output.result, context);
+  try {
+    // As the server's worker does (ANL-14): the memo asked for, then once more with the memo of
+    // the country the model found, if that one has a memo too.
+    let memo = isMemoCountry(evalCase.country) ? evalCase.country : null;
+    let output = await call(memo, files.slice());
+    let finalized = finalizeAnalysis(output.result, context);
+    const usage = { ...output.usage, costUsd: output.costUsd };
+    const retry = finalized.ok
+      ? memoCountryToRetry(memo, finalized.analysis.documentCountry)
+      : null;
+    if (retry) {
+      output = await call(retry, files);
+      finalized = finalizeAnalysis(output.result, context);
+      memo = retry;
+      usage.inputTokens += output.usage.inputTokens;
+      usage.outputTokens += output.usage.outputTokens;
+      usage.costUsd += output.costUsd;
+    }
     const done = {
       ...base,
       ms: Math.round(performance.now() - startedAt),
-      inputTokens: output.usage.inputTokens,
-      outputTokens: output.usage.outputTokens,
-      costUsd: output.costUsd,
+      inputTokens: usage.inputTokens,
+      outputTokens: usage.outputTokens,
+      costUsd: usage.costUsd,
       retried,
+      memo,
+      memoRetried: retry !== null,
       pageCount,
     };
     return finalized.ok

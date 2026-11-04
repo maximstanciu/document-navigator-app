@@ -83,7 +83,9 @@ const FRAUD = ANALYSIS_FIXTURES.fraudulentInvoice.title;
 const CONTRACT = ANALYSIS_FIXTURES.contract.title;
 
 /** The rows of the list, without the cards of «Needs attention», which end differently. */
-const listRows = () => screen.queryAllByRole('link', { name: / · (Analyzed|Not analyzed)$/ });
+// A card's name ends with its status, and the country of an analyzed document (DET-11).
+const listRows = () =>
+  screen.queryAllByRole('link', { name: / · (Analyzed · [^,]+|Not analyzed)$/ });
 
 describe('DocumentListScreen', () => {
   describe('the list (HOME-2)', () => {
@@ -98,7 +100,7 @@ describe('DocumentListScreen', () => {
       expect(rows).toHaveLength(2);
       expect(rows[0]).toHaveAccessibleName(
         new RegExp(
-          `^${INVOICE}, Invoice · Stadtwerke Musterstadt GmbH, By [^,]+, .* · 1 page · Analyzed$`
+          `^${INVOICE}, Invoice · Stadtwerke Musterstadt GmbH, By [^,]+, .* · 1 page · Analyzed · Germany$`
         )
       );
       expect(rows[1]).toHaveAccessibleName(/^Счёт за газ, .*2 pages · Not analyzed$/);
@@ -299,7 +301,7 @@ describe('DocumentListScreen', () => {
 
       await user.type(search, 'stadtwerke');
       expect(
-        await screen.findByRole('link', { name: new RegExp(`^${INVOICE}, .*Analyzed$`) })
+        await screen.findByRole('link', { name: new RegExp(`^${INVOICE}, .*Analyzed · Germany$`) })
       ).toBeOnTheScreen();
       expect(listRows()).toHaveLength(1);
 

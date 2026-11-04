@@ -7,6 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MinTouchTarget, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { countryName } from '@/lib/i18n/display-names';
 import { formatCalendarDate } from '@/lib/i18n/format';
 
 import { displayTitle, formatDocumentType, formatMeta } from '../format';
@@ -23,8 +24,8 @@ type DocumentListItemProps = {
 };
 
 /**
- * A document in the list (HOME-2): title, type, sender, nearest deadline, analysis status, and its
- * case (CASE-3).
+ * A document in the list (HOME-2): title, type, sender, nearest deadline, analysis status, the
+ * code of its country (DET-11), and its case (CASE-3).
  */
 export function DocumentListItem({
   document,
@@ -48,13 +49,18 @@ export function DocumentListItem({
     dueLine = overdue ? `${due} · ${t('documents.deadline.overdue')}` : due;
   }
   const meta = formatMeta(document, t, i18n.language);
+  // «PT» on the card; a screen reader says the country's name.
+  const metaLine = [meta, document.country].filter(Boolean).join(' · ');
+  const metaLabel = [meta, document.country && countryName(document.country, t)]
+    .filter(Boolean)
+    .join(' · ');
   const inCase = caseName ? t('cases.document.inCase', { name: caseName }) : null;
 
   return (
     <Link href={{ pathname: '/documents/[id]', params: { id: document.id } }} asChild>
       <Pressable
         role="link"
-        aria-label={[title, from, dueLine, meta, inCase].filter(Boolean).join(', ')}>
+        aria-label={[title, from, dueLine, metaLabel, inCase].filter(Boolean).join(', ')}>
         {({ pressed }) => (
           <ThemedView
             type={pressed ? 'backgroundSelected' : 'backgroundElement'}
@@ -73,7 +79,7 @@ export function DocumentListItem({
               </ThemedText>
             )}
             <ThemedText type="small" themeColor="textSecondary">
-              {meta}
+              {metaLine}
             </ThemedText>
             {caseName && (
               <View style={styles.case}>

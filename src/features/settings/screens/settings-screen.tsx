@@ -13,6 +13,7 @@ import { settingsQuery } from '@/lib/db/settings-query';
 import { env } from '@/lib/env';
 
 import { DeleteAllData } from '../components/delete-all-data';
+import { DocumentCountryPicker } from '../components/document-country-picker';
 import { ExplanationLanguagePicker, LanguagePicker } from '../components/language-picker';
 import { ReminderSettings } from '../components/reminder-settings';
 import { SettingsSection } from '../components/settings-section';
@@ -56,6 +57,7 @@ export function SettingsScreen() {
           <ReminderSettings />
         </SettingsSection>
         <SettingsSection title={t('settings.sections.analysis')}>
+          <DocumentCountryPicker />
           <RemainingAnalyses />
         </SettingsSection>
         <SettingsSection title={t('settings.sections.data')}>

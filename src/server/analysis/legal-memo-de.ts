@@ -7,6 +7,9 @@
 // It is checked again when the law changes and at least once a year. Budget: 20k tokens.
 
 export const LEGAL_MEMO_DE = {
+  country: 'DE',
+  /** The country's name in English, for rule 11 of the prompt. */
+  countryName: 'Germany',
   version: '2026-10-20',
   /** Who reviewed this version and when; `null` while it is a draft. */
   reviewed: null as string | null,

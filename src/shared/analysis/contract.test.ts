@@ -14,13 +14,34 @@ import { ANALYSIS_FIXTURES } from './fixtures';
 const { invoice } = ANALYSIS_FIXTURES;
 
 describe('analyzeResponseSchema', () => {
-  it('accepts the analysis with the page count the server counted', () => {
-    const body = { analysis: invoice, pageCount: 2 };
+  it('accepts the analysis with the page count the server counted and the memo it used', () => {
+    const body = {
+      analysis: invoice,
+      pageCount: 2,
+      legalMemo: { country: 'DE', version: '2026-10-20' },
+    };
     expect(analyzeResponseSchema.parse(body)).toEqual(body);
+  });
+
+  it('reads an answer of a server older than the memo field as made without a memo (ANL-14)', () => {
+    expect(analyzeResponseSchema.parse({ analysis: invoice, pageCount: 2 }).legalMemo).toBeNull();
+  });
+
+  it('accepts an analysis stored before SPEC v0.40, without the document’s country', () => {
+    const { documentCountry: _country, ...older } = invoice;
+    expect(analyzeResponseSchema.safeParse({ analysis: older, pageCount: 2 }).success).toBe(true);
   });
 
   it.each([
     ['no page count', { analysis: invoice }],
+    [
+      'a memo country that isn’t a code',
+      { analysis: invoice, pageCount: 1, legalMemo: { country: 'Portugal', version: '1' } },
+    ],
+    [
+      'a document country in lower case',
+      { analysis: { ...invoice, documentCountry: 'pt' }, pageCount: 1 },
+    ],
     ['a page count of zero', { analysis: invoice, pageCount: 0 }],
     ['an analysis that fails the schema', { analysis: { ...invoice, title: 1 }, pageCount: 1 }],
   ])('rejects %s', (_case, body) => {
@@ -32,7 +53,7 @@ describe('analysisJobStateSchema', () => {
   it.each([
     ['queued', { status: 'queued', ahead: 2 }],
     ['processing', { status: 'processing' }],
-    ['done', { status: 'done', analysis: invoice, pageCount: 2 }],
+    ['done', { status: 'done', analysis: invoice, pageCount: 2, legalMemo: null }],
     ['failed', { status: 'failed', error: { code: 'unavailable', message: 'Down.' } }],
   ])('accepts a %s job', (_status, state) => {
     expect(analysisJobStateSchema.parse(state)).toEqual(state);

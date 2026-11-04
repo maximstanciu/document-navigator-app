@@ -5,7 +5,13 @@ import { createLlmProvider } from './create-llm-provider';
 import { MockLlmProvider } from './providers/mock-llm-provider';
 import { OpenAiCompatibleProvider } from './providers/openai-compatible-provider';
 
-const input = { files: [], locale: 'ru', today: '2026-10-18', timezone: 'Europe/Berlin' } as const;
+const input = {
+  files: [],
+  locale: 'ru',
+  today: '2026-10-18',
+  timezone: 'Europe/Berlin',
+  country: null,
+} as const;
 
 const OPENAI_COMPATIBLE = {
   LLM_PROVIDER: 'openai-compatible',

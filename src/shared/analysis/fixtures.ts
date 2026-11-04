@@ -9,6 +9,7 @@ const invoice: AnalysisResult = {
   documentType: 'invoice',
   title: 'Счёт за электричество, сентябрь 2026',
   documentLanguage: 'de',
+  documentCountry: 'DE',
   sender: { name: 'Stadtwerke Musterstadt GmbH', kind: 'company' },
   documentDate: '2026-10-03',
   summary:
@@ -60,6 +61,7 @@ const officialNotice: AnalysisResult = {
   documentType: 'official_notice',
   title: 'Запрос справки из школы для детского пособия',
   documentLanguage: 'de',
+  documentCountry: 'DE',
   sender: { name: 'Familienkasse Musterstadt', kind: 'government' },
   documentDate: '2026-10-09',
   summary:
@@ -129,6 +131,7 @@ const contract: AnalysisResult = {
   documentType: 'contract',
   title: 'Договор с фитнес-клубом FitLife',
   documentLanguage: 'en',
+  documentCountry: 'DE',
   sender: { name: 'FitLife Clubs Ltd', kind: 'company' },
   documentDate: '2026-01-20',
   summary:
@@ -210,6 +213,7 @@ const fraudulentInvoice: AnalysisResult = {
   documentType: 'invoice',
   title: 'Требование оплатить таможенный сбор за посылку',
   documentLanguage: 'de',
+  documentCountry: 'DE',
   sender: { name: 'Paketdienst Express Zollservice', kind: 'company' },
   documentDate: '2026-10-17',
   summary:
@@ -293,6 +297,7 @@ const unreadable: AnalysisResult = {
   documentType: 'unknown',
   title: 'Нечитаемый документ',
   documentLanguage: 'und',
+  documentCountry: null,
   sender: null,
   documentDate: null,
   summary:
@@ -364,6 +369,7 @@ export function llmOutputFixture(name: AnalysisFixtureName): LlmAnalysis {
   const { schemaVersion: _schemaVersion, ...analysis } = structuredClone(ANALYSIS_FIXTURES[name]);
   return {
     ...analysis,
+    documentCountry: analysis.documentCountry ?? null,
     deadlines: analysis.deadlines.map((deadline) => ({
       ...deadline,
       rule: DEADLINE_RULES[name]?.[deadline.id] ?? null,

@@ -25,6 +25,7 @@ function toSummary(document: DocumentRecord): DocumentSummary {
     caseId: document.caseId,
     hasFraudSignals: (document.analysis?.fraudSignals.length ?? 0) > 0,
     hasHighRisk: document.analysis?.risks.some((risk) => risk.severity === 'high') ?? false,
+    country: document.analysis?.documentCountry ?? null,
   };
 }
 
@@ -78,6 +79,7 @@ export async function getDocument(id: string): Promise<DocumentDetail | null> {
     errorCode: document.errorCode,
     fileSize: document.fileSize,
     analysis: document.analysis,
+    legalMemoCountry: document.legalMemoCountry,
   };
 }
 

@@ -148,6 +148,32 @@ describe('SettingsScreen language (SET-1)', () => {
     );
   });
 
+  it('picks the country of documents, by default the phone’s region (SET-6, ANL-14)', async () => {
+    const user = userEvent.setup();
+    await renderSettings();
+    expect(
+      screen.getByRole('radio', { name: "Country of documents: Same as the phone's region" })
+    ).toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Country of documents: Portugal' }));
+    await waitFor(async () =>
+      expect((await repositories.settings.get()).documentCountry).toBe('PT')
+    );
+    expect(screen.getByRole('radio', { name: 'Country of documents: Portugal' })).toBeChecked();
+
+    await user.press(screen.getByRole('radio', { name: 'Country of documents: Another country' }));
+    await waitFor(async () =>
+      expect((await repositories.settings.get()).documentCountry).toBe('other')
+    );
+
+    await user.press(
+      screen.getByRole('radio', { name: "Country of documents: Same as the phone's region" })
+    );
+    await waitFor(async () =>
+      expect((await repositories.settings.get()).documentCountry).toBeNull()
+    );
+  });
+
   it('says when a choice could not be saved and shows the stored one', async () => {
     const user = userEvent.setup();
     jest.spyOn(repositories.settings, 'update').mockRejectedValueOnce(new Error('disk full'));

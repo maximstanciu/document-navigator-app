@@ -37,6 +37,7 @@ function scored(
     files: [],
     today: '2026-11-01',
     timezone: 'Europe/Berlin',
+    country: null,
     expect,
   };
   const run: CaseRun = {

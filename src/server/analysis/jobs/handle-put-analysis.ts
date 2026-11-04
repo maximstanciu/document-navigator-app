@@ -147,7 +147,7 @@ async function upload(
     const raced = deps.jobs.get(device, jobId);
     if (raced) return { state: stateOf(raced, deps), code: 'existing' };
 
-    const { files, locale, today, timezone, uiLocale, pushToken } = upload;
+    const { files, locale, today, timezone, uiLocale, pushToken, country } = upload;
     const job = createAnalysisJob({
       device,
       jobId,
@@ -159,7 +159,7 @@ async function upload(
       uiLocale,
       pushToken,
       queuedAt: deps.now(),
-      input: { files, locale, today, timezone },
+      input: { files, locale, today, timezone, country },
     });
     deps.jobs.add(job);
     deps.worker.kick();

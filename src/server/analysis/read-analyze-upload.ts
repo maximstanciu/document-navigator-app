@@ -7,6 +7,7 @@ import {
 } from '@/shared/analysis/contract';
 import { isCalendarDate } from '@/shared/calendar-date';
 import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
+import { isCountryCode, isMemoCountry, type MemoCountry } from '@/shared/legal-memo-countries';
 import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
 import { isUiLocale, type UiLocale } from '@/shared/ui-locales';
 
@@ -26,12 +27,16 @@ export type AnalyzeUpload = {
   timezone: string;
   uiLocale: UiLocale;
   pushToken: string | null;
+  /** The memo the app asked for (ANL-14); a country without one counts as none. */
+  country: MemoCountry | null;
 };
 
 /**
  * Reads and checks the body of `PUT /api/v1/analyses/{jobId}` (SPEC §7.2): one PDF or 1–30 JPEG
  * pages within `MAX_DOCUMENT_BYTES`, an explanation locale, the device's date and time zone, the
- * interface language and an optional push token. The number of PDF pages is checked later, by
+ * interface language, an optional push token and an optional country (ANL-14): a valid code
+ * without a memo counts as none, so a newer app works with an older server. The number of PDF pages
+ * is checked later, by
  * `countPages()`.
  *
  * Only the bytes leave this function: the parsed form and its files are dropped one by one as they
@@ -60,6 +65,10 @@ export async function readAnalyzeUpload(request: Request): Promise<AnalyzeUpload
   if (pushToken !== null && !isPushToken(pushToken)) {
     throw invalid(`${ANALYZE_FIELDS.pushToken} must be an Expo push token.`);
   }
+  const country = form.get(ANALYZE_FIELDS.country) ?? null;
+  if (country !== null && !isCountryCode(country)) {
+    throw invalid(`${ANALYZE_FIELDS.country} must be an ISO 3166-1 alpha-2 code in upper case.`);
+  }
 
   const entries: (FormFile | null)[] = checkFiles(form.getAll(ANALYZE_FIELDS.files));
   form.delete(ANALYZE_FIELDS.files);
@@ -78,7 +87,16 @@ export async function readAnalyzeUpload(request: Request): Promise<AnalyzeUpload
     files.push({ mimeType, bytes });
   }
 
-  return { kind, files, locale, today, timezone, uiLocale, pushToken };
+  return {
+    kind,
+    files,
+    locale,
+    today,
+    timezone,
+    uiLocale,
+    pushToken,
+    country: isMemoCountry(country) ? country : null,
+  };
 }
 
 /**

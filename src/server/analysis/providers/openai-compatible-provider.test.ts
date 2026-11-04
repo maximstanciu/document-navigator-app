@@ -52,7 +52,14 @@ type RequestBody = {
 };
 
 function input(files: LlmFile[], extra: Partial<LlmAnalyzeInput> = {}): LlmAnalyzeInput {
-  return { files, locale: 'en', today: '2026-10-20', timezone: 'Europe/Berlin', ...extra };
+  return {
+    files,
+    locale: 'en',
+    today: '2026-10-20',
+    timezone: 'Europe/Berlin',
+    country: null,
+    ...extra,
+  } as LlmAnalyzeInput;
 }
 
 const jpegFile = (bytes: number[]): LlmFile => ({
@@ -86,7 +93,11 @@ describe('OpenAiCompatibleProvider', () => {
       temperature: 0,
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'document_analysis', strict: true, schema: toLlmJsonSchema() },
+        json_schema: {
+          name: 'document_analysis',
+          strict: true,
+          schema: toLlmJsonSchema({ maxItems: true }),
+        },
       },
     });
     expect(body).not.toHaveProperty('reasoning_effort');

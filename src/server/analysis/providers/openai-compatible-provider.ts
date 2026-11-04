@@ -26,11 +26,14 @@ export type OpenAiCompatibleOptions = {
 };
 
 /**
- * An answer longer than this is a model stuck in a loop, not an analysis. A full analysis takes
- * a few thousand tokens; on a CPU each costs about a tenth of a second.
+ * An answer longer than this is a model stuck in a loop, not an analysis. A usual analysis takes
+ * 1–5 thousand tokens, one with every list at its bound (`maxItems` below) 10–14 thousand. On the
+ * server's CPU a token costs 0.1–0.15 s for a short document and 0.6 s at 50 PDF pages
+ * (deploy/README.md, «Модель»).
  */
-const MAX_OUTPUT_TOKENS = 8192;
-const SCHEMA = toLlmJsonSchema();
+const MAX_OUTPUT_TOKENS = 16384;
+/** Ollama's grammar holds the lists to their bounds (SPEC §7.3). */
+const SCHEMA = toLlmJsonSchema({ maxItems: true });
 
 type Message =
   | { role: 'system' | 'assistant'; content: string }
@@ -67,7 +70,7 @@ export class OpenAiCompatibleProvider implements LlmProvider {
   async analyze(input: LlmAnalyzeInput): Promise<LlmAnalyzeOutput> {
     const pages = await this.encodePages(input.files, input.signal);
     const messages: Message[] = [
-      { role: 'system', content: systemPrompt() },
+      { role: 'system', content: systemPrompt(input.country) },
       {
         role: 'user',
         content: [

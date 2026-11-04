@@ -24,6 +24,8 @@ export const REQUEST_FIELDS: Record<string, string> = {
   [ANALYZE_FIELDS.today]: '2026-10-18',
   [ANALYZE_FIELDS.timezone]: 'Europe/Berlin',
   [ANALYZE_FIELDS.uiLocale]: 'ru',
+  // The synthetic fixtures are from Germany, so their analysis needs no second call (ANL-14).
+  [ANALYZE_FIELDS.country]: 'DE',
 };
 
 export const TEST_PUSH_TOKEN = 'ExponentPushToken[xxxxxxxxxxxxxxxxxxxxxx]';

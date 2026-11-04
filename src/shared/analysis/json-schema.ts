@@ -23,21 +23,21 @@ const DROPPED_KEYWORDS = new Set([
   'exclusiveMaximum',
 ]);
 
-function toPortable(node: JsonSchema): JsonSchema {
+function toPortable(node: JsonSchema, keepMaxItems: boolean): JsonSchema {
   const result: JsonSchema = {};
   for (const [keyword, value] of Object.entries(node)) {
-    if (DROPPED_KEYWORDS.has(keyword)) continue;
+    if (DROPPED_KEYWORDS.has(keyword) && !(keepMaxItems && keyword === 'maxItems')) continue;
     if (keyword === 'properties') {
       result.properties = Object.fromEntries(
         Object.entries(value as Record<string, JsonSchema>).map(([name, child]) => [
           name,
-          toPortable(child),
+          toPortable(child, keepMaxItems),
         ])
       );
     } else if (keyword === 'items') {
-      result.items = toPortable(value as JsonSchema);
+      result.items = toPortable(value as JsonSchema, keepMaxItems);
     } else if (keyword === 'anyOf') {
-      result.anyOf = (value as JsonSchema[]).map(toPortable);
+      result.anyOf = (value as JsonSchema[]).map((child) => toPortable(child, keepMaxItems));
     } else {
       result[keyword] = value;
     }
@@ -55,8 +55,11 @@ function toPortable(node: JsonSchema): JsonSchema {
 
 /**
  * JSON Schema of the model's output, in the subset every provider candidate supports. The provider
- * (task 3.2) passes it as its structured-output schema.
+ * (task 3.2) passes it as its structured-output schema. `maxItems` keeps the array sizes for a
+ * provider whose grammar enforces them (llama.cpp in Ollama): the model then can't write more
+ * items than the bounds, which is what caps its output (SPEC §7.3). Lengths stay out: the grammar
+ * would cut a quote mid-word, and the server trims long text anyway.
  */
-export function toLlmJsonSchema(): JsonSchema {
-  return toPortable(z.toJSONSchema(llmAnalysisSchema) as JsonSchema);
+export function toLlmJsonSchema({ maxItems = false }: { maxItems?: boolean } = {}): JsonSchema {
+  return toPortable(z.toJSONSchema(llmAnalysisSchema) as JsonSchema, maxItems);
 }

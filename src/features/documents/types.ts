@@ -21,6 +21,8 @@ export type DocumentSummary = Pick<
   hasFraudSignals: boolean;
   /** The analysis found at least one high risk (DET-5). */
   hasHighRisk: boolean;
+  /** The country the document comes from, ISO 3166-1 alpha-2, if the analysis found it (ANL-14). */
+  country: string | null;
 };
 
 /** An open deadline as the documents list shows it: the nearest one on a card (HOME-2, HOME-1). */
@@ -31,7 +33,10 @@ export type DeadlineSummary = Pick<
 
 /** Everything the document screen shows about the document itself (DET-1…DET-10). */
 export type DocumentDetail = DocumentSummary &
-  Pick<DocumentRecord, 'documentDate' | 'mimeType' | 'errorCode' | 'fileSize' | 'analysis'>;
+  Pick<
+    DocumentRecord,
+    'documentDate' | 'mimeType' | 'errorCode' | 'fileSize' | 'analysis' | 'legalMemoCountry'
+  >;
 
 /** A page of the original. `uri` is `null` when its file is gone from the device (STO-8). */
 export type DocumentPage = { id: string; index: number; uri: string | null };

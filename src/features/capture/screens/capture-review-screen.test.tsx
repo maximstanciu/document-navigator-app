@@ -174,7 +174,8 @@ describe('CaptureReviewScreen (CAP-5)', () => {
     expect(await screen.findByText("This document hasn't been analyzed yet.")).toBeOnTheScreen();
     expect(screen).toHavePathname('/documents/uuid-1');
     expect(analyze).toHaveBeenCalledTimes(1);
-    expect(analyze).toHaveBeenCalledWith('uuid-1', expect.any(Function));
+    // No country picked: «Country of documents» decides (ANL-14).
+    expect(analyze).toHaveBeenCalledWith('uuid-1', expect.any(Function), undefined);
     expect(await repositories.documents.get('uuid-1')).toMatchObject({
       status: 'draft',
       source: 'scan',

@@ -16,6 +16,10 @@ describe('quoteWritesDate', () => {
     ['on the 1st of December 2026', '2026-12-01'],
     ['Оплатить до 1 декабря 2026 г.', '2026-12-01'],
     ['Сплатити до 1 грудня 2026 року', '2026-12-01'],
+    ['Pagar até 1 de dezembro de 2026.', '2026-12-01'],
+    ['O pagamento deve ser efetuado até 01/12/2026.', '2026-12-01'],
+    ['a reunião é a 3 de março', '2027-03-03'],
+    ['data limite: 1 dez. 2026', '2026-12-01'],
     ['Bitte zahlen Sie bis zum 1. Dezember 2026.', '2026-12-01'],
   ])('finds the date in %p', (quote, date) => {
     expect(quoteWritesDate(quote, date)).toBe(true);
@@ -25,6 +29,9 @@ describe('quoteWritesDate', () => {
     ['a relative deadline', 'Innerhalb von zwei Wochen nach Zustellung.', '2026-12-01'],
     ['another year', 'Bitte zahlen Sie bis zum 01.12.2025.', '2026-12-01'],
     ['another year after the month name', 'bis zum 1. Dezember 2025', '2026-12-01'],
+    ['another year after a Portuguese month', 'até 1 de dezembro de 2025', '2026-12-01'],
+    ['a working-day period', 'no prazo de 15 dias úteis a contar da notificação', '2026-12-01'],
+    ['the English word "out"', 'Pay 15 out of 20 instalments.', '2026-10-15'],
     ['another day', 'Bitte zahlen Sie bis zum 11.12.2026.', '2026-12-01'],
     ['a day inside a longer number', 'Rechnung 101.12.2026', '2026-12-01'],
     ['the US order of day and month', 'Pay by 01/12/2026.', '2026-01-12'],

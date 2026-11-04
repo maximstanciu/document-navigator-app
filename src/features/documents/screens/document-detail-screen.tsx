@@ -10,6 +10,7 @@ import { ThemedText } from '@/components/themed-text';
 import { NameForm } from '@/components/ui/name-form';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { AnalysisStatusPanel } from '@/features/analysis/components/analysis-status-panel';
+import type { DocumentCountryChoice } from '@/features/analysis/document-country';
 import { useAnalyzeDocument } from '@/features/analysis/queries';
 import { DocumentCase } from '@/features/cases/components/document-case';
 import { useTheme } from '@/hooks/use-theme';
@@ -19,7 +20,7 @@ import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 import { DocumentActionsButton, DocumentActionsSheet } from '../components/document-actions';
 import { DocumentResult } from '../components/document-result';
 import { OriginalBlock } from '../components/original-block';
-import { displayTitle, formatDocumentType } from '../format';
+import { displayTitle, formatDocumentType, formatOrigin } from '../format';
 import { documentQueries, useDeleteDocument, useRenameDocument } from '../queries';
 import type { DocumentDetail } from '../types';
 
@@ -43,7 +44,8 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 /**
  * A document (SPEC §4.4): the title, where its analysis stands, the analysis itself in the order of
  * the four questions (DET-1…DET-10), the original and the disclaimer. «⋯» in the header renames,
- * analyzes again or deletes it (DET-9); under the title, the case it is filed in (CASE-2).
+ * analyzes again, for another country too, or deletes it (DET-9); under the title, the document's
+ * language and country and the legal memo used (DET-11), and the case it is filed in (CASE-2).
  */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -73,6 +75,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
 
   const title = displayTitle(data.title, t);
   const meta = documentMeta(data, t, i18n.language);
+  const origin = data.analysis ? formatOrigin(data.analysis, data.legalMemoCountry, t) : '';
 
   // Without its page files a new analysis can only fail, and the document would read as failed
   // although its analysis is fine (STO-8).
@@ -80,8 +83,8 @@ export function DocumentDetailScreen({ id }: { id: string }) {
     pages.data !== undefined &&
     pages.data.length > 0 &&
     pages.data.every((page) => page.uri !== null);
-  const reanalyze = () => {
-    analyze.mutate(id);
+  const reanalyze = (country?: DocumentCountryChoice) => {
+    analyze.mutate({ documentId: id, country });
     // The progress shows at the top.
     scroll.current?.scrollTo({ y: 0, animated: true });
   };
@@ -138,6 +141,11 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       {meta !== '' && (
         <ThemedText type="small" themeColor="textSecondary">
           {meta}
+        </ThemedText>
+      )}
+      {origin !== '' && (
+        <ThemedText type="small" themeColor="textSecondary">
+          {origin}
         </ThemedText>
       )}
       <DocumentCase documentId={data.id} caseId={data.caseId} />

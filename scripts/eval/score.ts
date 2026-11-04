@@ -18,6 +18,9 @@ export type CaseRun = {
   costUsd: number;
   /** The model's first answer didn't fit the schema and it was asked again (SPEC §7.4). */
   retried: boolean;
+  /** The memo the analysis ended with and whether it took a second call (ANL-14); absent in older runs. */
+  memo?: string | null;
+  memoRetried?: boolean;
   pageCount: number;
   outcome:
     | { kind: 'analysis'; analysis: AnalysisResult; raw: unknown }

@@ -1,5 +1,7 @@
 import { z } from 'zod';
 
+import { COUNTRY_CODE } from '../legal-memo-countries';
+
 // Analysis result (SPEC §7.3): the single source of truth for its TypeScript type, runtime
 // validation and the JSON Schema sent to the model (`toLlmJsonSchema()` in ./json-schema.ts).
 //
@@ -131,7 +133,9 @@ function buildAnalysisSchema<RuleField extends z.ZodRawShape>(
       .describe('Time of day if the document gives one, HH:mm (24-hour).'),
     dateSource: z
       .enum(['explicit', 'computed'])
-      .describe('"computed" when the date is derived, e.g. "within 14 days of the letter".'),
+      .describe(
+        '"explicit" when the document writes the date out, e.g. "by 15.11.2026"; "computed" only when it gives a period from an event, e.g. "within 14 days of the letter".'
+      ),
     ...ruleField,
     computation: text(B.computation)
       .nullable()
@@ -171,7 +175,12 @@ function buildAnalysisSchema<RuleField extends z.ZodRawShape>(
     documentLanguage: (strict
       ? z.string().regex(LANGUAGE_TAG).max(B.languageTag)
       : z.string()
-    ).describe('BCP 47 tag of the language of the original, e.g. "de"; "und" if unknown.'),
+    ).describe('BCP 47 tag of the language of the original, e.g. "pt"; "und" if unknown.'),
+    documentCountry: (strict ? z.string().regex(COUNTRY_CODE) : z.string())
+      .nullable()
+      .describe(
+        'ISO 3166-1 alpha-2 code of the country the document comes from: of the authority, court, company or person that sent it, or whose law it follows, e.g. "PT". Null if the document does not show it.'
+      ),
     sender: senderSchema.nullable(),
     documentDate: calendarDate.nullable(),
     summary: text(B.summary).describe('2–4 sentences in plain language.'),
@@ -248,6 +257,8 @@ export const llmAnalysisShapeSchema = buildAnalysisSchema(false, {
 export const analysisResultSchema = z.object({
   schemaVersion: z.literal(ANALYSIS_SCHEMA_VERSION),
   ...buildAnalysisSchema(true, {}).shape,
+  // Analyses stored before SPEC v0.40 have no country (ANL-14); the field doesn't change the version.
+  documentCountry: z.string().regex(COUNTRY_CODE).nullable().optional(),
 });
 
 export type LlmAnalysis = z.infer<typeof llmAnalysisSchema>;

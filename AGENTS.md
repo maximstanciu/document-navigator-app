@@ -4,7 +4,7 @@ This is an Expo/React Native mobile application (Expo SDK 58, React Native 0.88,
 
 - `docs/SPEC.md` — requirements (IDs like CAP-2, ANL-8), data model, API contract, analysis schema. Source of truth for behavior.
 - `docs/IMPLEMENTATION_PLAN.md` — stages, tasks (e.g. 1.3), acceptance criteria, which skill to use.
-- Decisions D-2, D-3 and D-6 in SPEC §11.1 are **not made yet** (D-1, D-4 and D-5 are accepted and already reflected in the SPEC). Don't implement code that depends on an open decision; ask instead. When a decision is made, it is moved into the SPEC sections it affects.
+- Decisions D-2, D-3 and D-6 in SPEC §11.1 are **not made yet** (D-1, D-4, D-5 and D-7 are accepted and already reflected in the SPEC). Don't implement code that depends on an open decision; ask instead. When a decision is made, it is moved into the SPEC sections it affects.
 - Reference requirement IDs and task numbers in commit messages and PR descriptions.
 
 ## Expo has changed — do not trust your training data
@@ -56,10 +56,11 @@ src/
     i18n/              # i18next instance, Intl polyfills, ru/en dictionaries (resources/),
                        #   OS-level strings such as permission texts (native/, wired in app.json)
   shared/              # pure TS shared by client and server: limits.ts, explanation-locales.ts,
+                       #   legal-memo-countries.ts (D-7),
                        #   analysis/ (zod schema, API contract, LLM JSON Schema, synthetic fixtures)
   server/              # server-only code for API routes: server-deps.ts (shared deps from env),
                        #   http/ (errors, client headers and IP, multipart), analysis/ (handler,
-                       #   prompt and the legal memo for Germany, LlmProvider, providers/,
+                       #   prompt, legal memos by country (PT, DE; D-7), LlmProvider, providers/,
                        #   post-processing), limits/ (daily limits, budget),
                        #   metrics/ (beta report), store/ (counters: memory, Redis over the Upstash
                        #   REST API), logs/, privacy/ (pseudonyms), testing/ (request, PDF and deps

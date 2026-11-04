@@ -37,7 +37,13 @@ describe('handleLimits', () => {
         uiLocale: 'ru',
         pushToken: null,
         queuedAt: deps.now(),
-        input: { files: [], locale: 'ru', today: '2026-10-18', timezone: 'Europe/Berlin' },
+        input: {
+          files: [],
+          locale: 'ru',
+          today: '2026-10-18',
+          timezone: 'Europe/Berlin',
+          country: null,
+        },
       })
     );
 

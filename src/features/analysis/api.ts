@@ -1,5 +1,5 @@
 import { randomUUID } from 'expo-crypto';
-import { getCalendars } from 'expo-localization';
+import { getCalendars, getLocales } from 'expo-localization';
 
 import {
   getNotificationPermission,
@@ -20,11 +20,13 @@ import {
 } from '@/shared/analysis/contract';
 import { localCalendarDate } from '@/shared/calendar-date';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
+import type { MemoCountry } from '@/shared/legal-memo-countries';
 import { ACTIVE_JOBS_PER_DEVICE } from '@/shared/limits';
 import { limitsResponseSchema, type LimitsResponse } from '@/shared/limits-contract';
 import type { UiLocale } from '@/shared/ui-locales';
 
 import { analysisRecords } from './analysis-records';
+import { memoCountryFor, type DocumentCountryChoice } from './document-country';
 import { AnalysisError, toAnalysisError } from './errors';
 import { keepScreenAwake } from './keep-awake';
 import { pushTokenIfAllowed } from './push-token';
@@ -64,6 +66,8 @@ export type UploadRequest = {
   uiLocale: UiLocale;
   /** The Expo push token for that push, if notifications are allowed (ANL-12). */
   pushToken: string | null;
+  /** Whose legal memo the analysis starts with (ANL-14); `null` for none. */
+  country: MemoCountry | null;
 };
 
 /** A state the shared schema rejects counts as `analysis_failed` (SPEC §7.2). */
@@ -91,6 +95,7 @@ export async function uploadDocument(
   form.append(ANALYZE_FIELDS.timezone, request.timezone);
   form.append(ANALYZE_FIELDS.uiLocale, request.uiLocale);
   if (request.pushToken) form.append(ANALYZE_FIELDS.pushToken, request.pushToken);
+  if (request.country) form.append(ANALYZE_FIELDS.country, request.country);
 
   const body = await apiClient.put<unknown>(jobPath(jobId), {
     body: form,
@@ -155,6 +160,15 @@ async function explanationLocale(): Promise<ExplanationLocale> {
   return explanationLocale ?? currentLanguage();
 }
 
+/**
+ * The country for the legal memo (ANL-14): the one picked for this analysis (DET-9), else
+ * «Country of documents» (SET-6), by default the phone's region.
+ */
+async function memoCountry(picked: DocumentCountryChoice | undefined): Promise<MemoCountry | null> {
+  const choice = picked ?? (await getRepositories().settings.get()).documentCountry;
+  return memoCountryFor(choice, getLocales()[0]?.regionCode ?? null);
+}
+
 function deviceTimeZone(): string {
   return getCalendars()[0]?.timeZone ?? Intl.DateTimeFormat().resolvedOptions().timeZone ?? 'UTC';
 }
@@ -200,14 +214,16 @@ const oneDeletionRunAtATime = serialQueue();
  * its result comes later, through `checkAnalysisJobs()`. A rejected or broken upload fails the
  * document with the reason, which is also thrown as an `AnalysisError`. Without a network nothing
  * is sent and the document fails as `offline`, its pages kept (ANL-10); with three documents
- * already analyzing, as `too_many_jobs` (ANL-3, SPEC §8.3).
+ * already analyzing, as `too_many_jobs` (ANL-3, SPEC §8.3). The upload asks for the legal memo of
+ * `country`, picked for this analysis (DET-9), or of «Country of documents» (ANL-14, SET-6).
  *
  * Throws a plain `Error` without touching the document when it's gone or already being analyzed.
  * Cancelling (`cancelAnalysis()`) or deleting the document aborts the upload.
  */
 export async function analyzeDocument(
   documentId: string,
-  onStarted?: () => unknown
+  onStarted?: () => unknown,
+  country?: DocumentCountryChoice
 ): Promise<void> {
   const { documents } = getRepositories();
   const document = await documents.get(documentId);
@@ -231,9 +247,10 @@ export async function analyzeDocument(
       if (!(await isOnline())) throw new AnalysisError('offline');
       const others = (await documents.listAnalyzing()).filter(({ id }) => id !== documentId);
       if (others.length >= ACTIVE_JOBS_PER_DEVICE) throw new AnalysisError('too_many_jobs');
-      const [files, pushToken] = await Promise.all([
+      const [files, pushToken, memo] = await Promise.all([
         filesToUpload(documentId, document.mimeType),
         pushTokenIfAllowed(),
+        memoCountry(country),
       ]);
       state = await uploadDocument(
         job.jobId,
@@ -244,6 +261,7 @@ export async function analyzeDocument(
           timezone: deviceTimeZone(),
           uiLocale: currentLanguage(),
           pushToken,
+          country: memo,
         },
         controller.signal
       );
@@ -411,6 +429,7 @@ async function applyJobState(
           jobId: job.jobId,
           analysis: state.analysis,
           pageCount: state.pageCount,
+          legalMemoCountry: state.legalMemo?.country ?? null,
           ...analysisRecords(job.id, state.analysis, randomUUID),
         });
       } catch {
