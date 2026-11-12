@@ -125,22 +125,22 @@ describe('DocumentDetailScreen', () => {
   });
 
   describe('the document’s language, country and legal memo (DET-11, ANL-14)', () => {
-    it('names them under the title', async () => {
+    it('shows one flag when the language and the country match, and names them for a screen reader', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.invoice, 'DE');
       await renderDocument();
 
-      expect(
-        await screen.findByText('German · Germany · with the guide to German law')
-      ).toBeOnTheScreen();
+      expect(await screen.findByText('🇩🇪 · with the guide to German law')).toHaveAccessibleName(
+        'German · Germany · with the guide to German law'
+      );
     });
 
-    it('says when the analysis had no memo, and shows a country without a name as its code', async () => {
+    it('shows both flags when they differ, says when the analysis had no memo, and names a country without a name by its code', async () => {
       await seedAnalyzed({ ...ANALYSIS_FIXTURES.invoice, documentCountry: 'SE' });
       await renderDocument();
 
       expect(
-        await screen.findByText('German · SE · without a guide to local law')
-      ).toBeOnTheScreen();
+        await screen.findByText('🇩🇪 · 🇸🇪 · without a guide to local law')
+      ).toHaveAccessibleName('German · SE · without a guide to local law');
     });
 
     it('shows only the language of an analysis stored before the country was asked for', async () => {
@@ -148,7 +148,7 @@ describe('DocumentDetailScreen', () => {
       await seedAnalyzed(older);
       await renderDocument();
 
-      expect(await screen.findByText('German')).toBeOnTheScreen();
+      expect(await screen.findByText('🇩🇪')).toHaveAccessibleName('German');
       expect(screen.queryByText(/guide/)).not.toBeOnTheScreen();
     });
   });

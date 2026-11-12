@@ -1,7 +1,7 @@
 import type { TFunction } from 'i18next';
 
 import type { DocumentStatus } from '@/lib/db/types';
-import { countryName, languageName } from '@/lib/i18n/display-names';
+import { countryFlag, countryName, languageFlag, languageName } from '@/lib/i18n/display-names';
 import { formatTimestampDate } from '@/lib/i18n/format';
 import type { AnalysisResult, DocumentType } from '@/shared/analysis/schema';
 import { isMemoCountry } from '@/shared/legal-memo-countries';
@@ -42,23 +42,32 @@ export function formatMeta(
 }
 
 /**
- * «Португальский · Португалия · с памяткой по праву Португалии» (DET-11, ANL-14): the document's
- * language and country, and the legal memo its analysis was made with. An analysis stored before
- * SPEC v0.40 has no country and no memo: only its language shows.
+ * «🇵🇹 · с памяткой по праву Португалии» (DET-11, ANL-14): the flags of the document's language and
+ * country, one when they are the same, and the legal memo its analysis was made with. `label` names
+ * them for a screen reader: «Португальский · Португалия · с памяткой по праву Португалии». An
+ * analysis stored before SPEC v0.40 has no country and no memo: only its language shows.
  */
 export function formatOrigin(
   analysis: Pick<AnalysisResult, 'documentLanguage' | 'documentCountry'>,
   legalMemoCountry: string | null,
   t: TFunction
 ) {
-  const parts = [languageName(analysis.documentLanguage, t)];
-  if (analysis.documentCountry !== undefined) {
-    if (analysis.documentCountry) parts.push(countryName(analysis.documentCountry, t));
-    parts.push(
-      isMemoCountry(legalMemoCountry)
-        ? t(`documents.origin.memo.${legalMemoCountry}`)
-        : t('documents.origin.noMemo')
-    );
+  const { documentLanguage: language, documentCountry: country } = analysis;
+  const flags = [languageFlag(language)];
+  const names = [languageName(language, t)];
+  let memo: string | null = null;
+  if (country !== undefined) {
+    if (country) {
+      const flag = countryFlag(country);
+      if (flag !== flags[0]) flags.push(flag);
+      names.push(countryName(country, t));
+    }
+    memo = isMemoCountry(legalMemoCountry)
+      ? t(`documents.origin.memo.${legalMemoCountry}`)
+      : t('documents.origin.noMemo');
   }
-  return parts.filter(Boolean).join(' · ');
+  return {
+    line: [...flags, memo].filter(Boolean).join(' · '),
+    label: [...names, memo].filter(Boolean).join(' · '),
+  };
 }

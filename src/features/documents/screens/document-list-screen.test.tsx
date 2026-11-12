@@ -105,6 +105,8 @@ describe('DocumentListScreen', () => {
         )
       );
       expect(rows[1]).toHaveAccessibleName(/^Счёт за газ, .*2 pages · Not analyzed$/);
+      // The card shows the country's flag in place of its name.
+      expect(screen.getByText(/ · 1 page · Analyzed · 🇩🇪$/)).toBeOnTheScreen();
     });
 
     it('says when the nearest deadline has passed', async () => {

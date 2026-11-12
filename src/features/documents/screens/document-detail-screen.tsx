@@ -44,8 +44,8 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 /**
  * A document (SPEC §4.4): the title, where its analysis stands, the analysis itself in the order of
  * the four questions (DET-1…DET-10), the original and the disclaimer. «⋯» in the header renames,
- * analyzes again, for another country too, or deletes it (DET-9); under the title, the document's
- * language and country and the legal memo used (DET-11), and the case it is filed in (CASE-2).
+ * analyzes again, for another country too, or deletes it (DET-9); under the title, the flags of the
+ * document's language and country and the legal memo used (DET-11), and the case it is filed in (CASE-2).
  */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -75,7 +75,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
 
   const title = displayTitle(data.title, t);
   const meta = documentMeta(data, t, i18n.language);
-  const origin = data.analysis ? formatOrigin(data.analysis, data.legalMemoCountry, t) : '';
+  const origin = data.analysis ? formatOrigin(data.analysis, data.legalMemoCountry, t) : null;
 
   // Without its page files a new analysis can only fail, and the document would read as failed
   // although its analysis is fine (STO-8).
@@ -143,9 +143,9 @@ export function DocumentDetailScreen({ id }: { id: string }) {
           {meta}
         </ThemedText>
       )}
-      {origin !== '' && (
-        <ThemedText type="small" themeColor="textSecondary">
-          {origin}
+      {origin && origin.line !== '' && (
+        <ThemedText type="small" themeColor="textSecondary" aria-label={origin.label}>
+          {origin.line}
         </ThemedText>
       )}
       <DocumentCase documentId={data.id} caseId={data.caseId} />
