@@ -1,25 +1,22 @@
-import { toLlmJsonSchema } from '@/shared/analysis/json-schema';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
 import type { MemoCountry } from '@/shared/legal-memo-countries';
 
 import { LEGAL_MEMOS, type LegalMemo } from './legal-memos';
 
-// The prompt of the analysis (SPEC §7.4). This text carries the rules; the JSON Schema carries the
-// fields and their descriptions. The provider constrains the answer by the schema, but Ollama never
-// shows the model its descriptions (task 0.3), so the schema closes the system message as well,
-// and what must not be lost, such as the language of the answer and codes, is in the rules too.
-// In English, the language models follow best; the answer is written in the user's language. The
-// legal memo of the document's country (rule 11, ANL-14) goes first: the system message is the
-// same for every document from a country, so a provider can cache it as a whole.
+// The prompt of the analysis (SPEC §7.4). This text carries the rules; the JSON Schema the provider
+// sends carries the fields and their descriptions. Ollama constrains the answer by the schema but
+// never shows the model its descriptions (task 0.3), so what must not be lost, such as the language
+// of the answer and codes, is in the rules too. The schema itself stays out of this text: in the
+// third eval run the model, given it, wrote fewer deadlines. In English, the language models follow
+// best; the answer is written in the user's language. The legal memo of the document's country
+// (rule 11, ANL-14) goes first: the system message is the same for every document from a country,
+// so a provider can cache it as a whole.
 
 const LANGUAGE_NAMES: Record<ExplanationLocale, string> = { ru: 'Russian', en: 'English' };
 
-/** The schema of the answer as the model reads it: compact, the same as in `response_format`. */
-const SCHEMA_TEXT = JSON.stringify(toLlmJsonSchema());
-
 const rules = (
   rule11Text: string
-) => `You explain letters, invoices, contracts and official notices to people who may not know the language or the law of the document. You read the pages of one document and fill in the JSON Schema at the end of this message.
+) => `You explain letters, invoices, contracts and official notices to people who may not know the language or the law of the document. You read the pages of one document and fill in the JSON Schema you are given.
 
 Rules:
 1. Do not invent anything. If there are no deadlines, "deadlines" is empty. If an amount is not stated, it is not in "keyFacts".
@@ -40,10 +37,7 @@ Examples of deadline dates in a letter dated 2030-03-04 (rule 3; "computation" i
 - "No prazo de 15 dias úteis a contar da notificação, pode pagar a coima ou apresentar defesa." A period from receipt in working days: "dateSource": "computed", "date": "2030-03-19", "rule": {"from": "receipt", "fromDate": null, "direction": "after", "amount": 15, "unit": "day", "endOf": null}, "computation": 15 working days from receipt, counted as calendar days; the date of receipt is unknown, so it is counted from the date of the letter, and the real deadline is later.
 - "O contrato termina em 30/06/2031 e renova-se automaticamente, salvo oposição à renovação comunicada com a antecedência mínima de 120 dias." A period before a date in the text: "dateSource": "computed", "date": "2031-03-02", "rule": {"from": "date_in_text", "fromDate": "2031-06-30", "direction": "before", "amount": 120, "unit": "day", "endOf": null}, "computation": 120 days before the contract ends on 30 June 2031.
 
-Text fields: "title", "summary", descriptions, explanations, labels and "computation" are written in the language the user asks for, also when the document is in another language. "sourceQuote" and the "value" of key facts stay exactly as written in the document. "documentLanguage" is a language code such as "de" or "pt-BR", and "documentCountry" a country code such as "DE", never a name.
-
-The JSON Schema of the answer; its descriptions say what goes into each field:
-${SCHEMA_TEXT}`;
+Text fields: "title", "summary", descriptions, explanations, labels and "computation" are written in the language the user asks for, also when the document is in another language. "sourceQuote" and the "value" of key facts stay exactly as written in the document. "documentLanguage" is a language code such as "de" or "pt-BR", and "documentCountry" a country code such as "DE", never a name.`;
 
 /** Rule 11: how to use the memo, or that there is none, and the country to report (ANL-14). */
 function rule11(memo: LegalMemo | null): string {

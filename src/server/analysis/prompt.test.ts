@@ -1,5 +1,4 @@
 /** @jest-environment node */
-import { toLlmJsonSchema } from '@/shared/analysis/json-schema';
 import { DEADLINE_KINDS, KEY_FACT_KINDS } from '@/shared/analysis/schema';
 
 import { deadlineDate } from './deadline-date';
@@ -60,16 +59,12 @@ describe('systemPrompt (SPEC §7.4)', () => {
     ).toMatch(/^Write the explanation in Russian, even if the document is in another language\.$/m);
   });
 
-  it.each(['PT', null] as const)(
-    'ends with the JSON Schema of the answer for %s, whose descriptions Ollama never shows',
-    (country) => {
-      expect(
-        systemPrompt(country).endsWith(
-          `The JSON Schema of the answer; its descriptions say what goes into each field:\n${JSON.stringify(toLlmJsonSchema())}`
-        )
-      ).toBe(true);
-    }
-  );
+  it.each(['PT', null] as const)('leaves the JSON Schema out of the text for %s', (country) => {
+    // The provider sends it in `response_format`. In the third eval run (task 0.3) the schema at
+    // the end of the system message cost recall: the model wrote fewer deadlines.
+    expect(systemPrompt(country)).not.toContain('"additionalProperties"');
+    expect(systemPrompt(country)).toMatch(/fill in the JSON Schema you are given\./);
+  });
 
   it('gives examples whose computed dates the server counts the same way (rule 3)', () => {
     const letter = { documentDate: '2030-03-04', today: '2030-03-04' };
