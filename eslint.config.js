@@ -109,6 +109,7 @@ module.exports = defineConfig([
     },
   },
   {
-    ignores: ['dist/*', 'coverage/*', '.expo/*'],
+    // Claude Code worktrees: copies of the repo with their own checks.
+    ignores: ['dist/*', 'coverage/*', '.expo/*', '.claude/worktrees/*'],
   },
 ]);

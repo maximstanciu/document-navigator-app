@@ -26,6 +26,7 @@ module.exports = {
     '<rootDir>/src/test/setup-i18n.ts',
     '<rootDir>/src/test/setup-native-modules.ts',
   ],
-  testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/dist/'],
+  // Claude Code worktrees are copies of the repo, each with its own tests.
+  testPathIgnorePatterns: ['/node_modules/', '/.expo/', '/dist/', '<rootDir>/.claude/worktrees/'],
   collectCoverageFrom: ['src/**/*.{ts,tsx}', '!src/**/*.d.ts', '!src/test/**', '!src/app/**'],
 };

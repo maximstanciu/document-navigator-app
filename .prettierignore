@@ -7,3 +7,4 @@ android/
 coverage/
 package-lock.json
 assets/expo.icon/
+.claude/worktrees/
