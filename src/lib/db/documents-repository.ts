@@ -14,7 +14,7 @@ import {
   type Clock,
 } from './sql';
 import { mergeReanalysis, type ExistingAction, type ExistingDeadline } from './merge-reanalysis';
-import type { DocumentRecord } from './types';
+import type { DocumentRecord, DocumentSummaryRecord } from './types';
 
 type DocumentRow = {
   id: string;
@@ -70,6 +70,55 @@ function toRecord(row: DocumentRow): DocumentRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
+  };
+}
+
+type DocumentSummaryRow = Pick<
+  DocumentRow,
+  | 'id'
+  | 'title'
+  | 'status'
+  | 'document_type'
+  | 'sender_name'
+  | 'page_count'
+  | 'created_at'
+  | 'analyzed_at'
+  | 'attention_dismissed_at'
+  | 'case_id'
+> & { has_fraud_signals: number; has_high_risk: number; country: string | null };
+
+/**
+ * Active documents matching `where`, newest first, as summaries: SQLite works out the three facts
+ * about the analysis, so the list never moves the analysis JSON or the search text into JS
+ * (HOME-2). An analysis that isn't valid JSON reads as none, like `fromJson()`.
+ */
+function selectSummaries(where = '') {
+  return `SELECT id, title, status, document_type, sender_name, page_count, created_at,
+      analyzed_at, attention_dismissed_at, case_id,
+      COALESCE(json_array_length(analysis_json, '$.fraudSignals'), 0) > 0 AS has_fraud_signals,
+      EXISTS (SELECT 1 FROM json_each(analysis_json, '$.risks')
+        WHERE json_extract(value, '$.severity') = 'high') AS has_high_risk,
+      json_extract(analysis_json, '$.documentCountry') AS country
+    FROM (SELECT *, CASE WHEN json_valid(analysis) THEN analysis END AS analysis_json
+      FROM documents WHERE deleted_at IS NULL ${where})
+    ORDER BY created_at DESC, id`;
+}
+
+function toSummaryRecord(row: DocumentSummaryRow): DocumentSummaryRecord {
+  return {
+    id: row.id,
+    title: row.title,
+    status: row.status,
+    documentType: row.document_type,
+    senderName: row.sender_name,
+    pageCount: row.page_count,
+    createdAt: row.created_at,
+    analyzedAt: row.analyzed_at,
+    attentionDismissedAt: row.attention_dismissed_at,
+    caseId: row.case_id,
+    hasFraudSignals: row.has_fraud_signals === 1,
+    hasHighRisk: row.has_high_risk === 1,
+    country: row.country,
   };
 }
 
@@ -221,12 +270,10 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
       return toRecord(row);
     },
 
-    /** Active documents, newest first (HOME-2). */
-    async list(): Promise<DocumentRecord[]> {
-      const rows = await db.getAllAsync<DocumentRow>(
-        `SELECT ${COLUMNS} FROM documents WHERE deleted_at IS NULL ORDER BY created_at DESC, id`
-      );
-      return rows.map(toRecord);
+    /** Active documents, newest first, without their analyses (HOME-2). */
+    async listSummaries(): Promise<DocumentSummaryRecord[]> {
+      const rows = await db.getAllAsync<DocumentSummaryRow>(selectSummaries());
+      return rows.map(toSummaryRecord);
     },
 
     /** The titles of active documents, without reading their analyses: for the Deadlines tab (REM-1). */
@@ -236,17 +283,18 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
       );
     },
 
-    /** Case-insensitive search over title, sender, summary and key facts, Cyrillic included (HOME-3). */
-    async search(query: string): Promise<DocumentRecord[]> {
+    /**
+     * Case-insensitive search over title, sender, summary and key facts, Cyrillic included, without
+     * the analyses of the documents found (HOME-3).
+     */
+    async searchSummaries(query: string): Promise<DocumentSummaryRecord[]> {
       const normalized = normalizeForSearch(query);
       if (!normalized) return [];
-      const rows = await db.getAllAsync<DocumentRow>(
-        `SELECT ${COLUMNS} FROM documents
-         WHERE deleted_at IS NULL AND search_text LIKE ? ESCAPE '\\'
-         ORDER BY created_at DESC, id`,
+      const rows = await db.getAllAsync<DocumentSummaryRow>(
+        selectSummaries(`AND search_text LIKE ? ESCAPE '\\'`),
         [containsPattern(normalized)]
       );
-      return rows.map(toRecord);
+      return rows.map(toSummaryRecord);
     },
 
     async update(id: string, patch: DocumentPatch): Promise<DocumentRecord> {

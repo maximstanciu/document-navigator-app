@@ -97,7 +97,7 @@ describe('saveDraft (CAP-5)', () => {
       saveDraft('gallery', [jpeg('file:///cache/p1.jpg'), jpeg('file:///cache/gone.jpg')])
     ).rejects.toThrow('Source missing');
 
-    expect(await repositories.documents.list()).toEqual([]);
+    expect(await repositories.documents.listSummaries()).toEqual([]);
     expect(fakeFileSystem.files()).toEqual(['file:///cache/p1.jpg']);
   });
 

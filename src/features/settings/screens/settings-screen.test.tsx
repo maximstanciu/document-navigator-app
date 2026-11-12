@@ -344,7 +344,7 @@ describe('SettingsScreen «Delete all data» (SET-3, STO-7)', () => {
     await user.press(screen.getByRole('button', { name: 'Отмена' }));
 
     expect(screen.getByRole('button', { name: 'Удалить все данные' })).toBeOnTheScreen();
-    expect(await repositories.documents.list()).toHaveLength(1);
+    expect(await repositories.documents.listSummaries()).toHaveLength(1);
     expect(fakeNotifications.pending()).toHaveLength(3);
   });
 
@@ -358,7 +358,7 @@ describe('SettingsScreen «Delete all data» (SET-3, STO-7)', () => {
     // The settings are gone too: the interface follows the device again.
     expect(await screen.findByText('All data deleted.')).toBeOnTheScreen();
     expect(i18n.language).toBe('en');
-    expect(await repositories.documents.list()).toEqual([]);
+    expect(await repositories.documents.listSummaries()).toEqual([]);
     expect(await repositories.deadlines.list()).toEqual([]);
     expect(await repositories.settings.get()).toEqual(DEFAULT_SETTINGS);
     // Only the scanner's cache is left, outside the documents folder.
@@ -416,7 +416,7 @@ describe('SettingsScreen «Delete all data» (SET-3, STO-7)', () => {
     await user.press(screen.getByRole('button', { name: 'Удалить всё' }));
 
     expect(await screen.findByText('All data deleted.')).toBeOnTheScreen();
-    expect(await repositories.documents.list()).toEqual([]);
+    expect(await repositories.documents.listSummaries()).toEqual([]);
   });
 });
 

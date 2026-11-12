@@ -11,6 +11,7 @@ import type { DocumentDetail, DocumentPage, DocumentSummary } from './types';
  * `src/lib/db`, no React. Query hooks in `./queries.ts` wrap these functions.
  */
 
+/** For a document read whole; the list works the same facts out in SQL (`listSummaries()`). */
 function toSummary(document: DocumentRecord): DocumentSummary {
   return {
     id: document.id,
@@ -30,18 +31,16 @@ function toSummary(document: DocumentRecord): DocumentSummary {
 }
 
 /** Active documents, newest first (HOME-2). */
-export async function listDocuments(): Promise<DocumentSummary[]> {
-  const documents = await getRepositories().documents.list();
-  return documents.map(toSummary);
+export function listDocuments(): Promise<DocumentSummary[]> {
+  return getRepositories().documents.listSummaries();
 }
 
 /**
  * Documents whose title, sender, summary or key facts contain `query`, in any case, newest first
  * (HOME-3). An empty query finds nothing.
  */
-export async function searchDocuments(query: string): Promise<DocumentSummary[]> {
-  const documents = await getRepositories().documents.search(query);
-  return documents.map(toSummary);
+export function searchDocuments(query: string): Promise<DocumentSummary[]> {
+  return getRepositories().documents.searchSummaries(query);
 }
 
 /** «Got it» in «Needs attention»: the document's fraud signs or high risk are seen (HOME-1). */

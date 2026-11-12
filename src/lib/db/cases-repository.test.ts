@@ -161,7 +161,7 @@ describe('documents in cases (CASE-2, CASE-4)', () => {
     clock.advance(1000);
 
     await expect(repos.documents.moveToCase(['doc-1', 'doc-2'], 'flat')).resolves.toBe(true);
-    expect((await repos.documents.list()).map(({ id, caseId }) => [id, caseId])).toEqual([
+    expect((await repos.documents.listSummaries()).map(({ id, caseId }) => [id, caseId])).toEqual([
       ['doc-1', 'flat'],
       ['doc-2', 'flat'],
     ]);

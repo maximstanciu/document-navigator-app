@@ -3,7 +3,7 @@ import { createFakeClock, createTestDatabase } from '@/test/sqlite';
 
 import type { SqlDatabase } from './database';
 import { createRepositories, purgeTombstones, type Repositories } from './repositories';
-import { DEFAULT_SETTINGS } from './types';
+import { DEFAULT_SETTINGS, type DocumentRecord, type DocumentSummaryRecord } from './types';
 
 const DAY = 24 * 60 * 60 * 1000;
 
@@ -69,7 +69,7 @@ describe('documents repository', () => {
     clock.advance(1000);
     await repos.documents.create(newDocument('newer', 'New'));
 
-    const list = await repos.documents.list();
+    const list = await repos.documents.listSummaries();
 
     expect(list.map((document) => document.id)).toEqual(['newer', 'older']);
   });
@@ -138,25 +138,139 @@ describe('documents repository', () => {
     });
 
     it('finds Cyrillic text regardless of case', async () => {
-      expect((await repos.documents.search('штраф')).map((d) => d.id)).toEqual(['fine']);
-      expect((await repos.documents.search('ПАРКОВКУ')).map((d) => d.id)).toEqual(['fine']);
+      expect((await repos.documents.searchSummaries('штраф')).map((d) => d.id)).toEqual(['fine']);
+      expect((await repos.documents.searchSummaries('ПАРКОВКУ')).map((d) => d.id)).toEqual([
+        'fine',
+      ]);
     });
 
     it('treats «ё» and «е» as the same letter', async () => {
       await repos.documents.create(newDocument('bill', 'Счёт'));
 
-      expect((await repos.documents.search('счет')).map((d) => d.id)).toEqual(['bill']);
-      expect((await repos.documents.search('СЧЁТ')).map((d) => d.id)).toEqual(['bill']);
+      expect((await repos.documents.searchSummaries('счет')).map((d) => d.id)).toEqual(['bill']);
+      expect((await repos.documents.searchSummaries('СЧЁТ')).map((d) => d.id)).toEqual(['bill']);
     });
 
     it('matches the sender and takes % and _ literally', async () => {
-      expect((await repos.documents.search('stadtwerke')).map((d) => d.id)).toEqual(['invoice']);
-      expect((await repos.documents.search('50%')).map((d) => d.id)).toEqual(['invoice']);
-      expect(await repos.documents.search('5_%')).toEqual([]);
+      expect((await repos.documents.searchSummaries('stadtwerke')).map((d) => d.id)).toEqual([
+        'invoice',
+      ]);
+      expect((await repos.documents.searchSummaries('50%')).map((d) => d.id)).toEqual(['invoice']);
+      expect(await repos.documents.searchSummaries('5_%')).toEqual([]);
     });
 
     it('returns nothing for a blank query', async () => {
-      expect(await repos.documents.search('   ')).toEqual([]);
+      expect(await repos.documents.searchSummaries('   ')).toEqual([]);
+    });
+  });
+
+  describe('summaries without the analysis (HOME-1, HOME-2, HOME-3)', () => {
+    const { invoice, officialNotice, fraudulentInvoice, unreadable } = ANALYSIS_FIXTURES;
+
+    async function addAnalyzed(id: string, analysis: NonNullable<DocumentRecord['analysis']>) {
+      await repos.documents.create({ ...newDocument(id, analysis.title), pageCount: 2 });
+      await repos.documents.update(id, {
+        status: 'ready',
+        documentType: analysis.documentType,
+        senderName: analysis.sender?.name ?? null,
+        analysis,
+        analysisLocale: 'ru',
+        analyzedAt: clock.now().toISOString(),
+      });
+      clock.advance(1000);
+    }
+
+    const facts = (summaries: DocumentSummaryRecord[]) =>
+      summaries.map(({ id, hasFraudSignals, hasHighRisk, country }) => ({
+        id,
+        hasFraudSignals,
+        hasHighRisk,
+        country,
+      }));
+
+    it('works out fraud signs, a high risk and the country in SQL', async () => {
+      await repos.documents.create(newDocument('draft'));
+      clock.advance(1000);
+      await addAnalyzed('invoice', { ...invoice, documentCountry: 'PT' });
+      await addAnalyzed('notice', officialNotice);
+      await addAnalyzed('fraud', fraudulentInvoice);
+      await addAnalyzed('unreadable', unreadable);
+      await addAnalyzed('gone', fraudulentInvoice);
+      await repos.documents.remove('gone');
+
+      const summaries = await repos.documents.listSummaries();
+
+      expect(facts(summaries)).toEqual([
+        { id: 'unreadable', hasFraudSignals: false, hasHighRisk: false, country: null },
+        { id: 'fraud', hasFraudSignals: true, hasHighRisk: true, country: 'DE' },
+        { id: 'notice', hasFraudSignals: false, hasHighRisk: true, country: 'DE' },
+        { id: 'invoice', hasFraudSignals: false, hasHighRisk: false, country: 'PT' },
+        { id: 'draft', hasFraudSignals: false, hasHighRisk: false, country: null },
+      ]);
+    });
+
+    it('carries only the summary fields, not the analysis or the search text', async () => {
+      await repos.documents.create(newDocument('draft'));
+      clock.advance(1000);
+      await addAnalyzed('fraud', fraudulentInvoice);
+
+      expect(await repos.documents.listSummaries()).toEqual([
+        {
+          id: 'fraud',
+          title: fraudulentInvoice.title,
+          status: 'ready',
+          documentType: 'invoice',
+          senderName: 'Paketdienst Express Zollservice',
+          pageCount: 2,
+          createdAt: '2026-10-17T09:00:01.000Z',
+          analyzedAt: '2026-10-17T09:00:01.000Z',
+          attentionDismissedAt: null,
+          caseId: null,
+          hasFraudSignals: true,
+          hasHighRisk: true,
+          country: 'DE',
+        },
+        {
+          id: 'draft',
+          title: 'Счёт за электричество',
+          status: 'draft',
+          documentType: null,
+          senderName: null,
+          pageCount: null,
+          createdAt: '2026-10-17T09:00:00.000Z',
+          analyzedAt: null,
+          attentionDismissedAt: null,
+          caseId: null,
+          hasFraudSignals: false,
+          hasHighRisk: false,
+          country: null,
+        },
+      ]);
+    });
+
+    it('reads an analysis that is not valid JSON as none, like a whole document', async () => {
+      await addAnalyzed('broken', fraudulentInvoice);
+      await addAnalyzed('fraud', fraudulentInvoice);
+      await db.runAsync(`UPDATE documents SET analysis = '{"fraudSignals": [' WHERE id = ?`, [
+        'broken',
+      ]);
+
+      expect(facts(await repos.documents.listSummaries())).toEqual([
+        { id: 'fraud', hasFraudSignals: true, hasHighRisk: true, country: 'DE' },
+        { id: 'broken', hasFraudSignals: false, hasHighRisk: false, country: null },
+      ]);
+      expect((await repos.documents.get('broken'))?.analysis).toBeNull();
+    });
+
+    it('finds summaries with the same facts', async () => {
+      await addAnalyzed('notice', officialNotice);
+      await addAnalyzed('fraud', fraudulentInvoice);
+      await addAnalyzed('gone', fraudulentInvoice);
+      await repos.documents.remove('gone');
+
+      expect(facts(await repos.documents.searchSummaries('ZOLLSERVICE'))).toEqual([
+        { id: 'fraud', hasFraudSignals: true, hasHighRisk: true, country: 'DE' },
+      ]);
     });
   });
 
@@ -239,7 +353,9 @@ describe('documents repository', () => {
         analysisLocale: 'ru',
         analyzedAt: '2026-10-17T09:00:30.000Z',
       });
-      expect((await repos.documents.search('stadtwerke')).map((d) => d.id)).toEqual(['doc-1']);
+      expect((await repos.documents.searchSummaries('stadtwerke')).map((d) => d.id)).toEqual([
+        'doc-1',
+      ]);
       expect(await repos.deadlines.list({ documentId: 'doc-1' })).toMatchObject([
         { id: 'dl-1', status: 'open', reminderOffsetsDays: null, dueTime: null },
       ]);
@@ -389,7 +505,7 @@ describe('documents repository', () => {
         await analyzeAgain();
 
         expect(await repos.documents.get('doc-1')).toMatchObject({ title: 'Свет, сентябрь' });
-        expect((await repos.documents.search('свет')).map((d) => d.id)).toEqual(['doc-1']);
+        expect((await repos.documents.searchSummaries('свет')).map((d) => d.id)).toEqual(['doc-1']);
       });
 
       it('keeps a title given before the first analysis', async () => {
@@ -628,7 +744,7 @@ describe('documents repository', () => {
       await repos.documents.remove('doc-1');
 
       expect(await repos.documents.get('doc-1')).toBeNull();
-      expect(await repos.documents.list()).toEqual([]);
+      expect(await repos.documents.listSummaries()).toEqual([]);
       expect(await repos.pages.listByDocument('doc-1')).toEqual([]);
       expect(await repos.deadlines.list()).toEqual([]);
       expect(await repos.actions.listByDocument('doc-1')).toEqual([]);
@@ -705,7 +821,7 @@ describe('documents repository', () => {
       expect(await repos.settings.get()).toEqual(DEFAULT_SETTINGS);
       // The database still works as on a fresh install.
       await repos.documents.create(newDocument('doc-3'));
-      expect(await repos.documents.list()).toHaveLength(1);
+      expect(await repos.documents.listSummaries()).toHaveLength(1);
     });
 
     it('purges tombstones after the retention period, children included', async () => {

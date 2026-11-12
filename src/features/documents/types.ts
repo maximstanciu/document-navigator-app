@@ -1,29 +1,15 @@
-import type { ActionRecord, DeadlineRecord, DocumentRecord } from '@/lib/db/types';
+import type {
+  ActionRecord,
+  DeadlineRecord,
+  DocumentRecord,
+  DocumentSummaryRecord,
+} from '@/lib/db/types';
 
 /**
  * A row in the documents list (HOME-2) and what the «Needs attention» rule needs to know about the
  * analysis (HOME-1), without carrying the analysis itself.
  */
-export type DocumentSummary = Pick<
-  DocumentRecord,
-  | 'id'
-  | 'title'
-  | 'status'
-  | 'documentType'
-  | 'senderName'
-  | 'pageCount'
-  | 'createdAt'
-  | 'analyzedAt'
-  | 'attentionDismissedAt'
-  | 'caseId'
-> & {
-  /** The analysis found signs of fraud (ANL-11). */
-  hasFraudSignals: boolean;
-  /** The analysis found at least one high risk (DET-5). */
-  hasHighRisk: boolean;
-  /** The country the document comes from, ISO 3166-1 alpha-2, if the analysis found it (ANL-14). */
-  country: string | null;
-};
+export type DocumentSummary = DocumentSummaryRecord;
 
 /** An open deadline as the documents list shows it: the nearest one on a card (HOME-2, HOME-1). */
 export type DeadlineSummary = Pick<

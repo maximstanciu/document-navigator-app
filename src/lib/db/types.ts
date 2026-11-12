@@ -44,6 +44,31 @@ export type DocumentRecord = {
   deletedAt: string | null;
 };
 
+/**
+ * A document as the documents list shows it (HOME-2, HOME-3) and what the «Needs attention» rule
+ * needs to know about its analysis (HOME-1), read without the analysis itself.
+ */
+export type DocumentSummaryRecord = Pick<
+  DocumentRecord,
+  | 'id'
+  | 'title'
+  | 'status'
+  | 'documentType'
+  | 'senderName'
+  | 'pageCount'
+  | 'createdAt'
+  | 'analyzedAt'
+  | 'attentionDismissedAt'
+  | 'caseId'
+> & {
+  /** The analysis found signs of fraud (ANL-11). */
+  hasFraudSignals: boolean;
+  /** The analysis found at least one high risk (DET-5). */
+  hasHighRisk: boolean;
+  /** The country the document comes from, ISO 3166-1 alpha-2, if the analysis found it (ANL-14). */
+  country: string | null;
+};
+
 /** Documents about one matter, grouped by the person: «Квартира», «Налоги 2026» (CASE-1). */
 export type CaseRecord = {
   id: string;
