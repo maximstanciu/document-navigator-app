@@ -1,4 +1,4 @@
-import { screen, userEvent, waitFor } from '@testing-library/react-native';
+import { fireEvent, screen, userEvent, waitFor } from '@testing-library/react-native';
 import { Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
@@ -471,6 +471,18 @@ describe('DocumentDetailScreen', () => {
       await user.longPress(
         await screen.findByLabelText('IBAN для оплаты: DE89 3704 0044 0532 0130 00')
       );
+
+      expect(copy).toHaveBeenCalledWith('DE89 3704 0044 0532 0130 00');
+      expect(await screen.findByText('Copied')).toBeOnTheScreen();
+    });
+
+    it('offers screen readers «Copy» as an action on a key fact', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await renderDocument();
+
+      const fact = await screen.findByLabelText('IBAN для оплаты: DE89 3704 0044 0532 0130 00');
+      expect(fact).toHaveProp('accessibilityActions', [{ name: 'longpress', label: 'Copy' }]);
+      await fireEvent(fact, 'accessibilityAction', { nativeEvent: { actionName: 'longpress' } });
 
       expect(copy).toHaveBeenCalledWith('DE89 3704 0044 0532 0130 00');
       expect(await screen.findByText('Copied')).toBeOnTheScreen();

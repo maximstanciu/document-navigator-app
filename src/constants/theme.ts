@@ -14,7 +14,8 @@ export const Colors = {
     backgroundElement: '#F0F0F3',
     backgroundSelected: '#E0E1E6',
     textSecondary: '#60646C',
-    tint: '#0966CA',
+    // Dark enough for AA on `backgroundSelected` too: «Undo» on the Deadlines tab (task 6.2).
+    tint: '#0860BF',
     onTint: '#ffffff',
     danger: '#D93036',
     border: '#D9D9E0',

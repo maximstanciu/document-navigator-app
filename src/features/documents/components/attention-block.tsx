@@ -94,36 +94,45 @@ function AttentionCard({ item, today }: { item: AttentionItem; today: string }) 
             ...warnings,
           ]
             .filter(Boolean)
-            .join(', ')}
-          style={({ pressed }) => [styles.body, pressed && styles.pressed]}>
-          <ThemedText type="smallBold" numberOfLines={2}>
-            {title}
-          </ThemedText>
-          {nearest && <DueLine deadline={nearest} today={today} />}
-          {more && (
-            <ThemedText type="small" themeColor="textSecondary">
-              {more}
-            </ThemedText>
-          )}
-          {(document.hasFraudSignals || document.hasHighRisk) && (
-            <View style={styles.badges}>
-              {document.hasFraudSignals && (
-                <WarningBadge
-                  icon={{
-                    ios: 'exclamationmark.shield.fill',
-                    android: 'gpp_maybe',
-                    web: 'gpp_maybe',
-                  }}
-                  color="fraudWarning"
-                  label={t('documents.attention.fraud')}
-                />
+            .join(', ')}>
+          {/* Styled inside: `Link asChild` drops a style function on the Pressable, and with it
+              the spacing and the pressed feedback (task 6.2). */}
+          {({ pressed }) => (
+            <View style={[styles.body, pressed && styles.pressed]}>
+              <ThemedText type="smallBold" numberOfLines={2}>
+                {title}
+              </ThemedText>
+              {nearest && <DueLine deadline={nearest} today={today} />}
+              {more && (
+                <ThemedText type="small" themeColor="textSecondary">
+                  {more}
+                </ThemedText>
               )}
-              {document.hasHighRisk && (
-                <WarningBadge
-                  icon={{ ios: 'exclamationmark.octagon.fill', android: 'report', web: 'report' }}
-                  color="riskHigh"
-                  label={t('documents.risk.high')}
-                />
+              {(document.hasFraudSignals || document.hasHighRisk) && (
+                <View style={styles.badges}>
+                  {document.hasFraudSignals && (
+                    <WarningBadge
+                      icon={{
+                        ios: 'exclamationmark.shield.fill',
+                        android: 'gpp_maybe',
+                        web: 'gpp_maybe',
+                      }}
+                      color="fraudWarning"
+                      label={t('documents.attention.fraud')}
+                    />
+                  )}
+                  {document.hasHighRisk && (
+                    <WarningBadge
+                      icon={{
+                        ios: 'exclamationmark.octagon.fill',
+                        android: 'report',
+                        web: 'report',
+                      }}
+                      color="riskHigh"
+                      label={t('documents.risk.high')}
+                    />
+                  )}
+                </View>
               )}
             </View>
           )}

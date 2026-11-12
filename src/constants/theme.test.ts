@@ -28,12 +28,19 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   ['tint', 'background'],
   ['tint', 'backgroundElement'],
   ['onTint', 'tint'],
+  // A chosen row, a pressed card and the «Undo» banner on the Deadlines tab.
+  ['text', 'backgroundSelected'],
+  ['textSecondary', 'backgroundSelected'],
+  ['tint', 'backgroundSelected'],
+  ['riskHigh', 'backgroundSelected'],
   ...RISK_TOKENS.flatMap((token): [ThemeColor, ThemeColor][] => [
     [token, `${token}Background`],
     [token, 'background'],
     [token, 'backgroundElement'],
     ['text', `${token}Background`],
     ['textSecondary', `${token}Background`],
+    // «Show the quote» inside the fraud warning.
+    ['tint', `${token}Background`],
   ]),
 ];
 

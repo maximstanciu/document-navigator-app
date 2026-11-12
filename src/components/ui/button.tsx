@@ -4,6 +4,8 @@ import { ThemedText } from '@/components/themed-text';
 import { MinTouchTarget, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+const HIT_SLOP = { left: Spacing.two, right: Spacing.two };
+
 export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
   /**
@@ -34,7 +36,10 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
       aria-label={label}
       aria-disabled={disabled ?? undefined}
       disabled={disabled}
-      hitSlop={Spacing.two}
+      // Sideways only: `minHeight` already makes it 44 pt tall, and a slop above and below would
+      // reach into the next row of a wrapping button row (a deadline's card), where the later
+      // button wins the overlap and takes taps meant for the one above it (task 6.2).
+      hitSlop={HIT_SLOP}
       style={({ pressed }) => [
         styles.base,
         variant === 'plain' && styles.plain,

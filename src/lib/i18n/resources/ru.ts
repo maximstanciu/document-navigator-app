@@ -201,6 +201,7 @@ export const ru = {
     },
     keyFact: {
       copyHint: 'Нажмите и удерживайте, чтобы скопировать',
+      copy: 'Скопировать',
       copied: 'Скопировано',
     },
     original: {

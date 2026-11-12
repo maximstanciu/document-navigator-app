@@ -1,6 +1,6 @@
 import { render, screen, userEvent } from '@testing-library/react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Spacing } from '@/constants/theme';
 
 import { Button } from './button';
 
@@ -43,6 +43,15 @@ describe('Button', () => {
 
     expect(screen.getByText('Restore')).toBeOnTheScreen();
     expect(onPress).toHaveBeenCalledTimes(1);
+  });
+
+  it('widens its touch area sideways only, so a wrapped row of buttons does not overlap', async () => {
+    await render(<Button label="OK" variant="plain" onPress={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'OK' })).toHaveProp('hitSlop', {
+      left: Spacing.two,
+      right: Spacing.two,
+    });
   });
 
   it('shows a destructive action in the high-risk color, not by color alone', async () => {

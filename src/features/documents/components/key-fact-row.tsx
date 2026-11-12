@@ -44,6 +44,12 @@ export function KeyFactRow({ fact }: { fact: KeyFact }) {
     <Pressable
       aria-label={`${fact.label}: ${fact.value}`}
       accessibilityHint={t('documents.keyFact.copyHint')}
+      // «Copy» for screen readers: TalkBack's double-tap and hold says it, VoiceOver lists it among
+      // the actions, where a long press is hard to find (task 6.2).
+      accessibilityActions={[{ name: 'longpress', label: t('documents.keyFact.copy') }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'longpress') void copy();
+      }}
       onLongPress={copy}
       style={({ pressed }) => [
         styles.row,

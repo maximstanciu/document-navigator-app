@@ -195,6 +195,7 @@ export const en = {
     },
     keyFact: {
       copyHint: 'Touch and hold to copy',
+      copy: 'Copy',
       copied: 'Copied',
     },
     original: {

@@ -6,6 +6,7 @@ import CaptureRoute from '@/app/capture';
 import CaptureLayout from '@/app/capture/_layout';
 import CaseRoute from '@/app/cases/[id]';
 import DocumentRoute from '@/app/documents/[id]';
+import { Spacing } from '@/constants/theme';
 import { analysisRecords } from '@/features/analysis/analysis-records';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
 import { i18n } from '@/lib/i18n/i18n';
@@ -228,6 +229,16 @@ describe('DocumentListScreen', () => {
       await renderWithProviders(<DocumentListScreen />);
 
       expect(await screen.findByText('And 1 more deadline')).toBeOnTheScreen();
+    });
+
+    it('keeps the spacing of a card inside its link', async () => {
+      await addAnalyzed('notice', dueIn(ANALYSIS_FIXTURES.officialNotice, 3, 5));
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      // `Link asChild` drops a style function on the Pressable: the card's lines would touch.
+      const line = await screen.findByText('And 1 more deadline');
+      expect(line.parent).toHaveStyle({ gap: Spacing.one });
     });
 
     it('takes a warning out with «Got it» and keeps the document in the list', async () => {
