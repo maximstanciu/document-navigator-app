@@ -10,7 +10,11 @@
           "name" : "needle"
         },
         {
-          "image-name" : "page.svg",
+          "image-name" : "ring.svg",
+          "name" : "ring"
+        },
+        {
+          "image-name" : "page.png",
           "name" : "page"
         }
       ],
