@@ -1,8 +1,8 @@
 import { NativeTabs } from 'expo-router/native-tabs';
 import { useTranslation } from 'react-i18next';
-import { useColorScheme } from 'react-native';
+import { Platform, useColorScheme } from 'react-native';
 
-import { Colors } from '@/constants/theme';
+import { Colors, Fonts } from '@/constants/theme';
 
 export default function AppTabs() {
   const { t } = useTranslation();
@@ -12,8 +12,18 @@ export default function AppTabs() {
   return (
     <NativeTabs
       backgroundColor={colors.background}
-      indicatorColor={colors.backgroundElement}
-      labelStyle={{ selected: { color: colors.text } }}>
+      // Android's pill behind the chosen tab: the accent fill, with its icon in `onTint`.
+      indicatorColor={colors.tint}
+      // iOS has no indicator: there the chosen icon is in the text color.
+      iconColor={{
+        default: colors.textSecondary,
+        selected: Platform.OS === 'android' ? colors.onTint : colors.text,
+      }}
+      tintColor={colors.text}
+      labelStyle={{
+        default: { fontFamily: Fonts.sans, fontWeight: '500', color: colors.textSecondary },
+        selected: { fontFamily: Fonts.sans, fontWeight: '600', color: colors.text },
+      }}>
       <NativeTabs.Trigger name="index">
         <NativeTabs.Trigger.Label>{t('tabs.documents')}</NativeTabs.Trigger.Label>
         <NativeTabs.Trigger.Icon

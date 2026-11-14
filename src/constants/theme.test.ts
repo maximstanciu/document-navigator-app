@@ -33,6 +33,11 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   ['textSecondary', 'backgroundSelected'],
   ['tint', 'backgroundSelected'],
   ['riskHigh', 'backgroundSelected'],
+  // The inverse card that leads the documents tab (HOME-1) and its button.
+  ['onInverse', 'inverse'],
+  ['onInverseSecondary', 'inverse'],
+  ['onInverseAction', 'inverseAction'],
+  ['inverseAction', 'inverse'],
   ...RISK_TOKENS.flatMap((token): [ThemeColor, ThemeColor][] => [
     [token, `${token}Background`],
     [token, 'background'],

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import type { CaseSummary } from '../types';
@@ -66,7 +66,7 @@ export function CaseChips({ cases, counts }: CaseChipsProps) {
 
   return (
     <View style={styles.section}>
-      <ThemedText type="smallBold" role="heading">
+      <ThemedText type="label" role="heading" themeColor="textSecondary">
         {t('cases.title')}
       </ThemedText>
       <ScrollView
@@ -114,7 +114,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
   },
   label: {
     flexShrink: 1,

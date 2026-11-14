@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { Fonts, MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type SearchFieldProps = {
@@ -60,11 +60,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.two,
     paddingLeft: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.pill,
   },
   input: {
     flex: 1,
     minHeight: MinTouchTarget,
+    fontFamily: Fonts.sans,
     fontSize: 16,
     paddingVertical: Spacing.two,
   },

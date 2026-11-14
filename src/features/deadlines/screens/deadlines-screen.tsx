@@ -9,7 +9,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { BottomTabInset, MaxContentWidth, Radius, Spacing, TopTabInset } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
 import { formatClockTime } from '@/lib/i18n/format';
@@ -205,7 +205,11 @@ export function DeadlinesScreen() {
           sections={sections}
           keyExtractor={(deadline) => deadline.id}
           renderSectionHeader={({ section }) => (
-            <ThemedText type="smallBold" role="heading" style={styles.sectionHeader}>
+            <ThemedText
+              type="label"
+              role="heading"
+              themeColor="textSecondary"
+              style={styles.sectionHeader}>
               {section.title}
             </ThemedText>
           )}
@@ -256,7 +260,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
     paddingLeft: Spacing.three,
     paddingRight: Spacing.two,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
   },
   undoMessage: {
     flex: 1,

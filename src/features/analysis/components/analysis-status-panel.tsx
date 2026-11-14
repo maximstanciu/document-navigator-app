@@ -7,7 +7,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { openNotificationSettings } from '@/features/reminders/notifications';
 import { reminderQueries } from '@/features/reminders/queries';
 import type { DocumentRecord } from '@/lib/db/types';
@@ -209,7 +209,7 @@ const styles = StyleSheet.create({
   panel: {
     gap: Spacing.three,
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
   },
   progress: {
     gap: Spacing.two,

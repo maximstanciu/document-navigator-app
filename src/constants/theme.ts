@@ -1,26 +1,37 @@
 /**
- * Below are the colors that are used in the app. The colors are defined in the light and dark mode.
- * There are many other ways to style your app. For example, [Nativewind](https://www.nativewind.dev/), [Tamagui](https://tamagui.dev/), [unistyles](https://unistyl.es/), etc.
+ * The app's colors in light and dark mode, its type families, spacing and radii. The look: ink on a
+ * cool grey ground with white cards, and one lime accent. In the light theme the lime never sits on
+ * a light surface: it shows only on ink (the accent of `tint` fills and of the inverse card).
  */
 
 import '@/global.css';
 
 import { Platform } from 'react-native';
 
+const Ink = '#0B0D12';
+const Lime = '#C8F31D';
+
 export const Colors = {
   light: {
-    text: '#000000',
-    background: '#ffffff',
-    backgroundElement: '#F0F0F3',
-    backgroundSelected: '#E0E1E6',
-    textSecondary: '#60646C',
-    // Dark enough for AA on `backgroundSelected` too: «Undo» on the Deadlines tab (task 6.2).
-    tint: '#0860BF',
-    onTint: '#ffffff',
-    danger: '#D93036',
-    border: '#D9D9E0',
+    text: Ink,
+    background: '#F4F5F7',
+    backgroundElement: '#FFFFFF',
+    backgroundSelected: '#E3E5EA',
+    textSecondary: '#555B66',
+    // Fills (primary buttons, chosen chips, checkboxes) and tappable text: ink, with lime on it.
+    tint: Ink,
+    onTint: Lime,
+    danger: '#C62A30',
+    border: '#D9DCE1',
     // Dims the screen behind a sheet; never a text color.
     scrim: '#00000066',
+    // The card that leads a screen (the nearest deadline, HOME-1): ink in light, lime in dark.
+    inverse: Ink,
+    onInverse: '#FFFFFF',
+    onInverseSecondary: '#A4A9B3',
+    // A button on the inverse card.
+    inverseAction: Lime,
+    onInverseAction: Ink,
     // Risk levels and the fraud warning (DET-5, DET-10). Always paired with text and an icon:
     // color alone never carries the meaning (§8.4). Contrast is checked in theme.test.ts.
     riskHigh: '#B42318',
@@ -33,16 +44,21 @@ export const Colors = {
     fraudWarningBackground: '#FFE4E6',
   },
   dark: {
-    text: '#ffffff',
-    background: '#000000',
-    backgroundElement: '#212225',
-    backgroundSelected: '#2E3135',
-    textSecondary: '#B0B4BA',
-    tint: '#3C9FFE',
-    onTint: '#000000',
+    text: '#F5F6F8',
+    background: '#0A0B0E',
+    backgroundElement: '#15171C',
+    backgroundSelected: '#252830',
+    textSecondary: '#A4A9B3',
+    tint: Lime,
+    onTint: Ink,
     danger: '#FF6369',
-    border: '#3A3F42',
+    border: '#2B2F37',
     scrim: '#000000A6',
+    inverse: Lime,
+    onInverse: Ink,
+    onInverseSecondary: '#3A4708',
+    inverseAction: Ink,
+    onInverseAction: Lime,
     riskHigh: '#FDA29B',
     riskHighBackground: '#55160C',
     riskMedium: '#FEC84B',
@@ -56,30 +72,16 @@ export const Colors = {
 
 export type ThemeColor = keyof typeof Colors.light & keyof typeof Colors.dark;
 
-export const Fonts = Platform.select({
-  ios: {
-    /** iOS `UIFontDescriptorSystemDesignDefault` */
-    sans: 'system-ui',
-    /** iOS `UIFontDescriptorSystemDesignSerif` */
-    serif: 'ui-serif',
-    /** iOS `UIFontDescriptorSystemDesignRounded` */
-    rounded: 'ui-rounded',
-    /** iOS `UIFontDescriptorSystemDesignMonospaced` */
-    mono: 'ui-monospace',
-  },
-  default: {
-    sans: 'normal',
-    serif: 'serif',
-    rounded: 'normal',
-    mono: 'monospace',
-  },
-  web: {
-    sans: 'var(--font-display)',
-    serif: 'var(--font-serif)',
-    rounded: 'var(--font-rounded)',
-    mono: 'var(--font-mono)',
-  },
-});
+/**
+ * Onest for text, JetBrains Mono for dates, amounts and section labels. Embedded in the native
+ * build by the `expo-font` plugin (app.json) and loaded with `useAppFonts` on web. iOS names a
+ * family by the font file; on Android and web the name is the one given in app.json and
+ * `src/lib/fonts.web.ts`.
+ */
+export const Fonts = {
+  sans: 'Onest',
+  mono: Platform.select({ ios: 'JetBrains Mono', default: 'JetBrainsMono' }),
+} as const;
 
 export const Spacing = {
   half: 2,
@@ -89,6 +91,14 @@ export const Spacing = {
   four: 24,
   five: 32,
   six: 64,
+} as const;
+
+/** Corner radii: cards, the inverse card, small tiles and fully round pills. */
+export const Radius = {
+  tile: 14,
+  card: 22,
+  hero: 28,
+  pill: 999,
 } as const;
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;

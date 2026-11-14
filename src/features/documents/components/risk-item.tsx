@@ -5,7 +5,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Spacing, type ThemeColor } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { AnalysisResult, Level } from '@/shared/analysis/schema';
 
@@ -87,7 +87,7 @@ export function RiskItem({ risk }: { risk: Risk }) {
 const styles = StyleSheet.create({
   card: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
     gap: Spacing.two,
   },
   header: {

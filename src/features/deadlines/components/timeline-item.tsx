@@ -7,10 +7,10 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
-import { formatCalendarDate } from '@/lib/i18n/format';
+import { formatCalendarDate, formatDateTile } from '@/lib/i18n/format';
 
 import { formatDueIn } from '../format';
 import { AddToCalendarButton } from './add-to-calendar-button';
@@ -47,6 +47,7 @@ export function TimelineItem({
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const date = formatCalendarDate(deadline.dueDate, i18n.language);
+  const tile = formatDateTile(deadline.dueDate, i18n.language);
   const overdue = deadline.dueDate < today;
   // With actions the deadline gets no checkbox of its own; its description still says what it is,
   // unless its only action says the same.
@@ -55,13 +56,28 @@ export function TimelineItem({
     (actions.length === 1 && actions[0].description.trim() !== deadline.description.trim());
 
   return (
-    <ThemedView type="backgroundElement" style={styles.card}>
-      <ThemedText type="smallBold">
-        <ThemedText type="smallBold" style={overdue && { color: theme.riskHigh }}>
-          {formatDueIn(deadline.dueDate, today, t)}
+    // An overdue card is tinted; it says «overdue» in words as well.
+    <ThemedView type={overdue ? 'riskHighBackground' : 'backgroundElement'} style={styles.card}>
+      <View style={styles.header}>
+        {/* The day and month again, large: the line next to it says the date in full. */}
+        <ThemedView type={overdue ? 'background' : 'tint'} style={styles.tile} aria-hidden>
+          <ThemedText
+            type="subtitle"
+            themeColor={overdue ? 'text' : 'onTint'}
+            style={styles.tileDay}>
+            {tile.day}
+          </ThemedText>
+          <ThemedText type="label" themeColor={overdue ? 'riskHigh' : 'onTint'}>
+            {tile.month}
+          </ThemedText>
+        </ThemedView>
+        <ThemedText type="smallBold" style={styles.when}>
+          <ThemedText type="smallBold" style={overdue && { color: theme.riskHigh }}>
+            {formatDueIn(deadline.dueDate, today, t)}
+          </ThemedText>
+          {` · ${deadline.dueTime ? `${date}, ${deadline.dueTime}` : date}`}
         </ThemedText>
-        {` · ${deadline.dueTime ? `${date}, ${deadline.dueTime}` : date}`}
-      </ThemedText>
+      </View>
       {actions.length === 0 ? (
         <Checkbox
           label={deadline.description}
@@ -123,8 +139,30 @@ export function TimelineItem({
 const styles = StyleSheet.create({
   card: {
     gap: Spacing.one,
-    padding: Spacing.three,
-    borderRadius: Spacing.three,
+    padding: Spacing.three - Spacing.one,
+    borderRadius: Radius.card,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - Spacing.one,
+    paddingBottom: Spacing.one,
+  },
+  tile: {
+    width: 56,
+    minHeight: 60,
+    borderRadius: Radius.tile + Spacing.half,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.one,
+  },
+  tileDay: {
+    fontSize: 24,
+    lineHeight: 26,
+    letterSpacing: -0.8,
+  },
+  when: {
+    flex: 1,
   },
   footer: {
     flexDirection: 'row',

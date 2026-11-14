@@ -10,7 +10,7 @@ import type { ComponentRef, Ref } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, View, StyleSheet } from 'react-native';
 
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 
 import { ThemedText } from './themed-text';
 import { ThemedView } from './themed-view';
@@ -44,10 +44,10 @@ export function TabButton({ children, isFocused, ref, ...props }: TabTriggerSlot
       // expo-router types the slot ref as `Ref<View>` (the component type); Pressable wants the instance.
       ref={ref as unknown as Ref<ComponentRef<typeof Pressable>>}
       style={({ pressed }) => pressed && styles.pressed}>
-      <ThemedView
-        type={isFocused ? 'backgroundSelected' : 'backgroundElement'}
-        style={styles.tabButtonView}>
-        <ThemedText type="small" themeColor={isFocused ? 'text' : 'textSecondary'}>
+      <ThemedView type={isFocused ? 'tint' : 'backgroundElement'} style={styles.tabButtonView}>
+        <ThemedText
+          type={isFocused ? 'smallBold' : 'small'}
+          themeColor={isFocused ? 'onTint' : 'textSecondary'}>
           {children}
         </ThemedText>
       </ThemedView>
@@ -82,7 +82,7 @@ const styles = StyleSheet.create({
   innerContainer: {
     paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.five,
+    borderRadius: Radius.pill,
     flexDirection: 'row',
     alignItems: 'center',
     flexGrow: 1,
@@ -100,8 +100,8 @@ const styles = StyleSheet.create({
     opacity: 0.7,
   },
   tabButtonView: {
-    paddingVertical: Spacing.one,
+    paddingVertical: Spacing.two,
     paddingHorizontal: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.pill,
   },
 });

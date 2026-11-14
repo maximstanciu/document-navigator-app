@@ -8,7 +8,7 @@ import { Spacing } from '@/constants/theme';
 export function DetailSection({ title, children }: PropsWithChildren<{ title: string }>) {
   return (
     <View style={styles.section}>
-      <ThemedText type="smallBold" role="heading" themeColor="textSecondary">
+      <ThemedText type="label" role="heading" themeColor="textSecondary">
         {title}
       </ThemedText>
       {children}

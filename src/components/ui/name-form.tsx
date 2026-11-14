@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { Fonts, MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type NameFormProps = {
@@ -70,11 +70,12 @@ const styles = StyleSheet.create({
   },
   input: {
     minHeight: MinTouchTarget,
+    fontFamily: Fonts.sans,
     fontSize: 20,
     fontWeight: 600,
     paddingHorizontal: Spacing.three,
     paddingVertical: Spacing.two,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
     borderWidth: 2,
   },
   buttons: {

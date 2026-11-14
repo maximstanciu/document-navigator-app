@@ -24,10 +24,12 @@ IMAGES = ROOT / "assets" / "images"
 IOS_ASSETS = ROOT / "assets" / "expo.icon" / "Assets"
 CHROME = os.environ.get("CHROME", "google-chrome")
 
-# Tint from src/constants/theme.ts (light) and two lighter steps of it.
-BLUE = "#0860BF"
-PALE = "#B5D4F4"
-MID = "#85B7EB"
+# An ink tile, a white page with grey details, and the compass in the lime accent: the needle's
+# south half is a darker step of it.
+INK = "#0B0D12"
+PALE = "#C9CDD4"
+LIME = "#C8F31D"
+DEEP_LIME = "#8FAE14"
 WHITE = "#FFFFFF"
 
 # The page, drawn upright and then tilted. Its bottom runs off the tile unless `bottom` ends it.
@@ -38,7 +40,7 @@ LINES = [(22, 20, 18), (22, 29, 28)]  # x, y, width; 4.5 high
 BLEED_BOTTOM = 130
 WHOLE_BOTTOM = 96
 
-# The compass: a white ring and needle, cut out of the page with a gap around it.
+# The compass: a lime ring and needle, cut out of the page with a gap around it.
 CX, CY, R = 70, 76, 44
 RING_WIDTH = 5.5
 GAP = 3
@@ -100,13 +102,13 @@ def needle_points():
 def needle_layer():
     north, south = needle_points()
     return (
-        f'<path d="{north}" fill="{WHITE}"/><path d="{south}" fill="{MID}"/>'
-        f'<circle cx="{CX}" cy="{CY}" r="3.4" fill="{BLUE}"/>'
+        f'<path d="{north}" fill="{LIME}"/><path d="{south}" fill="{DEEP_LIME}"/>'
+        f'<circle cx="{CX}" cy="{CY}" r="3.4" fill="{INK}"/>'
     )
 
 
 def mark(bottom=BLEED_BOTTOM):
-    return page_layer(bottom) + ring_layer() + needle_layer()
+    return page_layer(bottom) + ring_layer(LIME) + needle_layer()
 
 
 def mono_mark(bottom=BLEED_BOTTOM):
@@ -199,7 +201,7 @@ def main():
         sys.exit(f"{CHROME} not found; set CHROME to a Chrome or Chromium binary")
     with tempfile.TemporaryDirectory() as tmp:
         work = Path(tmp)
-        background = f'<rect width="100" height="100" fill="{BLUE}"/>'
+        background = f'<rect width="100" height="100" fill="{INK}"/>'
         # Full bleed: iOS and the stores round the corners themselves.
         render("icon.png", svg(background + mark(), 1024, 1024), 1024, 1024, work, opaque=True)
         render(
@@ -224,7 +226,7 @@ def main():
             IMAGES / "notification-icon.png",
             size=(96, 96),
         )
-        tile = f'<rect width="100" height="100" rx="22" fill="{BLUE}"/>'
+        tile = f'<rect width="100" height="100" rx="22" fill="{INK}"/>'
         render(
             "favicon.png",
             svg(f'<clipPath id="tile">{tile}</clipPath><g clip-path="url(#tile)">'
@@ -239,7 +241,7 @@ def main():
         # PNG because it is cut with a mask.
         IOS_ASSETS.mkdir(exist_ok=True)
         save(rasterize(svg(page_layer(), 1024, 1024), 1024, 1024, work), IOS_ASSETS / "page.png")
-    for name, content in [("needle.svg", needle_layer()), ("ring.svg", ring_layer())]:
+    for name, content in [("needle.svg", needle_layer()), ("ring.svg", ring_layer(LIME))]:
         (IOS_ASSETS / name).write_text(svg(content, 1024, 1024) + "\n")
         print(f"assets/expo.icon/Assets/{name}")
 

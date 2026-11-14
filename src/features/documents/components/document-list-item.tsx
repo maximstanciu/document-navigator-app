@@ -1,17 +1,39 @@
 import { Link } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
+import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { countryFlag, countryName } from '@/lib/i18n/display-names';
 import { formatCalendarDate } from '@/lib/i18n/format';
+import type { DocumentType } from '@/shared/analysis/schema';
 
 import { displayTitle, formatDocumentType, formatMeta } from '../format';
 import type { DeadlineSummary, DocumentSummary } from '../types';
+
+const PLAIN_DOCUMENT: SymbolViewProps['name'] = {
+  ios: 'doc.text',
+  android: 'description',
+  web: 'description',
+};
+
+/** The tile on the left of a row, by the type of the document. Decoration: the type is in words. */
+const TYPE_ICONS: Record<DocumentType, SymbolViewProps['name']> = {
+  letter: { ios: 'envelope', android: 'mail', web: 'mail' },
+  invoice: { ios: 'bolt', android: 'receipt_long', web: 'receipt_long' },
+  contract: { ios: 'signature', android: 'handshake', web: 'handshake' },
+  official_notice: { ios: 'building.columns', android: 'account_balance', web: 'account_balance' },
+  fine: { ios: 'exclamationmark.triangle', android: 'warning', web: 'warning' },
+  tax: { ios: 'percent', android: 'percent', web: 'percent' },
+  insurance: { ios: 'shield', android: 'shield', web: 'shield' },
+  bank: { ios: 'creditcard', android: 'credit_card', web: 'credit_card' },
+  medical: { ios: 'cross.case', android: 'medical_services', web: 'medical_services' },
+  other: PLAIN_DOCUMENT,
+  unknown: PLAIN_DOCUMENT,
+};
 
 type DocumentListItemProps = {
   document: DocumentSummary;
@@ -67,34 +89,49 @@ export function DocumentListItem({
           <ThemedView
             type={pressed ? 'backgroundSelected' : 'backgroundElement'}
             style={styles.row}>
-            <ThemedText type="smallBold" numberOfLines={2}>
-              {title}
-            </ThemedText>
-            {from !== '' && (
-              <ThemedText type="small" numberOfLines={1}>
-                {from}
+            <ThemedView type="background" style={styles.tile}>
+              <SymbolView
+                name={document.documentType ? TYPE_ICONS[document.documentType] : PLAIN_DOCUMENT}
+                size={20}
+                tintColor={theme.text}
+              />
+            </ThemedView>
+            <View style={styles.text}>
+              <ThemedText type="smallBold" numberOfLines={2}>
+                {title}
               </ThemedText>
-            )}
-            {dueLine && (
-              <ThemedText type="smallBold" style={overdue && { color: theme.riskHigh }}>
-                {dueLine}
-              </ThemedText>
-            )}
-            <ThemedText type="small" themeColor="textSecondary">
-              {metaLine}
-            </ThemedText>
-            {caseName && (
-              <View style={styles.case}>
-                <SymbolView
-                  name={{ ios: 'folder', android: 'folder', web: 'folder' }}
-                  size={16}
-                  tintColor={theme.textSecondary}
-                />
-                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
-                  {caseName}
+              {from !== '' && (
+                <ThemedText type="small" numberOfLines={1}>
+                  {from}
                 </ThemedText>
-              </View>
-            )}
+              )}
+              {dueLine && (
+                // A pill, tinted when overdue; «overdue» is in its words too.
+                <ThemedView type={overdue ? 'riskHighBackground' : 'background'} style={styles.due}>
+                  <ThemedText
+                    type="code"
+                    themeColor={overdue ? 'riskHigh' : 'text'}
+                    style={styles.dueText}>
+                    {dueLine}
+                  </ThemedText>
+                </ThemedView>
+              )}
+              <ThemedText type="small" themeColor="textSecondary">
+                {metaLine}
+              </ThemedText>
+              {caseName && (
+                <View style={styles.case}>
+                  <SymbolView
+                    name={{ ios: 'folder', android: 'folder', web: 'folder' }}
+                    size={16}
+                    tintColor={theme.textSecondary}
+                  />
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {caseName}
+                  </ThemedText>
+                </View>
+              )}
+            </View>
           </ThemedView>
         )}
       </Pressable>
@@ -105,10 +142,33 @@ export function DocumentListItem({
 const styles = StyleSheet.create({
   row: {
     minHeight: MinTouchTarget,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.three,
-    borderRadius: Spacing.three,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    padding: Spacing.three - Spacing.one,
+    borderRadius: Radius.card,
+    gap: Spacing.three - Spacing.one,
+  },
+  tile: {
+    width: MinTouchTarget,
+    height: MinTouchTarget,
+    borderRadius: Radius.tile,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  text: {
+    flex: 1,
     gap: Spacing.one,
+    paddingVertical: Spacing.half,
+  },
+  due: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.two + Spacing.half,
+    paddingVertical: Spacing.one,
+    borderRadius: Radius.pill,
+    marginVertical: Spacing.half,
+  },
+  dueText: {
+    lineHeight: 16,
   },
   case: {
     flexDirection: 'row',

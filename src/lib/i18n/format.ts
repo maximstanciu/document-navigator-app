@@ -19,6 +19,27 @@ export function formatTimestampDateTime(isoTimestamp: string, language: string):
   }).format(new Date(isoTimestamp));
 }
 
+/** Today on top of a tab: «пт, 13 ноября» or «Fri, November 13», in the device's time zone. */
+export function formatWeekdayDate(date: Date, language: string): string {
+  return new Intl.DateTimeFormat(language, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'long',
+  }).format(date);
+}
+
+/**
+ * A calendar date (YYYY-MM-DD) split for a date tile: the day of the month and the short month,
+ * «16» and «нояб.». In UTC, as `formatCalendarDate`.
+ */
+export function formatDateTile(isoDate: string, language: string): { day: string; month: string } {
+  const date = new Date(`${isoDate}T00:00:00Z`);
+  return {
+    day: new Intl.DateTimeFormat(language, { day: 'numeric', timeZone: 'UTC' }).format(date),
+    month: new Intl.DateTimeFormat(language, { month: 'short', timeZone: 'UTC' }).format(date),
+  };
+}
+
 /** A time of day (`HH:mm`, local), e.g. when reminders come (SET-2): «09:00» or «09:00 AM». */
 export function formatClockTime(time: string, language: string): string {
   const [hours, minutes] = time.split(':').map(Number);

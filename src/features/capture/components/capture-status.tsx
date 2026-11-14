@@ -4,7 +4,7 @@ import { ActivityIndicator, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES } from '@/shared/limits';
 
@@ -61,7 +61,7 @@ export function CaptureStatus({ progress, notice }: CaptureStatusProps) {
 const styles = StyleSheet.create({
   box: {
     padding: Spacing.three,
-    borderRadius: Spacing.three,
+    borderRadius: Radius.card,
   },
   progress: {
     flexDirection: 'row',

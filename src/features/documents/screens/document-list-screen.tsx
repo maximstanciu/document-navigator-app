@@ -13,6 +13,7 @@ import { caseQueries } from '@/features/cases/queries';
 import { deadlineQueries } from '@/features/deadlines/queries';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
+import { formatWeekdayDate } from '@/lib/i18n/format';
 import { localCalendarDate } from '@/shared/calendar-date';
 
 import { deadlinesByDocument, selectAttention } from '../attention';
@@ -42,7 +43,7 @@ function countByCase(documents: readonly DocumentSummary[]): Map<string, number>
  */
 export function DocumentListScreen() {
   const theme = useTheme();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const now = useNow();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter | null>(null);
@@ -88,9 +89,14 @@ export function DocumentListScreen() {
 
   const header = (
     <View style={styles.heading}>
-      <ThemedText type="subtitle" role="heading" style={styles.title}>
-        {t('documents.title')}
-      </ThemedText>
+      <View style={styles.title}>
+        <ThemedText type="label" themeColor="textSecondary">
+          {formatWeekdayDate(now, i18n.language)}
+        </ThemedText>
+        <ThemedText type="subtitle" role="heading">
+          {t('documents.title')}
+        </ThemedText>
+      </View>
       <AddDocumentButton />
     </View>
   );
@@ -160,7 +166,7 @@ export function DocumentListScreen() {
             <View style={styles.listHeader}>
               <AttentionBlock items={attention} today={today} />
               {!searching && caseChips}
-              <ThemedText type="smallBold" role="heading">
+              <ThemedText type="label" role="heading" themeColor="textSecondary">
                 {searching ? t('documents.search.results') : t('documents.allDocuments')}
               </ThemedText>
               {types.length > 1 && (
@@ -195,7 +201,7 @@ const styles = StyleSheet.create({
   },
   heading: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-end',
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: Spacing.two,
@@ -203,6 +209,7 @@ const styles = StyleSheet.create({
   },
   title: {
     flexShrink: 1,
+    gap: Spacing.one,
   },
   listHeader: {
     gap: Spacing.three,

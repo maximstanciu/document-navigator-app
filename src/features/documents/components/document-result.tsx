@@ -116,7 +116,7 @@ export function DocumentResult({
       {!readable && <QualityNotice issues={analysis.quality.issues} />}
       {analysis.summary.trim() !== '' && (
         <DetailSection title={t('documents.section.summary')}>
-          <ThemedText>{analysis.summary}</ThemedText>
+          <ThemedText type="lead">{analysis.summary}</ThemedText>
         </DetailSection>
       )}
       <TasksBlocks documentId={documentId} documentTitle={documentTitle} readable={readable} />

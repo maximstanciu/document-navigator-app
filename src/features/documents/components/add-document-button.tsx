@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** «+» on the documents screen: opens the choice of source for a new document (CAP-1). */
@@ -43,7 +43,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
     paddingLeft: Spacing.three,
     paddingRight: Spacing.four,
-    borderRadius: MinTouchTarget / 2,
+    borderRadius: Radius.pill,
   },
   pressed: {
     opacity: 0.7,

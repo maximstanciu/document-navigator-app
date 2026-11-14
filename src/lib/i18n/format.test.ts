@@ -1,4 +1,11 @@
-import { formatCalendarDate, formatClockTime, formatFileSize, formatTimestampDate } from './format';
+import {
+  formatCalendarDate,
+  formatClockTime,
+  formatDateTile,
+  formatFileSize,
+  formatTimestampDate,
+  formatWeekdayDate,
+} from './format';
 
 describe('date formatting', () => {
   it('formats in the interface language', () => {
@@ -9,6 +16,19 @@ describe('date formatting', () => {
   it('keeps calendar dates on their day in any time zone', () => {
     expect(formatCalendarDate('2026-10-31', 'ru')).toMatch(/^31 /);
     expect(formatCalendarDate('2026-01-01', 'en')).toMatch(/Jan 1, 2026/);
+  });
+
+  it('splits a calendar date into the day and short month of a date tile', () => {
+    expect(formatDateTile('2026-11-16', 'en')).toEqual({ day: '16', month: 'Nov' });
+    expect(formatDateTile('2026-01-01', 'ru')).toEqual({
+      day: '1',
+      month: expect.stringMatching(/^янв/),
+    });
+  });
+
+  it('names the weekday with today on top of a tab', () => {
+    expect(formatWeekdayDate(new Date(2026, 10, 13, 12), 'en')).toBe('Fri, November 13');
+    expect(formatWeekdayDate(new Date(2026, 10, 13, 12), 'ru')).toBe('пт, 13 ноября');
   });
 
   it('shows a time of day as it is, whatever the time zone', () => {
