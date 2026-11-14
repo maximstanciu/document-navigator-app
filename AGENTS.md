@@ -39,7 +39,7 @@ Folders marked _(planned)_ don't exist yet; they are created by the plan task in
 src/
   app/                 # Expo Router routes ONLY — every file here is a route
     _layout.tsx        # root Stack + AppProviders
-    (tabs)/            # tab group (NativeTabs on iOS/Android, custom tab bar on web)
+    (tabs)/            # tab group: floating tab bar (src/components/app-tabs.tsx, all platforms)
     documents/[id].tsx # thin route: reads params, renders a feature screen
     api/v1/*+api.ts    # thin API routes: parse request, call a handler in src/server
   features/<feature>/  # one folder per domain area: capture, documents, analysis, deadlines,
@@ -111,7 +111,7 @@ Prefer those package docs over stale assumptions, and follow deprecation notices
 
 - Use **Expo Router** for all navigation. Routes live in `src/app/` — every file there is a screen, `_layout.tsx` files define navigators.
 - Import `Link`, `router`, and `useLocalSearchParams` from `expo-router`. Typed routes are enabled; use object hrefs for dynamic segments: `{ pathname: '/documents/[id]', params: { id } }`.
-- New tabs need a trigger in both `src/components/app-tabs.tsx` and `src/components/app-tabs.web.tsx`.
+- New tabs need a trigger in `src/components/app-tabs.tsx` (one floating tab bar for iOS, Android and web). Tab screens pad their scrolling content with `useBottomTabInset()` so it clears the bar.
 - Gate onboarding with `Stack.Protected` and a `guard`, not with redirects in effects; keep the splash screen up until migrations and settings are loaded.
 - Docs: https://docs.expo.dev/router/introduction.md
 

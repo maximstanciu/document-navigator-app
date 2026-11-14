@@ -14,7 +14,7 @@ description: Start this Expo app and look at it running — web preview in the b
 3. Read the page as text or take a screenshot; check the console for errors.
 4. Check both color schemes (the browser pane can emulate light/dark) and a phone-sized viewport.
 
-Web is a development preview only (SPEC §9): no scanner, notifications or calendar — those render their `.web.ts` stubs. Native-only code (`NativeTabs`, SF Symbols, permissions) renders differently or not at all. Say what you couldn't check.
+Web is a development preview only (SPEC §9): no scanner, notifications or calendar — those render their `.web.ts` stubs. Native-only code (SF Symbols, permissions) renders differently or not at all. Say what you couldn't check.
 
 ## Native: development build only
 

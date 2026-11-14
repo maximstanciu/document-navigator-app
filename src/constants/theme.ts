@@ -42,6 +42,9 @@ export const Colors = {
     riskLowBackground: '#E0EAFF',
     fraudWarning: '#9F1239',
     fraudWarningBackground: '#FFE4E6',
+    tabBar: '#FFFFFF',
+    tabBarBorder: '#FFFFFF',
+    tabBarShadow: '#0B0D121F',
   },
   dark: {
     text: '#F5F6F8',
@@ -67,6 +70,9 @@ export const Colors = {
     riskLowBackground: '#102A56',
     fraudWarning: '#FDA4AF',
     fraudWarningBackground: '#4C0519',
+    tabBar: '#1E2128',
+    tabBarBorder: '#2B2F37',
+    tabBarShadow: '#00000000',
   },
 } as const;
 
@@ -101,9 +107,12 @@ export const Radius = {
   pill: 999,
 } as const;
 
-export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
-/** Web renders the tab bar as a floating header (see `app-tabs.web.tsx`). */
-export const TopTabInset = Platform.select({ web: Spacing.six + Spacing.three }) ?? 0;
+/**
+ * The floating tab bar (`src/components/app-tabs.tsx`): its height and its widest, on a tablet or
+ * the web preview. Tab screens leave room for it with `useBottomTabInset()`.
+ */
+export const TabBarHeight = 68;
+export const TabBarMaxWidth = 480;
 /** Minimum touch target size (Apple HIG 44pt, Material 48dp). */
 export const MinTouchTarget = 44;
 export const MaxContentWidth = 800;

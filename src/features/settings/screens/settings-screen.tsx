@@ -7,7 +7,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Radius, Spacing, TopTabInset } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { RemainingAnalyses } from '@/features/analysis/components/remaining-analyses';
 import { settingsQuery } from '@/lib/db/settings-query';
 import { env } from '@/lib/env';
@@ -36,6 +37,7 @@ function InfoRow({ label, value }: { label: string; value: string }) {
  */
 export function SettingsScreen() {
   const { t } = useTranslation();
+  const bottomInset = useBottomTabInset();
   const { isPending, error, refetch } = useQuery(settingsQuery());
 
   let content;
@@ -45,7 +47,7 @@ export function SettingsScreen() {
     content = <ErrorState error={error} onRetry={() => refetch()} />;
   } else {
     content = (
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}>
         <ThemedText type="subtitle" role="heading" style={styles.heading}>
           {t('settings.title')}
         </ThemedText>
@@ -97,12 +99,11 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
   },
   heading: {
-    paddingTop: TopTabInset + Spacing.three,
+    paddingTop: Spacing.three,
   },
   content: {
     gap: Spacing.five,
     paddingHorizontal: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
   },
   row: {
     flexDirection: 'row',

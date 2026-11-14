@@ -7,10 +7,11 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { CaseChips } from '@/features/cases/components/case-chips';
 import { caseQueries } from '@/features/cases/queries';
 import { deadlineQueries } from '@/features/deadlines/queries';
+import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { formatWeekdayDate } from '@/lib/i18n/format';
@@ -44,6 +45,7 @@ function countByCase(documents: readonly DocumentSummary[]): Map<string, number>
 export function DocumentListScreen() {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
+  const bottomInset = useBottomTabInset();
   const now = useNow();
   const [query, setQuery] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter | null>(null);
@@ -177,7 +179,7 @@ export function DocumentListScreen() {
           ListEmptyComponent={empty}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="on-drag"
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
         />
       </SafeAreaView>
     </ThemedView>
@@ -205,7 +207,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     flexWrap: 'wrap',
     gap: Spacing.two,
-    paddingTop: TopTabInset + Spacing.three,
+    paddingTop: Spacing.three,
   },
   title: {
     flexShrink: 1,
@@ -219,7 +221,6 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
   },
   searching: {
     padding: Spacing.four,

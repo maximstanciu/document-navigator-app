@@ -38,6 +38,10 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   ['onInverseSecondary', 'inverse'],
   ['onInverseAction', 'inverseAction'],
   ['inverseAction', 'inverse'],
+  // The floating tab bar: its labels and icons, and the round «Add a document» on it.
+  ['text', 'tabBar'],
+  ['textSecondary', 'tabBar'],
+  ['tint', 'tabBar'],
   ...RISK_TOKENS.flatMap((token): [ThemeColor, ThemeColor][] => [
     [token, `${token}Background`],
     [token, 'background'],

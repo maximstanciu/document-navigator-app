@@ -14,7 +14,7 @@ Reference for structure — read these before writing anything:
 
 - `src/app/documents/[id].tsx` → `src/features/documents/screens/document-detail-screen.tsx` (pushed screen with param)
 - `src/app/(tabs)/index.tsx` → `src/features/documents/screens/document-list-screen.tsx` (tab with list)
-- `src/app/_layout.tsx` (root Stack), `src/app/(tabs)/_layout.tsx` + `src/components/app-tabs.tsx` / `app-tabs.web.tsx` (tabs)
+- `src/app/_layout.tsx` (root Stack), `src/app/(tabs)/_layout.tsx` + `src/components/app-tabs.tsx` (floating tab bar, all platforms)
 
 Both `documents` screens read local data through `documentQueries` and handle loading, error with retry, and empty or not-found states; their tests show how to seed data with `installTestRepositories()`.
 
@@ -23,7 +23,7 @@ Both `documents` screens read local data through `documentQueries` and handle lo
 | Want                           | File                                                                                                                                                                                                                                                          |
 | ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Screen pushed over the tabs    | `src/app/<feature>/<name>.tsx` or `src/app/<feature>/[id].tsx`                                                                                                                                                                                                |
-| New tab                        | `src/app/(tabs)/<name>.tsx` **and** a trigger in both `app-tabs.tsx` and `app-tabs.web.tsx`                                                                                                                                                                   |
+| New tab                        | `src/app/(tabs)/<name>.tsx` **and** a trigger in `app-tabs.tsx`; pad its scrolling content with `useBottomTabInset()`                                                                                                                                         |
 | Modal                          | `src/app/<name>.tsx` + `<Stack.Screen name="<name>" options={{ presentation: 'modal' }} />` in `src/app/_layout.tsx`; a multi-screen modal flow is a group with its own stack, like `capture/` (`_layout.tsx` + `index.tsx`, presented with `name="capture"`) |
 | Nested flow with its own stack | `src/app/<group>/_layout.tsx` exporting a `<Stack />`                                                                                                                                                                                                         |
 

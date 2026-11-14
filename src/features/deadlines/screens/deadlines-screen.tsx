@@ -9,7 +9,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { BottomTabInset, MaxContentWidth, Radius, Spacing, TopTabInset } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { useNow } from '@/hooks/use-now';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
 import { formatClockTime } from '@/lib/i18n/format';
@@ -51,6 +52,7 @@ type Undo = { message: string; label: string; run: () => void };
  */
 export function DeadlinesScreen() {
   const { t, i18n } = useTranslation();
+  const bottomInset = useBottomTabInset();
   const now = useNow();
   const deadlines = useQuery(deadlineQueries.open());
   const actions = useQuery(deadlineQueries.datedActions());
@@ -229,7 +231,7 @@ export function DeadlinesScreen() {
             <EmptyState title={t('deadlines.emptyTitle')} message={t('deadlines.emptyMessage')} />
           }
           stickySectionHeadersEnabled={false}
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
         />
       </SafeAreaView>
     </ThemedView>
@@ -252,7 +254,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   heading: {
-    paddingTop: TopTabInset + Spacing.three,
+    paddingTop: Spacing.three,
   },
   undo: {
     flexDirection: 'row',
@@ -272,6 +274,5 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
-    paddingBottom: BottomTabInset + Spacing.three,
   },
 });
