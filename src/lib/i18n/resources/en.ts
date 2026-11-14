@@ -333,6 +333,11 @@ export const en = {
     preparingPages: 'Preparing the pages…',
     preparingPagesProgress: 'Preparing the pages: {{done}} of {{total}}',
     pickerFailed: "Couldn't get the files. Try again.",
+    tooManySharedPhotos_one: 'A document can have at most {{count}} page. Share fewer photos.',
+    tooManySharedPhotos_other: 'A document can have at most {{count}} pages. Share fewer photos.',
+    unsupportedShare:
+      "This can't be analyzed. Share one PDF, or photos of a document as JPEG, PNG or HEIC.",
+    shareFailed: "Couldn't get the files from the other app. Share them again or choose them here.",
     reviewTitle: 'Check the pages',
     noPages: 'No pages yet',
     pageLabel: 'Page {{number}}',

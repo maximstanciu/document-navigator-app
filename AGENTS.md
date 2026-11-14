@@ -69,6 +69,8 @@ src/
   test/                # test helpers (renderWithProviders)
 deploy/                # self-hosted backend: Dockerfile, compose.yaml (API on Node, Redis + Upstash-compatible
                        #   REST proxy for counters, Caddy for HTTPS), server.js (Node entry), README.md
+plugins/               # local config plugins, referenced from app.json (CommonJS, test next to each):
+                       #   with-share-history-guard.js (CAP-11)
 scripts/eval/          # analysis quality evaluation: synthetic test documents with reference labels
                        #   (synthetic/, Python, task 0.6); the evaluation runner is (planned, 0.3/3.7)
 ```

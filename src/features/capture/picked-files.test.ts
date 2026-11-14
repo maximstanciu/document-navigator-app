@@ -1,6 +1,15 @@
+import appJson from '../../../app.json';
+
 import { MAX_IMAGE_PAGES } from '@/shared/limits';
 
-import { capturedMimeType, checkPickedFiles, type PickedFile } from './picked-files';
+import {
+  capturedMimeType,
+  checkPickedFiles,
+  checkSharedFiles,
+  SHARE_MULTIPLE_TYPES,
+  SHARE_SINGLE_TYPES,
+  type PickedFile,
+} from './picked-files';
 
 const MB = 1024 * 1024;
 
@@ -160,5 +169,62 @@ describe('checkPickedFiles (CAP-3, CAP-7)', () => {
     expect(
       checkPickedFiles('file', [file({ mimeType: 'application/zip', name: 'docs.zip' })])
     ).toEqual({ status: 'unsupported_type' });
+  });
+});
+
+describe('checkSharedFiles (CAP-11)', () => {
+  it('takes one shared PDF as a file', () => {
+    expect(checkSharedFiles([pdf()])).toEqual({
+      status: 'ok',
+      source: 'file',
+      pages: [expect.objectContaining({ mimeType: 'application/pdf', name: 'letter.pdf' })],
+    });
+  });
+
+  it('takes shared images as photos, in the order they came', () => {
+    const shared = [
+      file({ uri: 'file:///a.jpg' }),
+      file({ uri: 'file:///b.heic', mimeType: 'image/heif' }),
+    ];
+    expect(checkSharedFiles(shared)).toEqual({
+      status: 'ok',
+      source: 'gallery',
+      pages: [
+        expect.objectContaining({ uri: 'file:///a.jpg', mimeType: 'image/jpeg' }),
+        expect.objectContaining({ uri: 'file:///b.heic', mimeType: 'image/heic' }),
+      ],
+    });
+  });
+
+  it('refuses a PDF together with other files, other formats and text', () => {
+    expect(checkSharedFiles([pdf(), file()])).toEqual({ status: 'unsupported_type' });
+    expect(checkSharedFiles([pdf(), pdf()])).toEqual({ status: 'unsupported_type' });
+    expect(checkSharedFiles([file({ mimeType: 'image/webp', name: 'a.webp' })])).toEqual({
+      status: 'unsupported_type',
+    });
+    expect(
+      checkSharedFiles([{ uri: 'Hello', name: null, mimeType: 'text/plain', size: null }])
+    ).toEqual({ status: 'unsupported_type' });
+  });
+
+  it('refuses more images than a document can have', () => {
+    const shared = Array.from({ length: MAX_IMAGE_PAGES + 1 }, () => file());
+    expect(checkSharedFiles(shared)).toEqual({
+      status: 'too_many_pages',
+      pageCount: MAX_IMAGE_PAGES + 1,
+    });
+  });
+
+  it("matches the formats app.json's share menu offers", () => {
+    const plugins: unknown[] = appJson.expo.plugins;
+    const plugin = plugins.find(
+      (entry): entry is [string, { android: Record<string, unknown> }] =>
+        Array.isArray(entry) && entry[0] === 'expo-sharing'
+    );
+    expect(plugin?.[1].android).toEqual({
+      enabled: true,
+      singleShareMimeTypes: SHARE_SINGLE_TYPES,
+      multipleShareMimeTypes: SHARE_MULTIPLE_TYPES,
+    });
   });
 });

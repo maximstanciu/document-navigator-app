@@ -1,14 +1,16 @@
-import { screen, userEvent } from '@testing-library/react-native';
+import { act, screen, userEvent } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
 import CaptureRoute from '@/app/capture';
 import CaptureLayout from '@/app/capture/_layout';
 import ReviewRoute from '@/app/capture/review';
+import SharedRoute from '@/app/capture/shared';
 import { Button } from '@/components/ui/button';
 import { i18n } from '@/lib/i18n/i18n';
 import { createTestProviders } from '@/test/render';
 
+import { takeSharedFiles, type SharedFilesResult } from '../incoming-share';
 import { normalizeImage, type NormalizedImage } from '../normalize-image';
 import type { PickedFile } from '../picked-files';
 import { pickFile, pickPhotos } from '../pickers';
@@ -22,10 +24,12 @@ jest.mock('../scanner', () => ({
 }));
 jest.mock('../pickers', () => ({ pickPhotos: jest.fn(), pickFile: jest.fn() }));
 jest.mock('../normalize-image', () => ({ normalizeImage: jest.fn() }));
+jest.mock('../incoming-share', () => ({ takeSharedFiles: jest.fn() }));
 const scan = jest.mocked(scanner.scanDocument);
 const photos = jest.mocked(pickPhotos);
 const pickedFile = jest.mocked(pickFile);
 const normalize = jest.mocked(normalizeImage);
+const takeShared = jest.mocked(takeSharedFiles);
 
 const MB = 1024 * 1024;
 
@@ -53,6 +57,7 @@ function renderCapture(initialUrl: string) {
       'capture/_layout': CaptureLayout,
       'capture/index': CaptureRoute,
       'capture/review': ReviewRoute,
+      'capture/shared': SharedRoute,
     },
     { initialUrl, wrapper: createTestProviders() }
   );
@@ -76,6 +81,7 @@ afterEach(() => {
   photos.mockReset();
   pickedFile.mockReset();
   normalize.mockReset();
+  takeShared.mockReset();
 });
 
 describe('CaptureSourceScreen (CAP-1)', () => {
@@ -360,5 +366,116 @@ describe('CaptureSourceScreen (CAP-1)', () => {
     await renderCapture('/capture/review');
 
     expect(await screen.findByText('No pages yet')).toBeOnTheScreen();
+  });
+});
+
+describe('CaptureSourceScreen with files shared from another app (CAP-11)', () => {
+  function shared(...files: Partial<PickedFile>[]): SharedFilesResult {
+    return { status: 'shared', files: picked(...files).files };
+  }
+
+  it('shows a shared PDF for review with its name and size', async () => {
+    takeShared.mockResolvedValue(
+      shared({
+        uri: 'file:///cache/shared-files/1.pdf',
+        name: 'Счёт.pdf',
+        mimeType: 'application/pdf',
+        size: 2 * MB,
+      })
+    );
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByText('Счёт.pdf')).toBeOnTheScreen();
+    expect(screen).toHavePathname('/capture/review');
+    expect(screen.getByText('2 MB')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'Analyze the document' })).toBeEnabled();
+    // A file gets no more pages (CAP-5).
+    expect(screen.queryByRole('button', { name: 'Add more photos' })).not.toBeOnTheScreen();
+    expect(takeShared).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows shared photos as pages, prepared for upload, with «Add more photos»', async () => {
+    takeShared.mockResolvedValue(shared({}, { mimeType: 'image/heic', name: 'IMG_2.HEIC' }));
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByText('2 pages')).toBeOnTheScreen();
+    expect(screen).toHavePathname('/capture/review');
+    expect(normalize).toHaveBeenCalledTimes(2);
+    expect(screen.getByRole('button', { name: 'Add more photos' })).toBeEnabled();
+  });
+
+  it('shows progress while the shared files come in, with the sources disabled', async () => {
+    takeShared.mockReturnValue(new Promise(() => {}));
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByText('Preparing the pages…')).toBeOnTheScreen();
+    expect(screen.getByRole('button', { name: 'File' })).toBeDisabled();
+  });
+
+  it('explains what can be shared when the files do not fit, and offers the sources', async () => {
+    takeShared.mockResolvedValue(
+      shared({ mimeType: 'application/pdf', name: 'a.pdf' }, { mimeType: 'image/jpeg' })
+    );
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      "This can't be analyzed. Share one PDF, or photos of a document as JPEG, PNG or HEIC."
+    );
+    expect(screen).toHavePathname('/capture/shared');
+    expect(screen.getByRole('button', { name: 'File' })).toBeEnabled();
+  });
+
+  it('explains the page limit when too many photos are shared (CAP-7)', async () => {
+    takeShared.mockResolvedValue(shared(...Array.from({ length: 31 }, () => ({}))));
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'A document can have at most 30 pages. Share fewer photos.'
+    );
+  });
+
+  it('says so in Russian when the shared files cannot be read', async () => {
+    await i18n.changeLanguage('ru');
+    takeShared.mockResolvedValue({ status: 'failed' });
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Не удалось получить файлы из другого приложения. Поделитесь ещё раз или выберите их здесь.'
+    );
+  });
+
+  it('is the plain source choice when nothing is shared any more', async () => {
+    takeShared.mockResolvedValue({ status: 'none' });
+    await renderCapture('/capture/shared?share=1');
+
+    expect(await screen.findByRole('button', { name: 'File' })).toBeEnabled();
+    expect(screen).toHavePathname('/capture/shared');
+    expect(screen.queryByRole('alert')).not.toBeOnTheScreen();
+  });
+
+  it('takes the next share when it arrives while the screen is open', async () => {
+    takeShared.mockResolvedValueOnce({ status: 'failed' });
+    await renderCapture('/capture/shared?share=1');
+    expect(await screen.findByRole('alert')).toBeOnTheScreen();
+
+    takeShared.mockResolvedValueOnce(
+      shared({
+        uri: 'file:///cache/shared-files/1.pdf',
+        name: 'Next.pdf',
+        mimeType: 'application/pdf',
+      })
+    );
+    await act(() => router.navigate('/capture/shared?share=2'));
+
+    expect(await screen.findByText('Next.pdf')).toBeOnTheScreen();
+    expect(screen).toHavePathname('/capture/review');
+    expect(takeShared).toHaveBeenCalledTimes(2);
+  });
+
+  it('does not take the share on the plain source choice', async () => {
+    await renderCapture('/capture');
+
+    expect(await screen.findByRole('button', { name: 'File' })).toBeEnabled();
+    expect(takeShared).not.toHaveBeenCalled();
   });
 });

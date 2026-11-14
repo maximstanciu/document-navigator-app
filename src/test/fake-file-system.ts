@@ -2,6 +2,13 @@
 // src/lib/files uses. Use with `jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'))`.
 
 const DOCUMENT_ROOT = 'file:///data/app/files';
+const CACHE_ROOT = 'file:///data/app/cache';
+const ROOTS = [DOCUMENT_ROOT, CACHE_ROOT];
+
+/** The root a URI lies under, or `undefined` outside the app's folders. */
+function rootOf(uri: string): string | undefined {
+  return ROOTS.find((root) => uri.startsWith(`${root}/`));
+}
 const files = new Map<string, string>();
 const directories = new Set<string>();
 
@@ -26,12 +33,13 @@ export class Directory {
   create(options: { intermediates?: boolean; idempotent?: boolean } = {}) {
     if (this.exists && !options.idempotent) throw new Error(`Directory exists: ${this.uri}`);
     const parent = this.uri.slice(0, this.uri.lastIndexOf('/'));
-    if (!options.intermediates && parent !== DOCUMENT_ROOT && !directories.has(parent)) {
+    const root = rootOf(this.uri);
+    if (!options.intermediates && parent !== root && !directories.has(parent)) {
       throw new Error(`Parent missing: ${parent}`);
     }
-    // Like the real API, `intermediates` creates every missing parent below the document root.
+    // Like the real API, `intermediates` creates every missing parent below the root.
     let current = this.uri;
-    while (current.startsWith(`${DOCUMENT_ROOT}/`)) {
+    while (root && current.startsWith(`${root}/`)) {
       directories.add(current);
       current = current.slice(0, current.lastIndexOf('/'));
     }
@@ -70,6 +78,11 @@ export class File {
     files.set(destination.uri, content);
   }
 
+  async move(destination: File) {
+    await this.copy(destination);
+    files.delete(this.uri);
+  }
+
   delete() {
     if (!this.exists) throw new Error(`File missing: ${this.uri}`);
     files.delete(this.uri);
@@ -80,11 +93,15 @@ export const Paths = {
   get document() {
     return new Directory(DOCUMENT_ROOT);
   },
+  get cache() {
+    return new Directory(CACHE_ROOT);
+  },
 };
 
 /** Helpers for tests: seed source files and inspect what was written. */
 export const fakeFileSystem = {
   documentRoot: DOCUMENT_ROOT,
+  cacheRoot: CACHE_ROOT,
   reset() {
     files.clear();
     directories.clear();

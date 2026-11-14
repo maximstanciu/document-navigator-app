@@ -96,3 +96,36 @@ export function checkPickedFiles(
   }
   return { status: 'ok', pages };
 }
+
+/**
+ * Formats another app can share into the app on Android (CAP-11): the same as «File» takes, one
+ * at a time. Several files can only be images, the pages of one document. app.json's expo-sharing
+ * plugin lists them too (`singleShareMimeTypes`, `multipleShareMimeTypes`); a test keeps it in line.
+ */
+export const SHARE_SINGLE_TYPES = FILE_PICKER_TYPES;
+export const SHARE_MULTIPLE_TYPES = FILE_PICKER_TYPES.filter((type) => type.startsWith('image/'));
+
+export type SharedFilesCheck =
+  | {
+      status: 'ok';
+      /** A PDF is a file; images are photos, so the review offers «Add more photos» (CAP-5). */
+      source: 'file' | 'gallery';
+      pages: CapturedPage[];
+    }
+  | { status: 'unsupported_type' }
+  | { status: 'too_many_pages'; pageCount: number };
+
+/**
+ * Checks files shared from another app (CAP-11) like picked ones (CAP-3, CAP-7): one PDF, or one
+ * or more images. The share menu's type filters are only hints too: a PDF shared together with
+ * photos comes typed as «any file».
+ */
+export function checkSharedFiles(
+  files: readonly PickedFile[],
+  maxPages = MAX_IMAGE_PAGES
+): SharedFilesCheck {
+  const isPdf = files.length === 1 && capturedMimeType(files[0]) === 'application/pdf';
+  const source = isPdf ? 'file' : 'gallery';
+  const check = checkPickedFiles(source, files, maxPages);
+  return check.status === 'ok' ? { ...check, source } : check;
+}

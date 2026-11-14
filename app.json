@@ -125,6 +125,23 @@
           "microphonePermission": false
         }
       ],
+      [
+        "expo-sharing",
+        {
+          "android": {
+            "enabled": true,
+            "singleShareMimeTypes": [
+              "application/pdf",
+              "image/jpeg",
+              "image/png",
+              "image/heic",
+              "image/heif"
+            ],
+            "multipleShareMimeTypes": ["image/jpeg", "image/png", "image/heic", "image/heif"]
+          }
+        }
+      ],
+      "./plugins/with-share-history-guard",
       "expo-sqlite",
       "expo-secure-store",
       [

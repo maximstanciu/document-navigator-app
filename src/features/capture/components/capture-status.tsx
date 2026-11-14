@@ -17,6 +17,7 @@ function noticeText(notice: CaptureStatusNotice, t: TFunction): string {
   switch (notice) {
     case 'tooManyPages':
     case 'tooManyPhotos':
+    case 'tooManySharedPhotos':
       return t(`capture.${notice}`, { count: MAX_IMAGE_PAGES });
     case 'fileTooLarge':
     case 'pagesTooLarge':

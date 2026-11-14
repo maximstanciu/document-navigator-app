@@ -5,6 +5,10 @@ import { AppProviders } from '@/providers/app-providers';
 
 export { ErrorBoundary } from 'expo-router';
 
+// A link that opens a screen over the tabs, such as files shared from another app (CAP-11), keeps
+// the documents list beneath it, so «Back» and closing the modal lead there.
+export const unstable_settings = { anchor: '(tabs)' };
+
 // Keep the splash screen until the database is migrated; DatabaseGate hides it.
 SplashScreen.preventAutoHideAsync();
 
