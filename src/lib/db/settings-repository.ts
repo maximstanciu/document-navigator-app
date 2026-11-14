@@ -14,6 +14,7 @@ const KEYS: { [K in keyof Settings]: string } = {
   reminderOffsetsDays: 'reminder_offsets_days',
   reminderTime: 'reminder_time',
   notificationDetails: 'notification_details',
+  overdueReminder: 'overdue_reminder',
   onboardingCompleted: 'onboarding_completed',
   consent: 'consent',
 };
@@ -32,6 +33,7 @@ function isValid<K extends keyof Settings>(key: K, value: unknown): value is Set
     case 'reminderTime':
       return isClockTime(value);
     case 'notificationDetails':
+    case 'overdueReminder':
     case 'onboardingCompleted':
       return typeof value === 'boolean';
     case 'consent':

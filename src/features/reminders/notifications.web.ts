@@ -2,6 +2,7 @@ import type {
   NotificationChannel,
   NotificationPermission,
   OpenedNotification,
+  ReminderButtons,
   ReminderNotification,
 } from './notifications';
 
@@ -9,6 +10,8 @@ export type {
   NotificationChannel,
   NotificationPermission,
   OpenedNotification,
+  ReminderAction,
+  ReminderButtons,
   ReminderNotification,
 } from './notifications';
 
@@ -18,10 +21,10 @@ export type {
 export const DEADLINES_CHANNEL_ID = 'deadlines';
 export const ANALYSIS_CHANNEL_ID = 'analysis';
 
-export async function setUpNotifications(_channels: {
-  deadlines: NotificationChannel;
-  analysis: NotificationChannel;
-}) {}
+export async function setUpNotifications(
+  _channels: { deadlines: NotificationChannel; analysis: NotificationChannel },
+  _buttons: ReminderButtons
+) {}
 
 export async function getNotificationPermission(): Promise<NotificationPermission> {
   return 'unavailable';
@@ -39,6 +42,8 @@ export async function listScheduledNotificationIds(): Promise<string[]> {
 export async function scheduleNotification(_notification: ReminderNotification): Promise<void> {}
 
 export async function cancelNotification(_id: string): Promise<void> {}
+
+export async function dismissNotification(_id: string): Promise<void> {}
 
 export async function dismissShownNotifications(): Promise<void> {}
 

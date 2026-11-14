@@ -188,14 +188,14 @@ describe('SettingsScreen language (SET-1)', () => {
   });
 });
 
-describe('SettingsScreen reminders (SET-2, SET-5)', () => {
+describe('SettingsScreen reminders (SET-2, SET-5, SET-7)', () => {
   beforeEach(async () => {
     fakeNotifications.permission = 'granted';
     await seedDocument();
     await syncReminders();
   });
 
-  it('shows the defaults: 7 days, 1 day and on the day at 09:00, without details', async () => {
+  it('shows the defaults: 7 days, 1 day and on the day at 09:00, the day after, without details', async () => {
     await renderSettings();
 
     expect(await screen.findByRole('checkbox', { name: '7 days before' })).toBeChecked();
@@ -205,10 +205,19 @@ describe('SettingsScreen reminders (SET-2, SET-5)', () => {
     expect(screen.getByRole('checkbox', { name: '3 days before' })).not.toBeChecked();
     expect(screen.getByText('09:00 AM')).toBeOnTheScreen();
     expect(screen.getByRole('switch', { name: 'Details in notifications' })).not.toBeChecked();
+    expect(
+      screen.getByRole('switch', { name: 'Remind me if a deadline has passed' })
+    ).toBeChecked();
+    expect(
+      screen.getByText(
+        'For replies, submissions and cancellations, the app also reminds you 14 days before.'
+      )
+    ).toBeOnTheScreen();
     expect(pendingFireTimes()).toEqual([
       '2099-11-13T08:00:00.000Z',
       '2099-11-19T08:00:00.000Z',
       '2099-11-20T08:00:00.000Z',
+      '2099-11-21T08:00:00.000Z',
     ]);
   });
 
@@ -218,7 +227,13 @@ describe('SettingsScreen reminders (SET-2, SET-5)', () => {
 
     await user.press(await screen.findByRole('checkbox', { name: '14 days before' }));
     expect(await screen.findByRole('checkbox', { name: '14 days before' })).toBeChecked();
-    await waitFor(() => expect(pendingFireTimes()).toHaveLength(4));
+    // Every deadline gets 14 days now: no need to say some get it anyway (REM-14).
+    expect(
+      screen.queryByText(
+        'For replies, submissions and cancellations, the app also reminds you 14 days before.'
+      )
+    ).not.toBeOnTheScreen();
+    await waitFor(() => expect(pendingFireTimes()).toHaveLength(5));
     await user.press(screen.getByRole('checkbox', { name: '1 day before' }));
 
     await waitFor(async () =>
@@ -229,6 +244,7 @@ describe('SettingsScreen reminders (SET-2, SET-5)', () => {
         '2099-11-06T08:00:00.000Z',
         '2099-11-13T08:00:00.000Z',
         '2099-11-20T08:00:00.000Z',
+        '2099-11-21T08:00:00.000Z',
       ])
     );
   });
@@ -265,6 +281,7 @@ describe('SettingsScreen reminders (SET-2, SET-5)', () => {
         '2099-11-13T17:30:00.000Z',
         '2099-11-19T17:30:00.000Z',
         '2099-11-20T17:30:00.000Z',
+        '2099-11-21T17:30:00.000Z',
       ])
     );
   });
@@ -280,6 +297,53 @@ describe('SettingsScreen reminders (SET-2, SET-5)', () => {
 
     expect(screen.queryByLabelText('Reminder time')).not.toBeOnTheScreen();
     expect((await repositories.settings.get()).reminderTime).toBe('09:00');
+  });
+
+  it('turns the reminder the day after a deadline off and on, and reschedules (SET-7, REM-13)', async () => {
+    await renderSettings();
+    const overdue = await screen.findByRole('switch', {
+      name: 'Remind me if a deadline has passed',
+    });
+    expect(
+      screen.getByText(
+        "If a deadline isn't marked done, the app reminds you about it once more the next day."
+      )
+    ).toBeOnTheScreen();
+
+    await fireEvent(overdue, 'valueChange', false);
+
+    expect(
+      await screen.findByRole('switch', { name: 'Remind me if a deadline has passed' })
+    ).not.toBeChecked();
+    expect((await repositories.settings.get()).overdueReminder).toBe(false);
+    await waitFor(() =>
+      expect(pendingFireTimes()).toEqual([
+        '2099-11-13T08:00:00.000Z',
+        '2099-11-19T08:00:00.000Z',
+        '2099-11-20T08:00:00.000Z',
+      ])
+    );
+
+    await fireEvent(
+      screen.getByRole('switch', { name: 'Remind me if a deadline has passed' }),
+      'valueChange',
+      true
+    );
+
+    await waitFor(() => expect(pendingFireTimes()).toHaveLength(4));
+    expect((await repositories.settings.get()).overdueReminder).toBe(true);
+  });
+
+  it('says in Russian that replies, submissions and cancellations get 14 days too (REM-14)', async () => {
+    await repositories.settings.update({ locale: 'ru' });
+    await renderSettings();
+
+    expect(
+      await screen.findByText(
+        'Об ответах, подаче документов и расторжении приложение напомнит ещё и за 14 дней.'
+      )
+    ).toBeOnTheScreen();
+    expect(screen.getByRole('switch', { name: 'Напомнить, если срок прошёл' })).toBeChecked();
   });
 
   it('puts what a deadline is about into the notification text with «Details» (REM-12)', async () => {
@@ -345,7 +409,7 @@ describe('SettingsScreen «Delete all data» (SET-3, STO-7)', () => {
 
     expect(screen.getByRole('button', { name: 'Удалить все данные' })).toBeOnTheScreen();
     expect(await repositories.documents.listSummaries()).toHaveLength(1);
-    expect(fakeNotifications.pending()).toHaveLength(3);
+    expect(fakeNotifications.pending()).toHaveLength(4);
   });
 
   it('deletes documents, page files, reminders and settings', async () => {

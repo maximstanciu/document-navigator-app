@@ -739,10 +739,12 @@ describe('DocumentDetailScreen', () => {
 
       await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
 
+      // A submission and a response: 14, 7, 1 and 0 days before (REM-14) and the day after (REM-13).
       await waitFor(async () =>
-        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3, '2026-11-09': 3 })
+        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 5, '2026-11-09': 5 })
       );
-      expect(await screen.findByText(/^Reminders: Nov 2, /)).toBeOnTheScreen();
+      // The card lists 14 days ahead, not the day after.
+      expect(await screen.findByText(/^Reminders: Oct 26, .* · Nov 9, [^·]*$/)).toBeOnTheScreen();
     });
 
     it('cancels them for «Not relevant» and «Done», and brings them back on «Restore»', async () => {
@@ -756,13 +758,13 @@ describe('DocumentDetailScreen', () => {
           name: 'Mark the deadline of Nov 9, 2026 as not relevant',
         })
       );
-      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3 }));
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 5 }));
 
       await user.press(
         await screen.findByRole('button', { name: 'Restore the deadline of Nov 9, 2026' })
       );
       await waitFor(async () =>
-        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3, '2026-11-09': 3 })
+        expect(await remindersByDueDate()).toEqual({ '2026-11-06': 5, '2026-11-09': 5 })
       );
 
       await user.press(
@@ -770,7 +772,7 @@ describe('DocumentDetailScreen', () => {
           name: 'Последний день, чтобы обжаловать решение (Einspruch)',
         })
       );
-      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 3 }));
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-06': 5 }));
     });
 
     it('moves them with a changed date (US-8)', async () => {
@@ -789,13 +791,13 @@ describe('DocumentDetailScreen', () => {
       await user.type(field, '2026-11-14');
       await user.press(screen.getByRole('button', { name: 'Save' }));
 
-      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-14': 3 }));
+      await waitFor(async () => expect(await remindersByDueDate()).toEqual({ '2026-11-14': 4 }));
     });
 
     it('cancels them all when the document is deleted (STO-6)', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.officialNotice);
       await syncReminders();
-      expect(fakeNotifications.scheduled.size).toBe(6);
+      expect(fakeNotifications.scheduled.size).toBe(10);
       const user = userEvent.setup();
       await renderDocumentWithHeader();
 

@@ -97,6 +97,8 @@ describe('DeadlineReminders', () => {
     fakeNotifications.permission = 'granted';
     const user = userEvent.setup();
     await renderDeadline();
+    // Put off from a notification before: «Don't remind» drops that one too (REM-15).
+    await repositories.deadlines.update('pay', { snoozedUntil: '2026-11-01T08:00:00.000Z' });
     await syncReminders();
 
     expect(await screen.findByText(REMINDERS)).toBeOnTheScreen();
@@ -108,8 +110,34 @@ describe('DeadlineReminders', () => {
       await screen.findByRole('button', { name: 'Remind me about the deadline on Nov 20, 2026' })
     ).toBeOnTheScreen();
     expect(screen.queryByText(REMINDERS)).not.toBeOnTheScreen();
-    expect((await repositories.deadlines.get('pay'))?.reminderOffsetsDays).toEqual([]);
+    expect(await repositories.deadlines.get('pay')).toMatchObject({
+      reminderOffsetsDays: [],
+      snoozedUntil: null,
+    });
     await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(0));
+  });
+
+  it('leaves a reminder put off from a notification off the list (REM-3, REM-15)', async () => {
+    fakeNotifications.permission = 'granted';
+    await repositories.deadlines.insertMany([
+      {
+        id: 'pay',
+        documentId: 'doc-1',
+        kind: 'payment',
+        description: 'Pay the electricity bill',
+        dueDate: '2026-11-20',
+        dateSource: 'explicit',
+        confidence: 'high',
+      },
+    ]);
+    await repositories.deadlines.update('pay', { snoozedUntil: '2026-11-01T08:00:00.000Z' });
+    await syncReminders();
+
+    await renderWithProviders(<DeadlineFromDatabase id="pay" />);
+
+    expect(await screen.findByText(REMINDERS)).toBeOnTheScreen();
+    // It is scheduled all the same.
+    expect(fakeNotifications.pending()[0].fireAt).toBe('2026-11-01T08:00:00.000Z');
   });
 
   it('lists only the reminders still ahead', async () => {
@@ -119,6 +147,18 @@ describe('DeadlineReminders', () => {
 
     expect(
       await screen.findByText('Reminders: Oct 19, 09:00 AM · Oct 20, 09:00 AM')
+    ).toBeOnTheScreen();
+  });
+
+  it('lists 14 days ahead for a deadline that takes preparation, not the day after (REM-13, REM-14)', async () => {
+    fakeNotifications.permission = 'granted';
+
+    await renderDeadline({ kind: 'response' });
+
+    expect(
+      await screen.findByText(
+        'Reminders: Nov 6, 09:00 AM · Nov 13, 09:00 AM · Nov 19, 09:00 AM · Nov 20, 09:00 AM'
+      )
     ).toBeOnTheScreen();
   });
 
@@ -135,7 +175,7 @@ describe('DeadlineReminders', () => {
 
     expect(await screen.findByText(REMINDERS)).toBeOnTheScreen();
     expect(requestNotificationPermission).toHaveBeenCalledTimes(1);
-    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(3));
+    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(4));
   });
 
   it('explains how to allow notifications when they are denied (REM-5)', async () => {
@@ -216,6 +256,7 @@ describe('DeadlineReminders', () => {
     ['done', { status: 'done' }],
     ['not relevant', { status: 'dismissed' }],
     ['overdue', { dueDate: '2026-10-17' }],
+    // Only the reminder the day after is still ahead, and the card doesn't list it (REM-13).
     ['due today after the reminder time', { dueDate: '2026-10-18' }],
   ] as const)('shows nothing for a deadline %s', async (_case, overrides) => {
     fakeNotifications.permission = 'granted';

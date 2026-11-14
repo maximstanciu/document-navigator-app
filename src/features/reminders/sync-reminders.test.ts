@@ -57,10 +57,10 @@ function pendingIds() {
 }
 
 describe('syncReminders (REM-7)', () => {
-  it('schedules 7 days, 1 day and on the day at 09:00 with neutral text (REM-2, REM-12)', async () => {
+  it('schedules 7 days, 1 day, on the day and the day after at 09:00 with neutral text (REM-2, REM-12, REM-13)', async () => {
     await repositories.deadlines.insertMany([deadline()]);
 
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 3, cancelled: 0 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 4, cancelled: 0 });
 
     expect(fakeNotifications.pending()).toEqual([
       {
@@ -68,6 +68,7 @@ describe('syncReminders (REM-7)', () => {
         fireAt: '2026-11-13T08:00:00.000Z',
         body: 'A document deadline is in 7 days',
         data: { documentId: 'doc-1', deadlineId: 'pay' },
+        category: 'deadline_reminder',
       },
       expect.objectContaining({
         fireAt: '2026-11-19T08:00:00.000Z',
@@ -76,6 +77,10 @@ describe('syncReminders (REM-7)', () => {
       expect.objectContaining({
         fireAt: '2026-11-20T08:00:00.000Z',
         body: 'A document deadline is today',
+      }),
+      expect.objectContaining({
+        fireAt: '2026-11-21T08:00:00.000Z',
+        body: "A document deadline passed yesterday. If it's done, mark it in the app.",
       }),
     ]);
     // Nothing from the document reaches the OS: no amount, no sender, no description.
@@ -113,6 +118,7 @@ describe('syncReminders (REM-7)', () => {
       'In 7 days: Pay 120 EUR to Stadtwerke',
       'Tomorrow: Pay 120 EUR to Stadtwerke',
       'Today: Pay 120 EUR to Stadtwerke',
+      'Deadline passed yesterday: Pay 120 EUR to Stadtwerke',
     ]);
   });
 
@@ -121,12 +127,13 @@ describe('syncReminders (REM-7)', () => {
     await syncReminders(OCT_18);
 
     await i18n.changeLanguage('ru');
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 3, cancelled: 3 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 4, cancelled: 4 });
 
     expect(fakeNotifications.pending().map((notification) => notification.body)).toEqual([
       'Срок по документу через 7 дней',
       'Срок по документу завтра',
       'Срок по документу сегодня',
+      'Срок по документу прошёл вчера. Если уже сделано, отметьте это в приложении.',
     ]);
   });
 
@@ -146,10 +153,25 @@ describe('syncReminders (REM-7)', () => {
     await syncReminders(OCT_18);
 
     await change(repositories);
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 0, cancelled: 3 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 0, cancelled: 4 });
 
     expect(fakeNotifications.pending()).toEqual([]);
     expect(await recorded()).toEqual([]);
+  });
+
+  it('cancels the reminder after the deadline once «Remind me if a deadline has passed» is off (SET-7)', async () => {
+    await repositories.deadlines.insertMany([deadline()]);
+    await syncReminders(OCT_18);
+
+    await repositories.settings.update({ overdueReminder: false });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 0, cancelled: 1 });
+
+    expect(fakeNotifications.pending().map((notification) => notification.fireAt)).toEqual([
+      '2026-11-13T08:00:00.000Z',
+      '2026-11-19T08:00:00.000Z',
+      '2026-11-20T08:00:00.000Z',
+    ]);
+    expect(await recorded()).toEqual(pendingIds());
   });
 
   it('moves the reminders with a new due date', async () => {
@@ -163,6 +185,7 @@ describe('syncReminders (REM-7)', () => {
       '2026-11-24T08:00:00.000Z',
       '2026-11-30T08:00:00.000Z',
       '2026-12-01T08:00:00.000Z',
+      '2026-12-02T08:00:00.000Z',
     ]);
     expect(await recorded()).toEqual(pendingIds());
   });
@@ -180,7 +203,7 @@ describe('syncReminders (REM-7)', () => {
     });
 
     expect(await recorded()).toEqual(pendingIds());
-    expect(pendingIds()).toHaveLength(2);
+    expect(pendingIds()).toHaveLength(3);
   });
 
   it('schedules the nearest 60 and the rest as those fire (REM-8)', async () => {
@@ -217,7 +240,7 @@ describe('syncReminders (REM-7)', () => {
     expect(fakeNotifications.scheduled.size).toBe(0);
 
     fakeNotifications.permission = 'granted';
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 3, cancelled: 0 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 4, cancelled: 0 });
   });
 
   it('cancels everything once the permission is taken away in system settings', async () => {
@@ -225,7 +248,7 @@ describe('syncReminders (REM-7)', () => {
     await syncReminders(OCT_18);
 
     fakeNotifications.permission = 'denied';
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 0, cancelled: 3 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 0, cancelled: 4 });
 
     expect(await recorded()).toEqual([]);
   });
@@ -244,7 +267,7 @@ describe('syncReminders (REM-7)', () => {
     expect(await syncReminders(OCT_18)).toEqual({ scheduled: 1, cancelled: 1 });
 
     expect(pendingIds()).toContain(lost.id);
-    expect(fakeNotifications.scheduled.size).toBe(3);
+    expect(fakeNotifications.scheduled.size).toBe(4);
     expect(await recorded()).toEqual(pendingIds());
   });
 
@@ -254,10 +277,10 @@ describe('syncReminders (REM-7)', () => {
     const results = await Promise.all([syncReminders(OCT_18), syncReminders(OCT_18)]);
 
     expect(results).toEqual([
-      { scheduled: 3, cancelled: 0 },
+      { scheduled: 4, cancelled: 0 },
       { scheduled: 0, cancelled: 0 },
     ]);
-    expect(await recorded()).toHaveLength(3);
+    expect(await recorded()).toHaveLength(4);
   });
 
   it('leaves a failure to the next sync', async () => {
@@ -266,7 +289,7 @@ describe('syncReminders (REM-7)', () => {
 
     await expect(syncReminders(OCT_18)).rejects.toThrow('The OS refused');
 
-    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 3, cancelled: 0 });
+    expect(await syncReminders(OCT_18)).toEqual({ scheduled: 4, cancelled: 0 });
     expect(await recorded()).toEqual(pendingIds());
   });
 

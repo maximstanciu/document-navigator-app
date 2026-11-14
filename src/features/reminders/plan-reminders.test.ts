@@ -7,8 +7,12 @@ import { setTimeZone } from '@/test/time-zone';
 
 import {
   diffReminders,
+  OVERDUE_OFFSET_DAYS,
   planReminders,
+  PREPARATION_OFFSET_DAYS,
+  REMINDER_CATEGORY,
   REMINDER_LIMIT,
+  remindTomorrowAt,
   reminderMessage,
   toScheduledRecord,
   type PlannedReminder,
@@ -22,16 +26,21 @@ beforeEach(() => {
   setTimeZone('Europe/Berlin');
 });
 
-const SETTINGS: ReminderSettings = { ...DEFAULT_SETTINGS, language: 'en' };
+/** The real defaults: the reminder the day after a deadline still open (REM-13) is on. */
+const DEFAULTS: ReminderSettings = { ...DEFAULT_SETTINGS, language: 'en' };
+// Most cases look at the reminders up to the due date; the one after it has its own cases below.
+const SETTINGS: ReminderSettings = { ...DEFAULTS, overdueReminder: false };
 
 function deadline(overrides: Partial<ReminderDeadline> = {}): ReminderDeadline {
   return {
     id: 'pay',
     documentId: 'doc-1',
+    kind: 'payment',
     description: 'Pay the electricity bill',
     dueDate: '2026-11-20',
     status: 'open',
     reminderOffsetsDays: null,
+    snoozedUntil: null,
     updatedAt: '2026-10-17T09:00:00.000Z',
     deletedAt: null,
     ...overrides,
@@ -59,6 +68,7 @@ describe('planReminders', () => {
           key: 'reminders.notification.neutral.inDays',
           params: { count: 7 },
         },
+        category: 'deadline_reminder',
       },
       {
         id: expect.any(String),
@@ -71,6 +81,7 @@ describe('planReminders', () => {
           key: 'reminders.notification.neutral.tomorrow',
           params: { count: 1 },
         },
+        category: 'deadline_reminder',
       },
       {
         id: expect.any(String),
@@ -83,6 +94,7 @@ describe('planReminders', () => {
           key: 'reminders.notification.neutral.today',
           params: { count: 0 },
         },
+        category: 'deadline_reminder',
       },
     ]);
   });
@@ -245,6 +257,248 @@ describe('planReminders', () => {
     });
   });
 
+  describe('the reminder the day after (REM-13, SET-7)', () => {
+    it('comes once, the day after the due date at the reminder time, and is on by default', () => {
+      const plan = planReminders([deadline()], DEFAULTS, OCT_18);
+
+      expect(plan.map((reminder) => [reminder.daysBefore, reminder.fireAt])).toEqual([
+        [7, '2026-11-13T08:00:00.000Z'],
+        [1, '2026-11-19T08:00:00.000Z'],
+        [0, '2026-11-20T08:00:00.000Z'],
+        [OVERDUE_OFFSET_DAYS, '2026-11-21T08:00:00.000Z'],
+      ]);
+      expect(plan.at(-1)!.text).toEqual({
+        variant: 'neutral',
+        key: 'reminders.notification.neutral.yesterday',
+        params: { count: 1 },
+      });
+    });
+
+    it('says the deadline passed, with the description only with «Details in notifications»', () => {
+      const after = (settings: ReminderSettings) =>
+        planReminders([deadline()], settings, OCT_18).at(-1)!.text;
+      const ru = i18n.getFixedT('ru');
+
+      expect(reminderMessage(after(DEFAULTS), i18n.t)).toBe(
+        "A document deadline passed yesterday. If it's done, mark it in the app."
+      );
+      expect(reminderMessage(after(DEFAULTS), ru)).toBe(
+        'Срок по документу прошёл вчера. Если уже сделано, отметьте это в приложении.'
+      );
+      const details = { ...DEFAULTS, notificationDetails: true };
+      expect(reminderMessage(after(details), i18n.t)).toBe(
+        'Deadline passed yesterday: Pay the electricity bill'
+      );
+      expect(reminderMessage(after(details), ru)).toBe(
+        'Срок прошёл вчера: Pay the electricity bill'
+      );
+    });
+
+    it('is still ahead once the due date is over, and gone once it has come', () => {
+      const at = (now: string) =>
+        planReminders([deadline()], DEFAULTS, new Date(now)).map((reminder) => reminder.fireAt);
+
+      expect(at('2026-11-20T15:00:00+01:00')).toEqual(['2026-11-21T08:00:00.000Z']);
+      expect(at('2026-11-21T09:00:00+01:00')).toEqual([]);
+    });
+
+    it('comes for a deadline that passed yesterday, not for one that passed before (REM-2)', () => {
+      const plan = planReminders(
+        [
+          deadline({ id: 'yesterday', dueDate: '2026-11-17' }),
+          deadline({ id: 'last-week', dueDate: '2026-11-10' }),
+        ],
+        DEFAULTS,
+        new Date('2026-11-18T07:00:00+01:00')
+      );
+
+      expect(plan.map((reminder) => [reminder.deadlineId, reminder.fireAt])).toEqual([
+        ['yesterday', '2026-11-18T08:00:00.000Z'],
+      ]);
+    });
+
+    it('goes with the setting off, with the deadline’s reminders off and once it is closed', () => {
+      const daysOf = (deadlines: ReminderDeadline[], settings: ReminderSettings) =>
+        planReminders(deadlines, settings, OCT_18).map((reminder) => reminder.daysBefore);
+
+      expect(daysOf([deadline()], { ...DEFAULTS, overdueReminder: false })).toEqual([7, 1, 0]);
+      expect(daysOf([deadline({ reminderOffsetsDays: [] })], DEFAULTS)).toEqual([]);
+      expect(daysOf([deadline({ status: 'done' })], DEFAULTS)).toEqual([]);
+      expect(daysOf([deadline({ status: 'dismissed' })], DEFAULTS)).toEqual([]);
+    });
+
+    it('follows a deadline’s own offsets too', () => {
+      const plan = planReminders([deadline({ reminderOffsetsDays: [3] })], DEFAULTS, OCT_18);
+
+      expect(plan.map((reminder) => reminder.daysBefore)).toEqual([3, OVERDUE_OFFSET_DAYS]);
+    });
+
+    it('keeps the reminder time on the day after across a DST change and a month boundary', () => {
+      const after = (dueDate: string) =>
+        planReminders([deadline({ dueDate })], DEFAULTS, OCT_18).at(-1)!.fireAt;
+
+      // Clocks go back on 2026-10-25: 09:00 is 07:00Z the day before and 08:00Z that day.
+      expect(after('2026-10-24')).toBe('2026-10-25T08:00:00.000Z');
+      expect(after('2026-11-30')).toBe('2026-12-01T08:00:00.000Z');
+      expect(after('2026-12-31')).toBe('2027-01-01T08:00:00.000Z');
+    });
+
+    it('counts toward the limit of 60 (REM-8)', () => {
+      // 20 deadlines a day apart: 80 reminders with the one after each.
+      const deadlines = Array.from({ length: 20 }, (_, index) =>
+        deadline({ id: `d${String(index).padStart(2, '0')}`, dueDate: `2026-12-${index + 10}` })
+      );
+
+      const plan = planReminders(deadlines, DEFAULTS, OCT_18);
+
+      expect(plan).toHaveLength(REMINDER_LIMIT);
+      expect(plan.filter((reminder) => reminder.daysBefore === OVERDUE_OFFSET_DAYS)).not.toEqual(
+        []
+      );
+      expect(plan.map((reminder) => reminder.fireAt)).toEqual(
+        [...plan.map((reminder) => reminder.fireAt)].sort()
+      );
+    });
+  });
+
+  describe('14 days ahead for deadlines that take preparation (REM-14)', () => {
+    it.each(['response', 'submission', 'cancellation'] as const)(
+      'adds 14 days to the default reminders of a %s deadline',
+      (kind) => {
+        const plan = planReminders([deadline({ kind })], SETTINGS, OCT_18);
+
+        expect(plan.map((reminder) => [reminder.daysBefore, reminder.fireAt])).toEqual([
+          [PREPARATION_OFFSET_DAYS, '2026-11-06T08:00:00.000Z'],
+          [7, '2026-11-13T08:00:00.000Z'],
+          [1, '2026-11-19T08:00:00.000Z'],
+          [0, '2026-11-20T08:00:00.000Z'],
+        ]);
+        expect(reminderMessage(plan[0].text, i18n.t)).toBe('A document deadline is in 14 days');
+      }
+    );
+
+    it.each(['payment', 'appointment', 'renewal', 'other'] as const)(
+      'keeps the default reminders of a %s deadline',
+      (kind) => {
+        const plan = planReminders([deadline({ kind })], SETTINGS, OCT_18);
+
+        expect(plan.map((reminder) => reminder.daysBefore)).toEqual([7, 1, 0]);
+      }
+    );
+
+    it('leaves a deadline’s own offsets as they are, and reminders off stay off', () => {
+      const plan = planReminders(
+        [
+          deadline({ id: 'own', kind: 'response', reminderOffsetsDays: [3] }),
+          deadline({ id: 'off', kind: 'response', reminderOffsetsDays: [] }),
+        ],
+        SETTINGS,
+        OCT_18
+      );
+
+      expect(plan.map((reminder) => [reminder.deadlineId, reminder.daysBefore])).toEqual([
+        ['own', 3],
+      ]);
+    });
+
+    it('does not remind twice when 14 days is among the defaults', () => {
+      const settings = { ...SETTINGS, reminderOffsetsDays: [14, 1] };
+
+      const plan = planReminders([deadline({ kind: 'cancellation' })], settings, OCT_18);
+
+      expect(plan.map((reminder) => reminder.daysBefore)).toEqual([14, 1]);
+    });
+
+    it('skips 14 days ahead once that day has passed', () => {
+      const plan = planReminders(
+        [deadline({ kind: 'response' })],
+        SETTINGS,
+        new Date('2026-11-10T12:00:00+01:00')
+      );
+
+      expect(plan.map((reminder) => reminder.daysBefore)).toEqual([7, 1, 0]);
+    });
+  });
+
+  describe('a reminder put off from a notification (REM-15)', () => {
+    const snoozed = (snoozedUntil: string, overrides: Partial<ReminderDeadline> = {}) =>
+      deadline({ snoozedUntil, ...overrides });
+
+    it('comes once at that time, its text counting the days to the due date', () => {
+      const plan = planReminders([snoozed('2026-11-15T08:00:00.000Z')], SETTINGS, OCT_18);
+
+      expect(plan.map((reminder) => [reminder.daysBefore, reminder.fireAt])).toEqual([
+        [7, '2026-11-13T08:00:00.000Z'],
+        [5, '2026-11-15T08:00:00.000Z'],
+        [1, '2026-11-19T08:00:00.000Z'],
+        [0, '2026-11-20T08:00:00.000Z'],
+      ]);
+      expect(reminderMessage(plan[1].text, i18n.t)).toBe('A document deadline is in 5 days');
+    });
+
+    it('says how long ago the deadline passed, with the Russian plural forms', () => {
+      const textAt = (snoozedUntil: string, t = i18n.t) =>
+        reminderMessage(planReminders([snoozed(snoozedUntil)], SETTINGS, OCT_18).at(-1)!.text, t);
+      const ru = i18n.getFixedT('ru');
+
+      expect(textAt('2026-11-22T08:00:00.000Z')).toBe('A document deadline passed 2 days ago');
+      expect(textAt('2026-11-22T08:00:00.000Z', ru)).toBe('Срок по документу прошёл 2 дня назад');
+      expect(textAt('2026-11-25T08:00:00.000Z', ru)).toBe('Срок по документу прошёл 5 дней назад');
+      expect(textAt('2026-12-11T08:00:00.000Z', ru)).toBe('Срок по документу прошёл 21 день назад');
+      expect(textAt('2026-11-21T08:00:00.000Z', ru)).toBe(
+        'Срок по документу прошёл вчера. Если уже сделано, отметьте это в приложении.'
+      );
+    });
+
+    it('shows the deadline’s description with «Details in notifications»', () => {
+      const plan = planReminders(
+        [snoozed('2026-11-23T08:00:00.000Z')],
+        { ...SETTINGS, notificationDetails: true },
+        OCT_18
+      );
+
+      expect(reminderMessage(plan.at(-1)!.text, i18n.t)).toBe(
+        'Deadline passed 3 days ago: Pay the electricity bill'
+      );
+    });
+
+    it('comes once when it falls on another reminder', () => {
+      const plan = planReminders([snoozed('2026-11-20T08:00:00.000Z')], DEFAULTS, OCT_18);
+
+      expect(plan.map((reminder) => reminder.fireAt)).toEqual([
+        '2026-11-13T08:00:00.000Z',
+        '2026-11-19T08:00:00.000Z',
+        '2026-11-20T08:00:00.000Z',
+        '2026-11-21T08:00:00.000Z',
+      ]);
+    });
+
+    it('goes once it has come, and with the deadline closed or its reminders off', () => {
+      const fireTimes = (deadlines: ReminderDeadline[], now = OCT_18) =>
+        planReminders(deadlines, SETTINGS, now).map((reminder) => reminder.fireAt);
+
+      expect(
+        fireTimes([snoozed('2026-11-15T08:00:00.000Z')], new Date('2026-11-16T12:00:00Z'))
+      ).toEqual(['2026-11-19T08:00:00.000Z', '2026-11-20T08:00:00.000Z']);
+      expect(fireTimes([snoozed('2026-11-15T08:00:00.000Z', { status: 'done' })])).toEqual([]);
+      expect(fireTimes([snoozed('2026-11-15T08:00:00.000Z', { reminderOffsetsDays: [] })])).toEqual(
+        []
+      );
+      expect(fireTimes([snoozed('not a time')])).toEqual([
+        '2026-11-13T08:00:00.000Z',
+        '2026-11-19T08:00:00.000Z',
+        '2026-11-20T08:00:00.000Z',
+      ]);
+    });
+  });
+
+  it('gives every reminder the category with the buttons, in its id too (REM-15, REM-7)', () => {
+    const plan = planReminders([deadline()], DEFAULTS, OCT_18);
+
+    expect(plan.every((reminder) => reminder.category === REMINDER_CATEGORY)).toBe(true);
+    expect(plan.every((reminder) => reminder.id.endsWith(`/${REMINDER_CATEGORY}`))).toBe(true);
+  });
+
   describe('notification text (REM-12, SET-5)', () => {
     it('is neutral by default and carries nothing from the deadline', () => {
       const plan = planReminders([deadline()], SETTINGS, OCT_18);
@@ -378,6 +632,17 @@ describe('diffReminders (REM-7)', () => {
     });
   });
 
+  it('cancels only the reminder after the deadline when that setting is switched off (SET-7)', () => {
+    const on = planReminders([deadline()], DEFAULTS, OCT_18);
+
+    const diff = diffReminders(
+      planReminders([deadline()], { ...DEFAULTS, overdueReminder: false }, OCT_18),
+      synced(on)
+    );
+
+    expect(diff).toEqual({ schedule: [], cancel: [on.at(-1)!.id] });
+  });
+
   it('replaces the text when the interface language changes (SET-1)', () => {
     const scheduled = synced(planReminders([deadline()], SETTINGS, OCT_18));
 
@@ -470,5 +735,27 @@ describe('a deadline with several actions (REM-9)', () => {
       cancel: scheduled.map((record) => record.notificationId),
     });
     expect(reopened).toEqual(initial);
+  });
+});
+
+describe('remindTomorrowAt (REM-15)', () => {
+  it('is tomorrow at the reminder time in the device’s time zone', () => {
+    expect(remindTomorrowAt(new Date('2026-11-13T22:30:00+01:00'), '09:00')).toBe(
+      '2026-11-14T08:00:00.000Z'
+    );
+    // Just after midnight it is still the next calendar day.
+    expect(remindTomorrowAt(new Date('2026-11-14T00:10:00+01:00'), '18:30')).toBe(
+      '2026-11-15T17:30:00.000Z'
+    );
+  });
+
+  it('keeps the wall-clock time across a DST change and a month boundary', () => {
+    // Clocks go back on 2026-10-25 in Berlin.
+    expect(remindTomorrowAt(new Date('2026-10-24T20:00:00+02:00'), '09:00')).toBe(
+      '2026-10-25T08:00:00.000Z'
+    );
+    expect(remindTomorrowAt(new Date('2026-11-30T12:00:00+01:00'), '09:00')).toBe(
+      '2026-12-01T08:00:00.000Z'
+    );
   });
 });

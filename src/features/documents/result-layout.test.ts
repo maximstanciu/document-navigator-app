@@ -21,6 +21,7 @@ function deadline(id: string, dueDate: string, status: DeadlineRecord['status'] 
     confidence: 'high',
     status,
     reminderOffsetsDays: null,
+    snoozedUntil: null,
     createdAt: TIMESTAMP,
     updatedAt: TIMESTAMP,
     deletedAt: null,

@@ -298,6 +298,7 @@ export const en = {
       action: 'Undo',
       label: 'Undo: “{{description}}”',
     },
+    snoozed: "I'll remind you tomorrow at {{time}}",
   },
   capture: {
     title: 'Add a document',
@@ -418,13 +419,23 @@ export const en = {
       failed: "Couldn't change the reminders. Try again.",
     },
     notification: {
+      actions: {
+        done: 'Done',
+        snooze: 'Remind tomorrow',
+      },
       neutral: {
+        yesterday: "A document deadline passed yesterday. If it's done, mark it in the app.",
+        overdue_one: 'A document deadline passed {{count}} day ago',
+        overdue_other: 'A document deadline passed {{count}} days ago',
         today: 'A document deadline is today',
         tomorrow: 'A document deadline is tomorrow',
         inDays_one: 'A document deadline is in {{count}} day',
         inDays_other: 'A document deadline is in {{count}} days',
       },
       detailed: {
+        yesterday: 'Deadline passed yesterday: {{description}}',
+        overdue_one: 'Deadline passed {{count}} day ago: {{description}}',
+        overdue_other: 'Deadline passed {{count}} days ago: {{description}}',
         today: 'Today: {{description}}',
         tomorrow: 'Tomorrow: {{description}}',
         inDays_one: 'In {{count}} day: {{description}}',
@@ -474,6 +485,13 @@ export const en = {
       offsetsHint:
         'Applies to every deadline. To turn off reminders for one deadline, use its card.',
       lastOffset: 'At least one reminder stays on.',
+      preparationHint_one:
+        'For replies, submissions and cancellations, the app also reminds you {{count}} day before.',
+      preparationHint_other:
+        'For replies, submissions and cancellations, the app also reminds you {{count}} days before.',
+      overdue: 'Remind me if a deadline has passed',
+      overdueHint:
+        "If a deadline isn't marked done, the app reminds you about it once more the next day.",
       time: 'Reminder time',
       changeTime: 'Change',
       changeTimeLabel: 'Change reminder time, now {{time}}',

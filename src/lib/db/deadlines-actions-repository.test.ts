@@ -112,6 +112,16 @@ describe('deadlines repository', () => {
     });
   });
 
+  it('keeps a reminder put off from a notification until the date changes (REM-15)', async () => {
+    expect((await repos.deadlines.get('late'))?.snoozedUntil).toBeNull();
+
+    await repos.deadlines.update('late', { snoozedUntil: '2026-11-14T08:00:00.000Z' });
+    expect((await repos.deadlines.get('late'))?.snoozedUntil).toBe('2026-11-14T08:00:00.000Z');
+
+    await repos.deadlines.changeDate('late', '2026-11-25');
+    expect((await repos.deadlines.get('late'))?.snoozedUntil).toBeNull();
+  });
+
   it('refuses a date that is not in the calendar, and a missing deadline', async () => {
     await expect(repos.deadlines.changeDate('late', '2026-02-30')).rejects.toThrow(/calendar/);
     await expect(repos.deadlines.changeDate('missing', '2026-11-25')).rejects.toThrow(/not found/);

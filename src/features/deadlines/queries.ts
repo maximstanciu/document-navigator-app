@@ -5,6 +5,7 @@ import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 
 import {
   changeDeadlineDate,
+  completeFromNotification,
   dismissDeadline,
   listDatedActions,
   listDocumentTitles,
@@ -12,6 +13,8 @@ import {
   restoreDeadline,
   setActionDone,
   setDeadlineDone,
+  snoozeFromNotification,
+  undoCompleteFromNotification,
 } from './api';
 
 /**
@@ -45,7 +48,9 @@ export const deadlineQueries = {
  * A change to deadlines or actions refreshes both tables: a deadline's status follows its actions
  * (REM-9). Reminders follow too: a closed or dismissed deadline loses them, a new date moves them.
  */
-function useDeadlinesMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<void>) {
+function useDeadlinesMutation<TVariables, TData = void>(
+  mutationFn: (variables: TVariables) => Promise<TData>
+) {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
@@ -82,5 +87,22 @@ export function useRestoreDeadline() {
 export function useChangeDeadlineDate() {
   return useDeadlinesMutation(({ id, dueDate }: { id: string; dueDate: string }) =>
     changeDeadlineDate(id, dueDate)
+  );
+}
+
+/** «Done» on a reminder's notification (REM-15); resolves to what changed, `null` for nothing. */
+export function useCompleteFromNotification() {
+  return useDeadlinesMutation(completeFromNotification);
+}
+
+/** «Undo» on the Deadlines tab after «Done» from a notification. */
+export function useUndoCompleteFromNotification() {
+  return useDeadlinesMutation(undoCompleteFromNotification);
+}
+
+/** «Remind tomorrow» on a reminder's notification (REM-15); the sync schedules the extra reminder. */
+export function useSnoozeFromNotification() {
+  return useDeadlinesMutation(({ id, now }: { id: string; now: Date }) =>
+    snoozeFromNotification(id, now)
   );
 }

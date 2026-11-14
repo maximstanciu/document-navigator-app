@@ -20,6 +20,7 @@ const reminder = {
   notificationId: 'reminder-1',
   documentId: 'doc-1',
   deadlineId: 'pay',
+  action: 'open' as const,
 };
 
 /** The push about a finished analysis: it names only the job (ANL-12). */

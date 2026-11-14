@@ -69,6 +69,22 @@ describe('settings repository', () => {
     expect((await settings.get()).documentCountry).toBeNull();
   });
 
+  it('stores the reminder after a deadline, on by default (SET-7, REM-13)', async () => {
+    expect(DEFAULT_SETTINGS.overdueReminder).toBe(true);
+
+    await settings.update({ overdueReminder: false });
+
+    expect((await settings.get()).overdueReminder).toBe(false);
+    expect(
+      await db.getFirstAsync<{ value: string }>(
+        "SELECT value FROM settings WHERE key = 'overdue_reminder'"
+      )
+    ).toEqual({ value: 'false' });
+    await expect(
+      settings.update({ overdueReminder: 'no' } as unknown as Parameters<typeof settings.update>[0])
+    ).rejects.toThrow(/overdueReminder/);
+  });
+
   it('refuses a country without a memo', async () => {
     await expect(
       settings.update({ documentCountry: 'FR' } as unknown as Parameters<typeof settings.update>[0])

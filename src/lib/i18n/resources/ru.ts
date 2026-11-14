@@ -313,6 +313,8 @@ export const ru = {
       action: 'Отменить',
       label: 'Отменить: «{{description}}»',
     },
+    // After «Remind tomorrow» on a reminder's notification (REM-15).
+    snoozed: 'Напомню завтра в {{time}}',
   },
   capture: {
     title: 'Добавить документ',
@@ -448,7 +450,17 @@ export const ru = {
       failed: 'Не удалось изменить напоминания. Попробуйте ещё раз.',
     },
     notification: {
+      // The buttons of a reminder's notification (REM-15).
+      actions: {
+        done: 'Сделано',
+        snooze: 'Напомнить завтра',
+      },
       neutral: {
+        yesterday: 'Срок по документу прошёл вчера. Если уже сделано, отметьте это в приложении.',
+        overdue_one: 'Срок по документу прошёл {{count}} день назад',
+        overdue_few: 'Срок по документу прошёл {{count}} дня назад',
+        overdue_many: 'Срок по документу прошёл {{count}} дней назад',
+        overdue_other: 'Срок по документу прошёл {{count}} дня назад',
         today: 'Срок по документу сегодня',
         tomorrow: 'Срок по документу завтра',
         inDays_one: 'Срок по документу через {{count}} день',
@@ -457,6 +469,11 @@ export const ru = {
         inDays_other: 'Срок по документу через {{count}} дня',
       },
       detailed: {
+        yesterday: 'Срок прошёл вчера: {{description}}',
+        overdue_one: 'Срок прошёл {{count}} день назад: {{description}}',
+        overdue_few: 'Срок прошёл {{count}} дня назад: {{description}}',
+        overdue_many: 'Срок прошёл {{count}} дней назад: {{description}}',
+        overdue_other: 'Срок прошёл {{count}} дня назад: {{description}}',
         today: 'Сегодня: {{description}}',
         tomorrow: 'Завтра: {{description}}',
         inDays_one: 'Через {{count}} день: {{description}}',
@@ -510,6 +527,17 @@ export const ru = {
       offsetsHint:
         'Действует для всех сроков. Выключить напоминания об одном сроке можно в его карточке.',
       lastOffset: 'Хотя бы одно напоминание остаётся.',
+      preparationHint_one:
+        'Об ответах, подаче документов и расторжении приложение напомнит ещё и за {{count}} день.',
+      preparationHint_few:
+        'Об ответах, подаче документов и расторжении приложение напомнит ещё и за {{count}} дня.',
+      preparationHint_many:
+        'Об ответах, подаче документов и расторжении приложение напомнит ещё и за {{count}} дней.',
+      preparationHint_other:
+        'Об ответах, подаче документов и расторжении приложение напомнит ещё и за {{count}} дня.',
+      overdue: 'Напомнить, если срок прошёл',
+      overdueHint:
+        'Если срок не отмечен сделанным, приложение напомнит о нём ещё раз на следующий день.',
       time: 'Время напоминаний',
       changeTime: 'Изменить',
       changeTimeLabel: 'Изменить время напоминаний, сейчас {{time}}',

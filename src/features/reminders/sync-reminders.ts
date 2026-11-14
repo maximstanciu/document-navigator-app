@@ -46,6 +46,7 @@ async function sync(now: Date): Promise<SyncResult> {
       fireAt: reminder.fireAt,
       body: reminderMessage(reminder.text, t),
       data: { documentId: reminder.documentId, deadlineId: reminder.deadlineId },
+      category: reminder.category,
     });
   }
 

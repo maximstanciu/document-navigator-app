@@ -8,6 +8,8 @@ jest.mock('expo-notifications', () => ({
   ...jest.requireActual<typeof ExpoNotifications>('expo-notifications'),
   setNotificationHandler: jest.fn(),
   setNotificationChannelAsync: jest.fn(async () => null),
+  setNotificationCategoryAsync: jest.fn(async () => null),
+  scheduleNotificationAsync: jest.fn(async () => 'id'),
   getExpoPushTokenAsync: jest.fn(),
   addPushTokenListener: jest.fn(),
 }));
@@ -61,7 +63,29 @@ describe('toOpenedNotification', () => {
       notificationId: 'reminder-1',
       documentId: 'doc-1',
       deadlineId: 'pay',
+      action: 'open',
     });
+  });
+
+  it.each(['done', 'snooze'] as const)(
+    'reads a press on a reminder’s «%s» button (REM-15)',
+    (id) => {
+      expect(
+        adapter.toOpenedNotification(response({ documentId: 'doc-1', deadlineId: 'pay' }, id))
+      ).toEqual({
+        type: 'reminder',
+        notificationId: 'reminder-1',
+        documentId: 'doc-1',
+        deadlineId: 'pay',
+        action: id,
+      });
+    }
+  );
+
+  it('ignores a button on a push about a finished analysis', () => {
+    expect(
+      adapter.toOpenedNotification(response({ type: 'analysis', jobId: 'job-1' }, 'done'))
+    ).toBeNull();
   });
 
   it('reads the job of a tapped push about a finished analysis (ANL-12)', () => {
@@ -72,7 +96,7 @@ describe('toOpenedNotification', () => {
     });
   });
 
-  it('ignores actions other than the tap itself', () => {
+  it('ignores actions other than the tap and the reminder buttons', () => {
     const dismissed = response(
       { documentId: 'doc-1', deadlineId: 'pay' },
       'com.apple.UNNotificationDismissActionIdentifier'
@@ -96,9 +120,11 @@ describe('setUpNotifications', () => {
     analysis: { name: 'Document analysis', description: 'Analyzed' },
   };
 
+  const buttons = { done: 'Done', snooze: 'Remind tomorrow' };
+
   it('shows reminders while the app is open, but not the push about an analysis (ANL-12)', async () => {
     const { adapter, os } = load();
-    await adapter.setUpNotifications(channels);
+    await adapter.setUpNotifications(channels, buttons);
 
     const [[handler]] = os.setNotificationHandler.mock.calls;
     expect(await handler!.handleNotification(notification({ documentId: 'doc-1' }))).toEqual({
@@ -115,6 +141,46 @@ describe('setUpNotifications', () => {
       shouldPlaySound: false,
       shouldSetBadge: false,
     });
+  });
+
+  it('sets the reminder category with buttons that bring the app up (REM-15)', async () => {
+    const { adapter, os } = load();
+
+    await adapter.setUpNotifications(channels, buttons);
+
+    expect(os.setNotificationCategoryAsync).toHaveBeenCalledWith('deadline_reminder', [
+      { identifier: 'done', buttonTitle: 'Done', options: { opensAppToForeground: true } },
+      {
+        identifier: 'snooze',
+        buttonTitle: 'Remind tomorrow',
+        options: { opensAppToForeground: true },
+      },
+    ]);
+  });
+});
+
+describe('scheduleNotification', () => {
+  it('gives a reminder its category, so it shows the buttons (REM-15)', async () => {
+    const { adapter, os } = load();
+
+    await adapter.scheduleNotification({
+      id: 'reminder-1',
+      fireAt: '2026-11-20T08:00:00.000Z',
+      body: 'A document deadline is today',
+      data: { documentId: 'doc-1', deadlineId: 'pay' },
+      category: 'deadline_reminder',
+    });
+
+    expect(os.scheduleNotificationAsync).toHaveBeenCalledWith(
+      expect.objectContaining({
+        identifier: 'reminder-1',
+        content: {
+          body: 'A document deadline is today',
+          data: { documentId: 'doc-1', deadlineId: 'pay' },
+          categoryIdentifier: 'deadline_reminder',
+        },
+      })
+    );
   });
 });
 

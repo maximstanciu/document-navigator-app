@@ -50,6 +50,7 @@ describe('useUpdateSettings', () => {
         'In 7 days: Pay the electricity bill',
         'Tomorrow: Pay the electricity bill',
         'Today: Pay the electricity bill',
+        'Deadline passed yesterday: Pay the electricity bill',
       ])
     );
   });

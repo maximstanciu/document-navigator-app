@@ -6,8 +6,9 @@ import { setUpNotifications } from '../notifications';
 import { syncRemindersInBackground } from '../sync-reminders';
 
 /**
- * Sets up notifications (both channels, the `analysis` one of ANL-12 too) and syncs reminders at
- * start, after a change of the interface language (the text and the channel names follow it) and
+ * Sets up notifications (both channels, the `analysis` one of ANL-12 too, and the reminder buttons of
+ * REM-15) and syncs reminders at start, after a change of the interface language (the text, the
+ * channel names and the button titles follow it) and
  * whenever the app returns to the foreground (REM-7): reminders fired meanwhile, the time zone may
  * have changed, the permission may have been granted or taken away in system settings. Asks for
  * nothing (REM-5). Mount once, inside the database gate.
@@ -26,8 +27,12 @@ export function ReminderSync() {
         description: t('analysis.channel.description'),
       },
     };
+    const buttons = {
+      done: t('reminders.notification.actions.done'),
+      snooze: t('reminders.notification.actions.snooze'),
+    };
     // Sync either way: a channel that failed to set up now gets another try at the next start.
-    void setUpNotifications(channels)
+    void setUpNotifications(channels, buttons)
       .catch(() => undefined)
       .then(syncRemindersInBackground);
   }, [t]);

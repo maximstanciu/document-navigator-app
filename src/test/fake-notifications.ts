@@ -5,6 +5,7 @@ import type {
   NotificationChannel,
   NotificationPermission,
   OpenedNotification,
+  ReminderButtons,
   ReminderNotification,
 } from '@/features/reminders/notifications';
 
@@ -12,6 +13,7 @@ export type {
   NotificationChannel,
   NotificationPermission,
   OpenedNotification,
+  ReminderButtons,
   ReminderNotification,
 };
 
@@ -29,6 +31,8 @@ export const fakeNotifications = {
   answer: 'granted' as NotificationPermission,
   /** Pending notifications by identifier, as the OS holds them. */
   scheduled: new Map<string, ReminderNotification>(),
+  /** Identifiers of notifications removed from the notification center one by one. */
+  dismissed: [] as string[],
 
   /** The last tap on a notification, kept until cleared: set it before rendering for a cold start. */
   lastOpened: null as OpenedNotification | null,
@@ -63,7 +67,10 @@ export const fakeNotifications = {
 };
 
 export const setUpNotifications = jest.fn(
-  async (_channels: { deadlines: NotificationChannel; analysis: NotificationChannel }) => {}
+  async (
+    _channels: { deadlines: NotificationChannel; analysis: NotificationChannel },
+    _buttons: ReminderButtons
+  ) => {}
 );
 
 export const getNotificationPermission = jest.fn(async () => fakeNotifications.permission);
@@ -85,6 +92,10 @@ export const scheduleNotification = jest.fn(async (notification: ReminderNotific
 
 export const cancelNotification = jest.fn(async (id: string) => {
   fakeNotifications.scheduled.delete(id);
+});
+
+export const dismissNotification = jest.fn(async (id: string) => {
+  fakeNotifications.dismissed.push(id);
 });
 
 export const dismissShownNotifications = jest.fn(async () => {});
@@ -130,6 +141,7 @@ export function resetFakeNotifications() {
   fakeNotifications.permission = 'unavailable';
   fakeNotifications.answer = 'granted';
   fakeNotifications.scheduled.clear();
+  fakeNotifications.dismissed = [];
   fakeNotifications.lastOpened = null;
   fakeNotifications.pushToken = 'ExponentPushToken[fake-device]';
   openedListeners.clear();
@@ -142,6 +154,7 @@ export function resetFakeNotifications() {
     listScheduledNotificationIds,
     scheduleNotification,
     cancelNotification,
+    dismissNotification,
     dismissShownNotifications,
     getLastOpenedNotification,
     clearLastOpenedNotification,

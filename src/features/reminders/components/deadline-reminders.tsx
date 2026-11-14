@@ -17,7 +17,9 @@ import { reminderQueries, useTurnOffReminders, useTurnOnReminders } from '../que
  * The reminders of an open deadline on its card (DET-4, REM-3, REM-5). On: when they will come,
  * with «Don't remind». Off, or without the permission: «Remind», which asks for the permission the
  * first time and explains how to allow notifications if it is denied. Nothing on web, for a closed
- * or overdue deadline, or once every reminder time has passed.
+ * or overdue deadline, or once every reminder time up to the due date has passed. The reminder the
+ * day after (REM-13) isn't listed: it only comes if the deadline is never closed; nor is one put off
+ * from a notification (REM-15): the person chose it there.
  */
 export function DeadlineReminders({ deadline }: { deadline: DeadlineRecord }) {
   const { t, i18n } = useTranslation();
@@ -32,10 +34,16 @@ export function DeadlineReminders({ deadline }: { deadline: DeadlineRecord }) {
   const off = deadline.reminderOffsetsDays?.length === 0;
   // What the deadline gets with reminders on: its own offsets, or the defaults if they are off.
   const upcoming = planReminders(
-    [off ? { ...deadline, reminderOffsetsDays: null } : deadline],
+    [
+      {
+        ...deadline,
+        reminderOffsetsDays: off ? null : deadline.reminderOffsetsDays,
+        snoozedUntil: null,
+      },
+    ],
     { ...settings, language: i18n.language },
     new Date()
-  );
+  ).filter((reminder) => reminder.daysBefore >= 0);
   if (upcoming.length === 0) return null;
 
   const date = formatCalendarDate(deadline.dueDate, i18n.language);

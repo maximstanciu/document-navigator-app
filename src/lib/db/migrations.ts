@@ -131,6 +131,12 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 5,
     statements: [`ALTER TABLE documents ADD COLUMN legal_memo_country TEXT`],
   },
+  {
+    // REM-15: «Remind tomorrow» from a reminder's notification, the instant of the one extra
+    // reminder; `NULL` for none.
+    version: 6,
+    statements: [`ALTER TABLE deadlines ADD COLUMN snoozed_until TEXT`],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

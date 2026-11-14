@@ -107,6 +107,8 @@ export type DeadlineRecord = {
   status: DeadlineStatus;
   /** `null` — defaults from settings, `[]` — reminders off. */
   reminderOffsetsDays: number[] | null;
+  /** ISO 8601: «Remind tomorrow» from a reminder's notification (REM-15); `null` — none. */
+  snoozedUntil: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -147,6 +149,8 @@ export type Settings = {
   reminderTime: string;
   /** Show the gist and amount in notification text (SET-5, REM-12). */
   notificationDetails: boolean;
+  /** One more reminder the day after a deadline still open (SET-7, REM-13). */
+  overdueReminder: boolean;
   onboardingCompleted: boolean;
   /** Analysis consent with the version of the consent text the user accepted (ONB-2). */
   consent: { version: string; acceptedAt: string } | null;
@@ -159,6 +163,7 @@ export const DEFAULT_SETTINGS: Settings = {
   reminderOffsetsDays: [7, 1, 0],
   reminderTime: '09:00',
   notificationDetails: false,
+  overdueReminder: true,
   onboardingCompleted: false,
   consent: null,
 };

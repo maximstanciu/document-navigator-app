@@ -22,9 +22,15 @@ export async function turnOnReminders(
   return permission === 'granted' ? permission : requestNotificationPermission();
 }
 
-/** «Don't remind» on a deadline (REM-3): `[]` turns its reminders off. */
+/**
+ * «Don't remind» on a deadline (REM-3): `[]` turns its reminders off, and a reminder put off from a
+ * notification goes too (REM-15).
+ */
 export async function turnOffReminders(deadlineId: string): Promise<void> {
-  await getRepositories().deadlines.update(deadlineId, { reminderOffsetsDays: [] });
+  await getRepositories().deadlines.update(deadlineId, {
+    reminderOffsetsDays: [],
+    snoozedUntil: null,
+  });
 }
 
 /**

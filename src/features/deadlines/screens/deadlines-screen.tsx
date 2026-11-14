@@ -12,15 +12,18 @@ import { Button } from '@/components/ui/button';
 import { BottomTabInset, MaxContentWidth, Spacing, TopTabInset } from '@/constants/theme';
 import { useNow } from '@/hooks/use-now';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
-import { localCalendarDate } from '@/shared/calendar-date';
+import { formatClockTime } from '@/lib/i18n/format';
+import { clockTime, localCalendarDate } from '@/shared/calendar-date';
 
 import { TimelineItem } from '../components/timeline-item';
+import { clearNotificationOutcome, useNotificationOutcome } from '../notification-outcome';
 import {
   deadlineQueries,
   useDismissDeadline,
   useRestoreDeadline,
   useSetActionDone,
   useSetDeadlineDone,
+  useUndoCompleteFromNotification,
 } from '../queries';
 import { groupTimeline } from '../timeline';
 
@@ -42,10 +45,12 @@ type Undo = { message: string; label: string; run: () => void };
 /**
  * The Deadlines tab (REM-1): open deadlines of all documents, soonest first, in «Overdue», «This
  * week» and «Later». «Done» (US-9) and «Not relevant» (US-12) take a deadline off the tab and cancel
- * its reminders, with «Undo» until the next change or until the person leaves the tab.
+ * its reminders, with «Undo» until the next change or until the person leaves the tab. A press on a
+ * reminder's button opens the tab the same way (REM-15): «Undo» after «Done», the time of the extra
+ * reminder after «Remind tomorrow».
  */
 export function DeadlinesScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const now = useNow();
   const deadlines = useQuery(deadlineQueries.open());
   const actions = useQuery(deadlineQueries.datedActions());
@@ -54,12 +59,22 @@ export function DeadlinesScreen() {
   const setActionDone = useSetActionDone();
   const dismiss = useDismissDeadline();
   const restore = useRestoreDeadline();
+  const undoFromNotification = useUndoCompleteFromNotification();
+  const outcome = useNotificationOutcome();
   const [undo, setUndo] = useState<Undo | null>(null);
   const [failed, setFailed] = useState(false);
 
   // Cleanup runs when the tab loses focus: the offer belongs to what was just done here. The hook
   // re-runs the effect, cleanup first, whenever the callback changes, so it must stay the same.
-  useFocusEffect(useCallback(() => () => setUndo(null), []));
+  useFocusEffect(
+    useCallback(
+      () => () => {
+        setUndo(null);
+        clearNotificationOutcome();
+      },
+      []
+    )
+  );
 
   const queries = [deadlines, actions, titles];
   if (deadlines.isPending || actions.isPending || titles.isPending) {
@@ -75,7 +90,11 @@ export function DeadlinesScreen() {
   }
 
   const busy =
-    setDeadlineDone.isPending || setActionDone.isPending || dismiss.isPending || restore.isPending;
+    setDeadlineDone.isPending ||
+    setActionDone.isPending ||
+    dismiss.isPending ||
+    restore.isPending ||
+    undoFromNotification.isPending;
   const today = localCalendarDate(now);
   const actionsByDeadline = byDeadline(actions.data);
   const sections = groupTimeline(deadlines.data, today).map((group) => ({
@@ -87,6 +106,7 @@ export function DeadlinesScreen() {
   /** Each change replaces the offer to undo the one before it; a failure says so. */
   function callbacks(next: Undo | null) {
     setUndo(null);
+    clearNotificationOutcome();
     setFailed(false);
     return {
       onSuccess: () => setUndo(next),
@@ -122,6 +142,21 @@ export function DeadlinesScreen() {
     setActionDone.mutate({ id: action.id, done }, callbacks(offer));
   }
 
+  // What a reminder's button did, when nothing has been changed on the tab since (REM-15).
+  const offer =
+    undo ??
+    (outcome?.kind === 'done'
+      ? undoOffer(
+          outcome.description,
+          t('deadlines.undo.done', { description: outcome.description }),
+          () => undoFromNotification.mutate(outcome, callbacks(null))
+        )
+      : null);
+  const snoozedAt =
+    outcome?.kind === 'snoozed'
+      ? formatClockTime(clockTime(new Date(outcome.remindAt)), i18n.language)
+      : null;
+
   function markNotRelevant(deadline: DeadlineRecord) {
     const offer = undoOffer(
       deadline.description,
@@ -139,18 +174,25 @@ export function DeadlinesScreen() {
           <ThemedText type="subtitle" role="heading" style={styles.heading}>
             {t('deadlines.title')}
           </ThemedText>
-          {undo && (
+          {offer && (
             <ThemedView type="backgroundSelected" style={styles.undo}>
               <ThemedText type="small" role="alert" style={styles.undoMessage}>
-                {undo.message}
+                {offer.message}
               </ThemedText>
               <Button
                 label={t('deadlines.undo.action')}
-                aria-label={undo.label}
+                aria-label={offer.label}
                 variant="plain"
                 disabled={busy}
-                onPress={undo.run}
+                onPress={offer.run}
               />
+            </ThemedView>
+          )}
+          {snoozedAt && (
+            <ThemedView type="backgroundSelected" style={styles.undo}>
+              <ThemedText type="small" role="alert" style={styles.undoMessage}>
+                {t('deadlines.snoozed', { time: snoozedAt })}
+              </ThemedText>
             </ThemedView>
           )}
           {failed && (

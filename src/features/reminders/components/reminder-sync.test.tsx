@@ -62,14 +62,18 @@ describe('ReminderSync', () => {
 
     await renderWithProviders(<ReminderSync />);
 
-    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(3));
-    expect(setUpNotifications).toHaveBeenCalledWith({
-      deadlines: { name: 'Deadlines', description: 'Reminders about document deadlines' },
-      analysis: {
-        name: 'Document analysis',
-        description: 'When a document you sent has been analyzed',
+    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(4));
+    expect(setUpNotifications).toHaveBeenCalledWith(
+      {
+        deadlines: { name: 'Deadlines', description: 'Reminders about document deadlines' },
+        analysis: {
+          name: 'Document analysis',
+          description: 'When a document you sent has been analyzed',
+        },
       },
-    });
+      // The reminder buttons (REM-15).
+      { done: 'Done', snooze: 'Remind tomorrow' }
+    );
     expect(requestNotificationPermission).not.toHaveBeenCalled();
   });
 
@@ -88,27 +92,31 @@ describe('ReminderSync', () => {
     fakeNotifications.permission = 'granted';
     await addDeadline('pay');
     await renderWithProviders(<ReminderSync />);
-    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(3));
+    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(4));
 
     await act(() => i18n.changeLanguage('ru'));
 
     await waitFor(() =>
-      expect(setUpNotifications).toHaveBeenLastCalledWith({
-        deadlines: { name: 'Сроки', description: 'Напоминания о сроках по документам' },
-        analysis: {
-          name: 'Анализ документов',
-          description: 'Когда отправленный документ разобран',
+      expect(setUpNotifications).toHaveBeenLastCalledWith(
+        {
+          deadlines: { name: 'Сроки', description: 'Напоминания о сроках по документам' },
+          analysis: {
+            name: 'Анализ документов',
+            description: 'Когда отправленный документ разобран',
+          },
         },
-      })
+        { done: 'Сделано', snooze: 'Напомнить завтра' }
+      )
     );
     await waitFor(() =>
       expect(bodies()).toEqual([
         'Срок по документу через 7 дней',
         'Срок по документу завтра',
         'Срок по документу сегодня',
+        'Срок по документу прошёл вчера. Если уже сделано, отметьте это в приложении.',
       ])
     );
-    expect(fakeNotifications.scheduled.size).toBe(3);
+    expect(fakeNotifications.scheduled.size).toBe(4);
   });
 
   it('syncs again when the app returns to the foreground (REM-7)', async () => {
@@ -122,6 +130,6 @@ describe('ReminderSync', () => {
     fakeNotifications.permission = 'granted';
     onAppStateChange?.('active');
 
-    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(3));
+    await waitFor(() => expect(fakeNotifications.scheduled.size).toBe(4));
   });
 });

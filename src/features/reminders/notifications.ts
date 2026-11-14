@@ -8,6 +8,7 @@ import {
   clearLastNotificationResponse,
   DEFAULT_ACTION_IDENTIFIER,
   dismissAllNotificationsAsync,
+  dismissNotificationAsync,
   getAllScheduledNotificationsAsync,
   getExpoPushTokenAsync,
   getLastNotificationResponse,
@@ -16,6 +17,7 @@ import {
   requestPermissionsAsync,
   SchedulableTriggerInputTypes,
   scheduleNotificationAsync,
+  setNotificationCategoryAsync,
   setNotificationChannelAsync,
   setNotificationHandler,
   type NotificationContent,
@@ -23,6 +25,8 @@ import {
   type NotificationResponse,
 } from 'expo-notifications';
 import { Linking } from 'react-native';
+
+import { REMINDER_CATEGORY } from './plan-reminders';
 
 // Adapter over `expo-notifications`: local reminders (REM-4) and the push about a finished analysis
 // (ANL-12). The rest of the app sees these functions, and tests mock this module. The web stub is
@@ -43,6 +47,16 @@ export const ANALYSIS_CHANNEL_ID = 'analysis';
 /** A channel's texts, in the interface language. */
 export type NotificationChannel = { name: string; description: string };
 
+/**
+ * What a tap on a reminder asks for: `open` — the notification itself (REM-6); `done` and `snooze`
+ * — its «Done» and «Remind tomorrow» buttons (REM-15). The button ids are the action identifiers
+ * the OS reports back.
+ */
+export type ReminderAction = 'open' | 'done' | 'snooze';
+
+/** The titles of a reminder's buttons, in the interface language (REM-15). */
+export type ReminderButtons = { done: string; snooze: string };
+
 export type ReminderNotification = {
   /** Our reminder id, the notification's identifier in the OS. */
   id: string;
@@ -52,6 +66,8 @@ export type ReminderNotification = {
   body: string;
   /** Ids only, for opening the document from the notification (REM-6, task 5.3). */
   data: { documentId: string; deadlineId: string };
+  /** The category set up with its buttons by `setUpNotifications()` (REM-15). */
+  category: string;
 };
 
 /**
@@ -65,6 +81,8 @@ export type OpenedNotification =
       notificationId: string;
       documentId: string;
       deadlineId: string;
+      /** The notification itself or one of its buttons. */
+      action: ReminderAction;
     }
   | { type: 'analysis'; notificationId: string; jobId: string };
 
@@ -88,15 +106,18 @@ function analysisJobOf(content: NotificationContent): string | null {
 
 /**
  * Shows reminders while the app is open too, but not the push about a finished analysis: the app
- * asks about the job instead (ANL-12). Creates or renames the `deadlines` and `analysis` channels.
- * Run at every start and after a language change: a channel's name and description can change,
- * nothing else can. Creating a channel asks for nothing (the app targets Android 13+), so the
- * permission dialog never appears at launch (REM-5); a push token needs one to exist first.
+ * asks about the job instead (ANL-12). Creates or renames the `deadlines` and `analysis` channels,
+ * and sets the reminder category with its «Done» and «Remind tomorrow» buttons (REM-15). Both
+ * buttons bring the app up: an action without it needs a background task, which expo-notifications
+ * runs for a button only on Android. Run at every start and after a language change: a channel's
+ * name and description and the buttons' titles follow it. Creating a channel asks for nothing (the
+ * app targets Android 13+), so the permission dialog never appears at launch (REM-5); a push token
+ * needs one to exist first.
  */
-export async function setUpNotifications(channels: {
-  deadlines: NotificationChannel;
-  analysis: NotificationChannel;
-}) {
+export async function setUpNotifications(
+  channels: { deadlines: NotificationChannel; analysis: NotificationChannel },
+  buttons: ReminderButtons
+) {
   setNotificationHandler({
     handleNotification: async (notification) => {
       const show = analysisJobOf(notification.request.content) === null;
@@ -118,6 +139,10 @@ export async function setUpNotifications(channels: {
       importance: AndroidImportance.DEFAULT,
     });
   }
+  await setNotificationCategoryAsync(REMINDER_CATEGORY, [
+    { identifier: 'done', buttonTitle: buttons.done, options: { opensAppToForeground: true } },
+    { identifier: 'snooze', buttonTitle: buttons.snooze, options: { opensAppToForeground: true } },
+  ]);
 }
 
 export async function getNotificationPermission(): Promise<NotificationPermission> {
@@ -146,7 +171,11 @@ export async function listScheduledNotificationIds(): Promise<string[]> {
 export async function scheduleNotification(notification: ReminderNotification): Promise<void> {
   await scheduleNotificationAsync({
     identifier: notification.id,
-    content: { body: notification.body, data: notification.data },
+    content: {
+      body: notification.body,
+      data: notification.data,
+      categoryIdentifier: notification.category,
+    },
     trigger: {
       type: SchedulableTriggerInputTypes.DATE,
       date: new Date(notification.fireAt),
@@ -160,6 +189,14 @@ export async function cancelNotification(id: string): Promise<void> {
 }
 
 /**
+ * Removes one shown notification from the notification center: a reminder whose button was pressed
+ * (REM-15), since the documentation doesn't promise the OS removes it.
+ */
+export async function dismissNotification(id: string): Promise<void> {
+  await dismissNotificationAsync(id);
+}
+
+/**
  * Removes the reminders already shown from the notification center: all of them are ours. With
  * «Details in notifications» (SET-5) they carry what a deadline is about.
  */
@@ -167,19 +204,29 @@ export async function dismissShownNotifications(): Promise<void> {
   await dismissAllNotificationsAsync();
 }
 
+/** The tap itself or a reminder's button; anything else, like iOS's dismiss action, is `null`. */
+function actionOf(identifier: string): ReminderAction | null {
+  if (identifier === DEFAULT_ACTION_IDENTIFIER) return 'open';
+  return identifier === 'done' || identifier === 'snooze' ? identifier : null;
+}
+
 /**
- * The reminder or analysis push behind a tap on its notification. Anything else is `null`: another
- * action than the tap itself (a dismiss action on iOS), or a notification without our ids.
+ * The reminder or analysis push behind a tap on its notification, or on a reminder's button. Anything
+ * else is `null`: another action (a dismiss action on iOS, a button on an analysis push), or a
+ * notification without our ids.
  */
 export function toOpenedNotification(response: NotificationResponse): OpenedNotification | null {
-  if (response.actionIdentifier !== DEFAULT_ACTION_IDENTIFIER) return null;
+  const action = actionOf(response.actionIdentifier);
+  if (action === null) return null;
   const { identifier, content } = response.notification.request;
   const jobId = analysisJobOf(content);
-  if (jobId !== null) return { type: 'analysis', notificationId: identifier, jobId };
+  if (jobId !== null) {
+    return action === 'open' ? { type: 'analysis', notificationId: identifier, jobId } : null;
+  }
   const documentId = content.data?.documentId;
   const deadlineId = content.data?.deadlineId;
   if (typeof documentId !== 'string' || typeof deadlineId !== 'string') return null;
-  return { type: 'reminder', notificationId: identifier, documentId, deadlineId };
+  return { type: 'reminder', notificationId: identifier, documentId, deadlineId, action };
 }
 
 /**

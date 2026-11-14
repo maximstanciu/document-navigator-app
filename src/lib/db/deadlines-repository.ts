@@ -19,14 +19,15 @@ type DeadlineRow = {
   confidence: DeadlineRecord['confidence'];
   status: DeadlineStatus;
   reminder_offsets_days: string | null;
+  snoozed_until: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
 };
 
 const COLUMNS = `id, document_id, kind, description, due_date, due_time, date_source, original_date,
-  source_quote, source_page, computation, confidence, status, reminder_offsets_days, created_at,
-  updated_at, deleted_at`;
+  source_quote, source_page, computation, confidence, status, reminder_offsets_days, snoozed_until,
+  created_at, updated_at, deleted_at`;
 
 function toOffsets(value: string | null): number[] | null {
   const parsed = fromJson(value);
@@ -49,6 +50,7 @@ function toRecord(row: DeadlineRow): DeadlineRecord {
     confidence: row.confidence,
     status: row.status,
     reminderOffsetsDays: toOffsets(row.reminder_offsets_days),
+    snoozedUntil: row.snoozed_until,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -84,6 +86,7 @@ export type DeadlinePatch = Partial<
     | 'confidence'
     | 'status'
     | 'reminderOffsetsDays'
+    | 'snoozedUntil'
   >
 >;
 
@@ -101,6 +104,7 @@ const PATCH_COLUMNS = {
     column: 'reminder_offsets_days',
     toSql: (value: number[] | null) => toJson(value),
   },
+  snoozedUntil: { column: 'snoozed_until', toSql: text },
 } as const;
 
 export type DeadlineFilter = { documentId?: string; statuses?: readonly DeadlineStatus[] };
@@ -123,7 +127,7 @@ export async function settleDeadlineStatus(tx: SqlExecutor, deadlineId: string, 
 export async function insertDeadline(tx: SqlExecutor, deadline: NewDeadline, timestamp: string) {
   await tx.runAsync(
     `INSERT INTO deadlines (${COLUMNS})
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL)`,
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?, NULL)`,
     [
       deadline.id,
       deadline.documentId,
@@ -199,13 +203,14 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
     /**
      * «Change date» (US-8, DET-4): the person's date wins. The deadline becomes `dateSource: 'user'`
      * and remembers the analysis's date in `originalDate` the first time, so a re-analysis keeps it
-     * and doesn't bring the old date back as a new deadline (ANL-8).
+     * and doesn't bring the old date back as a new deadline (ANL-8). A reminder put off from a
+     * notification goes (REM-15): it was about the old date.
      */
     async changeDate(id: string, dueDate: string): Promise<void> {
       if (!isCalendarDate(dueDate)) throw new Error(`Not a calendar date: ${dueDate}`);
       // SET reads the row as it was, so original_date takes the date before this change.
       const result = await db.runAsync(
-        `UPDATE deadlines SET due_date = ?, date_source = 'user', updated_at = ?,
+        `UPDATE deadlines SET due_date = ?, date_source = 'user', updated_at = ?, snoozed_until = NULL,
            original_date = CASE WHEN date_source = 'user' THEN original_date ELSE due_date END
          WHERE id = ? AND deleted_at IS NULL`,
         [dueDate, now().toISOString(), id]

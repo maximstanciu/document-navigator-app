@@ -12,7 +12,7 @@ import {
 /**
  * Opens the document of a tapped notification: a reminder's (REM-6), or the one analyzed under the
  * job of a push about a finished analysis (ANL-12), which stays on the list when that document is
- * gone. The tap that launched the app, kept by the OS, and every tap while it runs. Each tap opens
+ * gone. A press on a reminder's button is left to `DeadlineNotificationActions` (REM-15). The tap that launched the app, kept by the OS, and every tap while it runs. Each tap opens
  * it once: the OS forgets it after that, so a reload or remount does not open it again, and the tap
  * reported both ways at a cold start is pushed once. Mount once, inside the database gate and after
  * the root navigator, so that the document screen opens over the tabs and «Back» leads to the list.
@@ -29,6 +29,8 @@ export function NotificationOpener() {
       router.push({ pathname: '/documents/[id]', params: { id } });
 
     const open = (opened: OpenedNotification) => {
+      // A reminder's buttons are the Deadlines tab's (REM-15): it clears them itself.
+      if (opened.type === 'reminder' && opened.action !== 'open') return;
       clearLastOpenedNotification();
       if (opened.notificationId === lastOpenedId.current) return;
       lastOpenedId.current = opened.notificationId;
