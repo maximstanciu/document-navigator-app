@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { Link } from 'expo-router';
+import { Link, router } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -10,7 +10,11 @@ import { Button } from '@/components/ui/button';
 import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { formatDueIn } from '@/features/deadlines/format';
 import { useTheme } from '@/hooks/use-theme';
-import { formatCalendarDate } from '@/lib/i18n/format';
+import {
+  formatCalendarDate,
+  formatCalendarWeekday,
+  formatShortCalendarDate,
+} from '@/lib/i18n/format';
 import { daysBetween } from '@/shared/calendar-date';
 
 import type { AttentionItem } from '../attention';
@@ -118,7 +122,13 @@ function Warnings({
   );
 }
 
-function DismissButton({ item, variant }: { item: AttentionItem; variant: 'plain' | 'inverse' }) {
+function DismissButton({
+  item,
+  variant,
+}: {
+  item: AttentionItem;
+  variant: 'plain' | 'inverseOutline';
+}) {
   const { t } = useTranslation();
   const dismiss = useDismissAttention();
   if (!item.dismissible) return null;
@@ -135,15 +145,55 @@ function DismissButton({ item, variant }: { item: AttentionItem; variant: 'plain
   );
 }
 
-/** The big countdown on the lead card: how many days are left or overdue, or «Today». */
-function Countdown({ dueDate, today }: { dueDate: string; today: string }) {
+/** Within this many days a deadline on the lead card is «Soon». */
+const SOON_DAYS = 3;
+
+/**
+ * «Overdue» or «Soon» in the corner of the lead card, in words with an icon; nothing for a deadline
+ * further away (the card can lead with a warning whose deadline is weeks off).
+ */
+function StatusBadge({ days }: { days: number }) {
+  const theme = useTheme();
   const { t } = useTranslation();
-  const days = daysBetween(today, dueDate);
+  if (days > SOON_DAYS) return null;
+  return (
+    <View style={styles.badge}>
+      <SymbolView
+        name={{ ios: 'exclamationmark.triangle.fill', android: 'warning', web: 'warning' }}
+        size={16}
+        tintColor={theme.onInverseWarning}
+      />
+      <ThemedText type="smallBold" themeColor="onInverseWarning">
+        {days < 0 ? t('deadlines.dueIn.overdue') : t('documents.attention.soon')}
+      </ThemedText>
+    </View>
+  );
+}
+
+/**
+ * The big countdown on the lead card: how many days are left or overdue, or «Today», with the date
+ * beside it: «до 16 нояб., пн».
+ */
+function Countdown({ deadline, today }: { deadline: DeadlineSummary; today: string }) {
+  const { t, i18n } = useTranslation();
+  const days = daysBetween(today, deadline.dueDate);
+  const weekday = formatCalendarWeekday(deadline.dueDate, i18n.language);
+  const dateLine = (
+    <ThemedText type="code" themeColor="onInverseSecondary" style={styles.countdownDate}>
+      {t(days < 0 ? 'documents.attention.wasDue' : 'documents.attention.dueOn', {
+        date: formatShortCalendarDate(deadline.dueDate, today, i18n.language),
+        weekday: deadline.dueTime ? `${weekday}, ${deadline.dueTime}` : weekday,
+      })}
+    </ThemedText>
+  );
   if (days === 0 || days === 1) {
     return (
-      <ThemedText type="display" themeColor="onInverse" style={styles.countdownWord}>
-        {t(days === 0 ? 'deadlines.dueIn.today' : 'deadlines.dueIn.tomorrow')}
-      </ThemedText>
+      <View style={styles.countdown}>
+        <ThemedText type="display" themeColor="onInverse" style={styles.countdownWord}>
+          {t(days === 0 ? 'deadlines.dueIn.today' : 'deadlines.dueIn.tomorrow')}
+        </ThemedText>
+        <View style={styles.countdownSide}>{dateLine}</View>
+      </View>
     );
   }
   const count = Math.abs(days);
@@ -152,18 +202,22 @@ function Countdown({ dueDate, today }: { dueDate: string; today: string }) {
       <ThemedText type="display" themeColor="onInverse">
         {count}
       </ThemedText>
-      <ThemedText type="lead" themeColor="onInverse" style={styles.countdownUnit}>
-        {t(days < 0 ? 'documents.attention.daysOverdue' : 'documents.attention.daysLeft', {
-          count,
-        })}
-      </ThemedText>
+      <View style={styles.countdownSide}>
+        <ThemedText type="lead" themeColor="onInverse">
+          {t(days < 0 ? 'documents.attention.daysOverdue' : 'documents.attention.daysLeft', {
+            count,
+          })}
+        </ThemedText>
+        {dateLine}
+      </View>
     </View>
   );
 }
 
 /**
- * The first item, when it has a deadline, leads the tab on the inverse card: the countdown in big
- * numbers, then what to do and in which document.
+ * The first item, when it has a deadline, leads the tab on the inverse card: «Nearest deadline» and
+ * «Overdue» or «Soon», the countdown in big numbers, what to do and in which document, then «Open
+ * document» and, for a warning, «Got it».
  */
 function LeadCard({
   item,
@@ -177,25 +231,29 @@ function LeadCard({
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const { document, deadlines } = item;
-  const due = dueText(nearest, today, t, i18n.language);
+  const title = displayTitle(document.title, t);
   const others = deadlines.length - 1;
+  const href = { pathname: '/documents/[id]', params: { id: document.id } } as const;
 
   return (
     <View style={[styles.lead, { backgroundColor: theme.inverse }]}>
-      <Link href={{ pathname: '/documents/[id]', params: { id: document.id } }} asChild>
+      <Link href={href} asChild>
         <Pressable role="link" aria-label={itemLabel(item, today, t, i18n.language)}>
           {({ pressed }) => (
             <View style={[styles.leadBody, pressed && styles.pressed]}>
-              <ThemedText type="label" themeColor="onInverseSecondary">
-                {due.date}
-              </ThemedText>
-              <Countdown dueDate={nearest.dueDate} today={today} />
+              <View style={styles.leadTop}>
+                <ThemedText type="label" themeColor="onInverseSecondary">
+                  {t('documents.attention.nearest')}
+                </ThemedText>
+                <StatusBadge days={daysBetween(today, nearest.dueDate)} />
+              </View>
+              <Countdown deadline={nearest} today={today} />
               <View style={styles.body}>
                 <ThemedText type="lead" themeColor="onInverse" numberOfLines={3}>
                   {nearest.description}
                 </ThemedText>
                 <ThemedText type="small" themeColor="onInverseSecondary" numberOfLines={2}>
-                  {displayTitle(document.title, t)}
+                  {title}
                 </ThemedText>
                 {others > 0 && (
                   <ThemedText type="small" themeColor="onInverseSecondary">
@@ -208,7 +266,18 @@ function LeadCard({
           )}
         </Pressable>
       </Link>
-      <DismissButton item={item} variant="inverse" />
+      <View style={styles.leadButtons}>
+        <View style={styles.leadOpen}>
+          <Button
+            label={t('documents.attention.open')}
+            aria-label={t('documents.attention.openLabel', { title })}
+            role="link"
+            variant="inverse"
+            onPress={() => router.push(href)}
+          />
+        </View>
+        <DismissButton item={item} variant="inverseOutline" />
+      </View>
     </View>
   );
 }
@@ -290,15 +359,34 @@ const styles = StyleSheet.create({
   leadBody: {
     gap: Spacing.three,
   },
+  leadTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  leadButtons: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: Spacing.two,
+  },
+  leadOpen: {
+    flexGrow: 1,
+  },
   countdown: {
     flexDirection: 'row',
     alignItems: 'flex-end',
     flexWrap: 'wrap',
     columnGap: Spacing.three,
   },
-  countdownUnit: {
+  countdownSide: {
     flexShrink: 1,
+    gap: Spacing.half,
     paddingBottom: Spacing.two,
+  },
+  countdownDate: {
+    lineHeight: 16,
   },
   countdownWord: {
     fontSize: 56,

@@ -18,7 +18,6 @@ import { formatWeekdayDate } from '@/lib/i18n/format';
 import { localCalendarDate } from '@/shared/calendar-date';
 
 import { deadlinesByDocument, selectAttention } from '../attention';
-import { AddDocumentButton } from '../components/add-document-button';
 import { AttentionBlock } from '../components/attention-block';
 import { DocumentListItem } from '../components/document-list-item';
 import { EmptyDocuments } from '../components/empty-documents';
@@ -91,15 +90,12 @@ export function DocumentListScreen() {
 
   const header = (
     <View style={styles.heading}>
-      <View style={styles.title}>
-        <ThemedText type="label" themeColor="textSecondary">
-          {formatWeekdayDate(now, i18n.language)}
-        </ThemedText>
-        <ThemedText type="subtitle" role="heading">
-          {t('documents.title')}
-        </ThemedText>
-      </View>
-      <AddDocumentButton />
+      <ThemedText type="label" themeColor="textSecondary">
+        {formatWeekdayDate(now, i18n.language)}
+      </ThemedText>
+      <ThemedText type="subtitle" role="heading">
+        {t('documents.title')}
+      </ThemedText>
     </View>
   );
 
@@ -148,7 +144,7 @@ export function DocumentListScreen() {
   return (
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        {/* Outside the list, so «Add» and the search stay in reach however far it is scrolled. */}
+        {/* Outside the list, so the search stays in reach however far it is scrolled. */}
         <View style={styles.top}>
           {header}
           <SearchField value={query} onChangeText={setQuery} />
@@ -202,16 +198,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
   },
   heading: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
-    paddingTop: Spacing.three,
-  },
-  title: {
-    flexShrink: 1,
     gap: Spacing.one,
+    paddingTop: Spacing.three,
   },
   listHeader: {
     gap: Spacing.three,

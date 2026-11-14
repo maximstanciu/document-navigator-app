@@ -36,6 +36,7 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   // The inverse card that leads the documents tab (HOME-1) and its button.
   ['onInverse', 'inverse'],
   ['onInverseSecondary', 'inverse'],
+  ['onInverseWarning', 'inverse'],
   ['onInverseAction', 'inverseAction'],
   ['inverseAction', 'inverse'],
   // The floating tab bar: its labels and icons, and the round «Add a document» on it.

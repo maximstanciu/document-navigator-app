@@ -207,10 +207,11 @@ export function DeadlinesScreen() {
           sections={sections}
           keyExtractor={(deadline) => deadline.id}
           renderSectionHeader={({ section }) => (
+            // «Overdue» in the risk color; its words say it anyway.
             <ThemedText
               type="label"
               role="heading"
-              themeColor="textSecondary"
+              themeColor={section.key === 'overdue' ? 'riskHigh' : 'textSecondary'}
               style={styles.sectionHeader}>
               {section.title}
             </ThemedText>

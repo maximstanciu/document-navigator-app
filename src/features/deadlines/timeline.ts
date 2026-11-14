@@ -9,7 +9,8 @@ export type TimelineGroup<T> = { key: TimelineGroupKey; deadlines: T[] };
 
 const GROUP_ORDER: readonly TimelineGroupKey[] = ['overdue', 'thisWeek', 'later'];
 
-function groupOf(dueDate: string, today: string): TimelineGroupKey {
+/** The group of a deadline due on `dueDate`, by the device's calendar date `today`. */
+export function timelineGroupOf(dueDate: string, today: string): TimelineGroupKey {
   const days = daysBetween(today, dueDate);
   if (days < 0) return 'overdue';
   return days < THIS_WEEK_DAYS ? 'thisWeek' : 'later';
@@ -25,7 +26,7 @@ export function groupTimeline<T extends { dueDate: string }>(
   today: string
 ): TimelineGroup<T>[] {
   const byKey: Record<TimelineGroupKey, T[]> = { overdue: [], thisWeek: [], later: [] };
-  for (const deadline of deadlines) byKey[groupOf(deadline.dueDate, today)].push(deadline);
+  for (const deadline of deadlines) byKey[timelineGroupOf(deadline.dueDate, today)].push(deadline);
   const groups = GROUP_ORDER.map((key) => ({ key, deadlines: byKey[key] }));
   return groups.filter((group) => group.deadlines.length > 0);
 }

@@ -91,8 +91,9 @@ describe('CaseScreen (CASE-3…CASE-5)', () => {
     expect(await screen.findByRole('heading', { name: 'Квартира' })).toBeOnTheScreen();
     expect(screen.getByRole('heading', { name: '2 documents in this case' })).toBeOnTheScreen();
     expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeOnTheScreen();
+    // Its card in «Needs attention» and its row; «Open document» names it after its own words.
     expect(
-      screen.getAllByRole('link', { name: new RegExp(ANALYSIS_FIXTURES.invoice.title) })
+      screen.getAllByRole('link', { name: new RegExp(`^${ANALYSIS_FIXTURES.invoice.title}`) })
     ).toHaveLength(2);
     expect(screen.getByRole('link', { name: /^Счёт за газ/ })).toBeOnTheScreen();
     expect(screen.queryByText('Страховка')).not.toBeOnTheScreen();

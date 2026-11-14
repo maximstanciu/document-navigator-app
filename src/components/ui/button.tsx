@@ -11,9 +11,10 @@ export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   /**
    * `plain`: tinted text without a fill, as wide as its label, for actions inside a card.
    * `destructive`: a deleting action, in the high-risk color on the card background.
-   * `inverse`: a button on the inverse card (the nearest deadline, HOME-1).
+   * `inverse`: the main button on the inverse card (the nearest deadline, HOME-1);
+   * `inverseOutline`: a second one beside it, outlined.
    */
-  variant?: 'primary' | 'secondary' | 'plain' | 'destructive' | 'inverse';
+  variant?: 'primary' | 'secondary' | 'plain' | 'destructive' | 'inverse' | 'inverseOutline';
 };
 
 export function Button({ label, variant = 'primary', disabled, ...rest }: ButtonProps) {
@@ -24,6 +25,7 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
     plain: 'transparent',
     destructive: theme.backgroundElement,
     inverse: theme.inverseAction,
+    inverseOutline: 'transparent',
   }[variant];
   const color = {
     primary: theme.onTint,
@@ -31,6 +33,7 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
     plain: theme.tint,
     destructive: theme.riskHigh,
     inverse: theme.onInverseAction,
+    inverseOutline: theme.onInverse,
   }[variant];
 
   return (
@@ -46,6 +49,7 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
       style={({ pressed }) => [
         styles.base,
         variant === 'plain' && styles.plain,
+        variant === 'inverseOutline' && [styles.outline, { borderColor: theme.onInverseSecondary }],
         { backgroundColor: background },
         pressed && styles.pressed,
         disabled && styles.disabled,
@@ -76,6 +80,9 @@ const styles = StyleSheet.create({
   plain: {
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.one,
+  },
+  outline: {
+    borderWidth: 1,
   },
   pressed: {
     opacity: 0.7,

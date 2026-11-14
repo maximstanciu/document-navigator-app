@@ -29,6 +29,8 @@ export const Colors = {
     inverse: Ink,
     onInverse: '#FFFFFF',
     onInverseSecondary: '#A4A9B3',
+    // «Overdue» and «Soon» on the inverse card, always with an icon and in words.
+    onInverseWarning: '#FDA29B',
     // A button on the inverse card.
     inverseAction: Lime,
     onInverseAction: Ink,
@@ -60,6 +62,7 @@ export const Colors = {
     inverse: Lime,
     onInverse: Ink,
     onInverseSecondary: '#3A4708',
+    onInverseWarning: '#9A1B10',
     inverseAction: Ink,
     onInverseAction: Lime,
     riskHigh: '#FDA29B',

@@ -102,9 +102,12 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       contentInsetAdjustmentBehavior="automatic"
       // With the keyboard up for «Rename», the first tap on «Save» saves instead of closing it.
       keyboardShouldPersistTaps="handled">
+      {/* The title is the heading below, so the header shows only «Back» and «⋯»; `title` still
+          names the screen for the back button that leads here and the browser tab on web. */}
       <Stack.Screen
         options={{
           title,
+          headerTitle: '',
           headerRight: () => <DocumentActionsButton onPress={() => setActionsOpen(true)} />,
         }}
       />

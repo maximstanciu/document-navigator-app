@@ -27,6 +27,10 @@ export function displayTitle(title: string, t: TFunction) {
   return title.trim() || t('documents.untitled');
 }
 
+/**
+ * «14 нояб. 2026 г. · 2 страницы · Не разобран» on a row of the documents list (HOME-2): when it was
+ * added, its pages, and the analysis status until it is analyzed.
+ */
 export function formatMeta(
   document: { createdAt: string; pageCount: number | null; status: DocumentStatus },
   t: TFunction,
@@ -35,7 +39,7 @@ export function formatMeta(
   return [
     formatTimestampDate(document.createdAt, language),
     formatPageCount(document.pageCount, t),
-    formatStatus(document.status, t),
+    document.status === 'ready' ? null : formatStatus(document.status, t),
   ]
     .filter(Boolean)
     .join(' · ');

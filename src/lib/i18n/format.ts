@@ -64,6 +64,26 @@ export function formatCalendarDate(isoDate: string, language: string): string {
 }
 
 /**
+ * A calendar date (YYYY-MM-DD) as short as it can be told apart: «27 нояб.» or «Nov 27» in the year
+ * of `today`, with the year in another: «3 янв. 2027 г.». In UTC, as `formatCalendarDate`.
+ */
+export function formatShortCalendarDate(isoDate: string, today: string, language: string): string {
+  return new Intl.DateTimeFormat(language, {
+    year: isoDate.slice(0, 4) === today.slice(0, 4) ? undefined : 'numeric',
+    month: 'short',
+    day: 'numeric',
+    timeZone: 'UTC',
+  }).format(new Date(`${isoDate}T00:00:00Z`));
+}
+
+/** The short weekday of a calendar date (YYYY-MM-DD): «пн» or «Mon». In UTC, as `formatCalendarDate`. */
+export function formatCalendarWeekday(isoDate: string, language: string): string {
+  return new Intl.DateTimeFormat(language, { weekday: 'short', timeZone: 'UTC' }).format(
+    new Date(`${isoDate}T00:00:00Z`)
+  );
+}
+
+/**
  * A file size for the `fileSize.kb` / `fileSize.mb` strings: whole kilobytes below 1 MB, megabytes
  * with one decimal above. The unit comes from the dictionaries rather than the `unit` style of
  * `Intl.NumberFormat`, which Hermes wasn't checked for (spike 0.7).

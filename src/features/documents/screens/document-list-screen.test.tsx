@@ -9,6 +9,7 @@ import DocumentRoute from '@/app/documents/[id]';
 import { Spacing } from '@/constants/theme';
 import { analysisRecords } from '@/features/analysis/analysis-records';
 import { setRepositories, type Repositories } from '@/lib/db/repositories';
+import { formatShortCalendarDate } from '@/lib/i18n/format';
 import { i18n } from '@/lib/i18n/i18n';
 import { ANALYSIS_FIXTURES } from '@/shared/analysis/fixtures';
 import type { AnalysisResult } from '@/shared/analysis/schema';
@@ -83,10 +84,8 @@ const INVOICE = ANALYSIS_FIXTURES.invoice.title;
 const FRAUD = ANALYSIS_FIXTURES.fraudulentInvoice.title;
 const CONTRACT = ANALYSIS_FIXTURES.contract.title;
 
-/** The rows of the list, without the cards of «Needs attention», which end differently. */
-// A card's name ends with its status, and the country of an analyzed document (DET-11).
-const listRows = () =>
-  screen.queryAllByRole('link', { name: / · (Analyzed · [^,]+|Not analyzed)$/ });
+/** The rows of the list, without the cards of «Needs attention»: only a row names its pages. */
+const listRows = () => screen.queryAllByRole('link', { name: / · \d+ pages?\b/ });
 
 describe('DocumentListScreen', () => {
   describe('the list (HOME-2)', () => {
@@ -101,12 +100,26 @@ describe('DocumentListScreen', () => {
       expect(rows).toHaveLength(2);
       expect(rows[0]).toHaveAccessibleName(
         new RegExp(
-          `^${INVOICE}, Invoice · Stadtwerke Musterstadt GmbH, By [^,]+, .* · 1 page · Analyzed · Germany$`
+          `^${INVOICE}, Invoice · Stadtwerke Musterstadt GmbH, By [^,]+, .* · 1 page · Germany$`
         )
       );
+      // The status shows until the document is analyzed.
       expect(rows[1]).toHaveAccessibleName(/^Счёт за газ, .*2 pages · Not analyzed$/);
       // The card shows the country's flag in place of its name.
-      expect(screen.getByText(/ · 1 page · Analyzed · 🇩🇪$/)).toBeOnTheScreen();
+      expect(screen.getByText(/ · 1 page · 🇩🇪$/)).toBeOnTheScreen();
+    });
+
+    it('shows how soon the nearest deadline is on a pill: in days within the week, then the date', async () => {
+      await addAnalyzed('notice', dueIn(ANALYSIS_FIXTURES.officialNotice, 2));
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 40));
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      const today = localCalendarDate(new Date());
+      expect(await screen.findByText('2 days')).toBeOnTheScreen();
+      expect(
+        screen.getByText(formatShortCalendarDate(addDays(today, 40), today, 'en'))
+      ).toBeOnTheScreen();
     });
 
     it('says when the nearest deadline has passed', async () => {
@@ -180,24 +193,6 @@ describe('DocumentListScreen', () => {
       expect(screen).toHavePathname('/documents/doc-1');
       expect(await screen.findByRole('heading', { name: 'Счёт за газ' })).toBeOnTheScreen();
     });
-
-    it('opens the choice of source from «Add» (CAP-1)', async () => {
-      const user = userEvent.setup();
-      await addDocument('doc-1', 'Счёт за газ');
-      await renderRouter(
-        {
-          index: DocumentListScreen,
-          'capture/_layout': CaptureLayout,
-          'capture/index': CaptureRoute,
-        },
-        { initialUrl: '/', wrapper: createTestProviders() }
-      );
-
-      await user.press(await screen.findByRole('button', { name: 'Add a document' }));
-
-      expect(screen).toHavePathname('/capture');
-      expect(await screen.findByRole('button', { name: 'Scan' })).toBeOnTheScreen();
-    });
   });
 
   describe('«Needs attention» (HOME-1)', () => {
@@ -212,7 +207,10 @@ describe('DocumentListScreen', () => {
 
       expect(await screen.findByRole('heading', { name: 'Needs attention' })).toBeOnTheScreen();
       const rows = listRows();
-      const cards = screen.getAllByRole('link').filter((link) => !rows.includes(link));
+      const opens = screen.getAllByRole('link', { name: /^Open document/ });
+      const cards = screen
+        .getAllByRole('link')
+        .filter((link) => !rows.includes(link) && !opens.includes(link));
       expect(cards).toHaveLength(4);
       expect(cards[0]).toHaveAccessibleName(new RegExp(`^${INVOICE}, Overdue · .+, Оплатить`));
       expect(cards[1]).toHaveAccessibleName(
@@ -272,6 +270,34 @@ describe('DocumentListScreen', () => {
       expect(screen.queryByRole('heading', { name: 'Needs attention' })).not.toBeOnTheScreen();
     });
 
+    it('leads with the nearest deadline: «Overdue», the days, the date and «Open document»', async () => {
+      const user = userEvent.setup();
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, -2));
+      await renderRouter(
+        { index: DocumentListScreen, 'documents/[id]': DocumentRoute },
+        { initialUrl: '/', wrapper: createTestProviders() }
+      );
+
+      expect(await screen.findByText('Nearest deadline')).toBeOnTheScreen();
+      // In words with an icon in the corner, and again by the big number.
+      expect(screen.getAllByText('Overdue').length).toBeGreaterThan(0);
+      expect(screen.getByText('days overdue')).toBeOnTheScreen();
+      expect(screen.getByText(/^was due [A-Z][a-z]{2} \d{1,2}, [A-Z][a-z]{2}$/)).toBeOnTheScreen();
+
+      await user.press(screen.getByRole('link', { name: `Open document “${INVOICE}”` }));
+
+      expect(screen).toHavePathname('/documents/invoice');
+    });
+
+    it('calls a deadline in 3 days or fewer «Soon»', async () => {
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 3));
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByText('Soon')).toBeOnTheScreen();
+      expect(screen.getByText('days left')).toBeOnTheScreen();
+    });
+
     it('opens the document from its card', async () => {
       const user = userEvent.setup();
       await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 1));
@@ -314,7 +340,7 @@ describe('DocumentListScreen', () => {
 
       await user.type(search, 'stadtwerke');
       expect(
-        await screen.findByRole('link', { name: new RegExp(`^${INVOICE}, .*Analyzed · Germany$`) })
+        await screen.findByRole('link', { name: new RegExp(`^${INVOICE}, .* · Germany$`) })
       ).toBeOnTheScreen();
       expect(listRows()).toHaveLength(1);
 

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { AccessibilityInfo, Pressable, StyleSheet } from 'react-native';
+import { AccessibilityInfo, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { AnalysisResult } from '@/shared/analysis/schema';
@@ -19,7 +20,7 @@ type KeyFact = AnalysisResult['keyFacts'][number];
  * «Copied», on screen and to screen readers. The value is never trimmed: the server drops a fact
  * that runs too long rather than cut an IBAN short (SPEC §7.4).
  */
-export function KeyFactRow({ fact }: { fact: KeyFact }) {
+function KeyFactRow({ fact }: { fact: KeyFact }) {
   const theme = useTheme();
   const { t } = useTranslation();
   const [copied, setCopied] = useState(false);
@@ -53,27 +54,74 @@ export function KeyFactRow({ fact }: { fact: KeyFact }) {
       onLongPress={copy}
       style={({ pressed }) => [
         styles.row,
-        { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
+        pressed && { backgroundColor: theme.backgroundSelected },
       ]}>
-      <ThemedText type="small" themeColor="textSecondary">
+      <ThemedText type="small" themeColor="textSecondary" style={styles.label}>
         {fact.label}
       </ThemedText>
-      <ThemedText type="default">{fact.value}</ThemedText>
-      {copied && (
-        <ThemedText type="smallBold" themeColor="tint">
-          {t('documents.keyFact.copied')}
+      <View style={styles.value}>
+        <ThemedText type="code" style={styles.valueText}>
+          {fact.value}
         </ThemedText>
-      )}
+        {copied && (
+          <ThemedText type="smallBold" themeColor="tint">
+            {t('documents.keyFact.copied')}
+          </ThemedText>
+        )}
+      </View>
     </Pressable>
   );
 }
 
+/**
+ * «Key facts» in one card (DET-6): a row per fact, label on the left and value on the right, with a
+ * line between them. A value that doesn't fit beside its label goes under it.
+ */
+export function KeyFacts({ facts }: { facts: readonly KeyFact[] }) {
+  const theme = useTheme();
+  return (
+    <ThemedView type="backgroundElement" style={styles.card}>
+      {facts.map((fact, index) => (
+        <View key={index}>
+          {index > 0 && <View style={[styles.divider, { backgroundColor: theme.border }]} />}
+          <KeyFactRow fact={fact} />
+        </View>
+      ))}
+    </ThemedView>
+  );
+}
+
 const styles = StyleSheet.create({
-  row: {
-    minHeight: MinTouchTarget,
-    gap: Spacing.half,
-    paddingHorizontal: Spacing.three,
-    paddingVertical: Spacing.two,
+  card: {
     borderRadius: Radius.card,
+    overflow: 'hidden',
+  },
+  row: {
+    minHeight: MinTouchTarget + Spacing.one,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    columnGap: Spacing.three,
+    rowGap: Spacing.half,
+    paddingHorizontal: Spacing.three,
+    paddingVertical: Spacing.two + Spacing.half,
+  },
+  label: {
+    flexShrink: 1,
+  },
+  value: {
+    flexGrow: 1,
+    flexShrink: 1,
+    alignItems: 'flex-end',
+  },
+  valueText: {
+    fontSize: 14,
+    lineHeight: 20,
+    textAlign: 'right',
+  },
+  divider: {
+    height: StyleSheet.hairlineWidth,
+    marginHorizontal: Spacing.three,
   },
 });

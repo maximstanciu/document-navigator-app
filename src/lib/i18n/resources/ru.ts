@@ -35,7 +35,6 @@ export const ru = {
   },
   documents: {
     title: 'Документы',
-    add: 'Добавить',
     addDocument: 'Добавить документ',
     loadingList: 'Загружаем документы',
     loadingOne: 'Загружаем документ',
@@ -110,6 +109,14 @@ export const ru = {
       daysOverdue_few: 'дня просрочки',
       daysOverdue_many: 'дней просрочки',
       daysOverdue_other: 'дня просрочки',
+      // The card of the nearest deadline: its label, «Скоро» when 3 days or fewer are left, the date
+      // next to the big number («до 16 нояб., пн») and the button that opens the document.
+      nearest: 'Ближайший срок',
+      soon: 'Скоро',
+      dueOn: 'до {{date}}, {{weekday}}',
+      wasDue: 'срок был {{date}}, {{weekday}}',
+      open: 'Открыть документ',
+      openLabel: 'Открыть документ «{{title}}»',
     },
     untitled: 'Документ без названия',
     notFoundTitle: 'Документ не найден',
@@ -186,6 +193,11 @@ export const ru = {
       due: 'До {{date}}',
       dueAt: 'До {{date}}, {{time}}',
       overdue: 'Просрочено',
+      // Как скоро, на плашке строки в списке документов: «3 дня».
+      inDaysShort_one: '{{count}} день',
+      inDaysShort_few: '{{count}} дня',
+      inDaysShort_many: '{{count}} дней',
+      inDaysShort_other: '{{count}} дня',
       computed: 'Рассчитано: {{computation}}',
       checkOriginal: 'Проверьте эту дату по оригиналу.',
       changedByYou: 'Дату изменили вы.',

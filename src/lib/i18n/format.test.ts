@@ -1,8 +1,10 @@
 import {
   formatCalendarDate,
+  formatCalendarWeekday,
   formatClockTime,
   formatDateTile,
   formatFileSize,
+  formatShortCalendarDate,
   formatTimestampDate,
   formatWeekdayDate,
 } from './format';
@@ -24,6 +26,17 @@ describe('date formatting', () => {
       day: '1',
       month: expect.stringMatching(/^янв/),
     });
+  });
+
+  it('leaves out the year of a date in the current year', () => {
+    expect(formatShortCalendarDate('2026-11-27', '2026-11-14', 'en')).toBe('Nov 27');
+    expect(formatShortCalendarDate('2026-11-27', '2026-11-14', 'ru')).toMatch(/^27 нояб\.?$/);
+    expect(formatShortCalendarDate('2027-01-03', '2026-11-14', 'en')).toBe('Jan 3, 2027');
+  });
+
+  it('names the weekday of a calendar date in any time zone', () => {
+    expect(formatCalendarWeekday('2026-11-16', 'en')).toBe('Mon');
+    expect(formatCalendarWeekday('2026-11-16', 'ru')).toBe('пн');
   });
 
   it('names the weekday with today on top of a tab', () => {

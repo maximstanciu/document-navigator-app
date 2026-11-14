@@ -13,7 +13,7 @@ import { DeadlineCard, DismissedDeadline, UndatedActions } from './deadline-card
 import { DetailSection } from './detail-section';
 import { FraudWarning } from './fraud-warning';
 import { InlineError } from './inline-error';
-import { KeyFactRow } from './key-fact-row';
+import { KeyFacts } from './key-fact-row';
 import { QualityNotice } from './quality-notice';
 import { RiskItem } from './risk-item';
 
@@ -129,9 +129,7 @@ export function DocumentResult({
       )}
       {analysis.keyFacts.length > 0 && (
         <DetailSection title={t('documents.section.keyFacts')}>
-          {analysis.keyFacts.map((fact, index) => (
-            <KeyFactRow key={index} fact={fact} />
-          ))}
+          <KeyFacts facts={analysis.keyFacts} />
         </DetailSection>
       )}
     </View>

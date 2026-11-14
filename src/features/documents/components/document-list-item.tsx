@@ -1,3 +1,4 @@
+import type { TFunction } from 'i18next';
 import { Link } from 'expo-router';
 import { SymbolView, type SymbolViewProps } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
@@ -6,10 +7,13 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import { formatDueIn } from '@/features/deadlines/format';
+import { THIS_WEEK_DAYS } from '@/features/deadlines/timeline';
 import { useTheme } from '@/hooks/use-theme';
 import { countryFlag, countryName } from '@/lib/i18n/display-names';
-import { formatCalendarDate } from '@/lib/i18n/format';
+import { formatCalendarDate, formatShortCalendarDate } from '@/lib/i18n/format';
 import type { DocumentType } from '@/shared/analysis/schema';
+import { daysBetween } from '@/shared/calendar-date';
 
 import { displayTitle, formatDocumentType, formatMeta } from '../format';
 import type { DeadlineSummary, DocumentSummary } from '../types';
@@ -35,6 +39,22 @@ const TYPE_ICONS: Record<DocumentType, SymbolViewProps['name']> = {
   unknown: PLAIN_DOCUMENT,
 };
 
+/** Within this many days, or overdue, the deadline's pill is tinted; its words say how soon. */
+const URGENT_DAYS = 3;
+
+/**
+ * The pill on the right of a row: «Просрочено», «Сегодня», «Завтра», «3 дня» within the week, the
+ * date after it.
+ */
+function duePill(deadline: DeadlineSummary, today: string, t: TFunction, language: string) {
+  const days = daysBetween(today, deadline.dueDate);
+  let text: string;
+  if (days < 2) text = formatDueIn(deadline.dueDate, today, t);
+  else if (days < THIS_WEEK_DAYS) text = t('documents.deadline.inDaysShort', { count: days });
+  else text = formatShortCalendarDate(deadline.dueDate, today, language);
+  return { text, urgent: days <= URGENT_DAYS };
+}
+
 type DocumentListItemProps = {
   document: DocumentSummary;
   /** Its nearest open deadline, if it has one. */
@@ -46,8 +66,9 @@ type DocumentListItemProps = {
 };
 
 /**
- * A document in the list (HOME-2): title, type, sender, nearest deadline, analysis status, the
- * flag of its country (DET-11), and its case (CASE-3).
+ * A document in the list (HOME-2): title, type and sender, the nearest deadline on a pill to the
+ * right, when it was added, its pages, the analysis status until it is analyzed, the flag of its
+ * country (DET-11), and its case (CASE-3). A screen reader hears the deadline's full date.
  */
 export function DocumentListItem({
   document,
@@ -63,6 +84,7 @@ export function DocumentListItem({
     .join(' · ');
   let dueLine: string | null = null;
   const overdue = nearestDeadline !== undefined && nearestDeadline.dueDate < today;
+  const pill = nearestDeadline && duePill(nearestDeadline, today, t, i18n.language);
   if (nearestDeadline) {
     const date = formatCalendarDate(nearestDeadline.dueDate, i18n.language);
     const due = nearestDeadline.dueTime
@@ -101,20 +123,9 @@ export function DocumentListItem({
                 {title}
               </ThemedText>
               {from !== '' && (
-                <ThemedText type="small" numberOfLines={1}>
+                <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                   {from}
                 </ThemedText>
-              )}
-              {dueLine && (
-                // A pill, tinted when overdue; «overdue» is in its words too.
-                <ThemedView type={overdue ? 'riskHighBackground' : 'background'} style={styles.due}>
-                  <ThemedText
-                    type="code"
-                    themeColor={overdue ? 'riskHigh' : 'text'}
-                    style={styles.dueText}>
-                    {dueLine}
-                  </ThemedText>
-                </ThemedView>
               )}
               <ThemedText type="small" themeColor="textSecondary">
                 {metaLine}
@@ -132,6 +143,19 @@ export function DocumentListItem({
                 </View>
               )}
             </View>
+            {pill && (
+              // Tinted when it is near or has passed; the words say so too.
+              <ThemedView
+                type={pill.urgent ? 'riskHighBackground' : 'background'}
+                style={styles.due}>
+                <ThemedText
+                  type="code"
+                  themeColor={pill.urgent ? 'riskHigh' : 'text'}
+                  style={styles.dueText}>
+                  {pill.text}
+                </ThemedText>
+              </ThemedView>
+            )}
           </ThemedView>
         )}
       </Pressable>
@@ -143,7 +167,7 @@ const styles = StyleSheet.create({
   row: {
     minHeight: MinTouchTarget,
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: Spacing.three - Spacing.one,
     borderRadius: Radius.card,
     gap: Spacing.three - Spacing.one,
@@ -157,15 +181,14 @@ const styles = StyleSheet.create({
   },
   text: {
     flex: 1,
-    gap: Spacing.one,
+    gap: Spacing.half,
     paddingVertical: Spacing.half,
   },
   due: {
-    alignSelf: 'flex-start',
+    flexShrink: 0,
     paddingHorizontal: Spacing.two + Spacing.half,
-    paddingVertical: Spacing.one,
-    borderRadius: Radius.pill,
-    marginVertical: Spacing.half,
+    paddingVertical: Spacing.one + Spacing.half,
+    borderRadius: Radius.tile - Spacing.half,
   },
   dueText: {
     lineHeight: 16,

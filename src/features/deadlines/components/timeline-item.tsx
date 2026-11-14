@@ -7,13 +7,27 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import { MinTouchTarget, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
 import { formatCalendarDate, formatDateTile } from '@/lib/i18n/format';
 
 import { formatDueIn } from '../format';
+import { timelineGroupOf, type TimelineGroupKey } from '../timeline';
 import { AddToCalendarButton } from './add-to-calendar-button';
+
+/**
+ * The date tile steps down with distance: overdue on the ground with the month in the risk color,
+ * this week in ink on light (light on dark), later muted.
+ */
+const TILE_COLORS: Record<
+  TimelineGroupKey,
+  { background: ThemeColor; day: ThemeColor; month: ThemeColor }
+> = {
+  overdue: { background: 'background', day: 'text', month: 'riskHigh' },
+  thisWeek: { background: 'text', day: 'background', month: 'background' },
+  later: { background: 'backgroundSelected', day: 'text', month: 'textSecondary' },
+};
 
 type TimelineItemProps = {
   deadline: DeadlineRecord;
@@ -49,6 +63,7 @@ export function TimelineItem({
   const date = formatCalendarDate(deadline.dueDate, i18n.language);
   const tile = formatDateTile(deadline.dueDate, i18n.language);
   const overdue = deadline.dueDate < today;
+  const tileColors = TILE_COLORS[timelineGroupOf(deadline.dueDate, today)];
   // With actions the deadline gets no checkbox of its own; its description still says what it is,
   // unless its only action says the same.
   const describe =
@@ -60,14 +75,11 @@ export function TimelineItem({
     <ThemedView type={overdue ? 'riskHighBackground' : 'backgroundElement'} style={styles.card}>
       <View style={styles.header}>
         {/* The day and month again, large: the line next to it says the date in full. */}
-        <ThemedView type={overdue ? 'background' : 'tint'} style={styles.tile} aria-hidden>
-          <ThemedText
-            type="subtitle"
-            themeColor={overdue ? 'text' : 'onTint'}
-            style={styles.tileDay}>
+        <ThemedView type={tileColors.background} style={styles.tile} aria-hidden>
+          <ThemedText type="subtitle" themeColor={tileColors.day} style={styles.tileDay}>
             {tile.day}
           </ThemedText>
-          <ThemedText type="label" themeColor={overdue ? 'riskHigh' : 'onTint'}>
+          <ThemedText type="label" themeColor={tileColors.month}>
             {tile.month}
           </ThemedText>
         </ThemedView>
