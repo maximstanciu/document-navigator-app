@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "336418762139",
+    "project_id": "document-navigadocnavigatortor",
+    "storage_bucket": "document-navigadocnavigatortor.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:336418762139:android:05fcc63aa6f784519a853e",
+        "android_client_info": {
+          "package_name": "com.stanciu.docnavigator"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyA7TWSgAYKF0Wt6HZ3tspLYxPtwiW4ZQZ4"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

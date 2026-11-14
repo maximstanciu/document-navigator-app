@@ -34,6 +34,10 @@ yarn-error.*
 .env*.local
 deploy/.env
 
+# Firebase service account keys (FCM V1, uploaded to EAS credentials): secrets, never commit.
+# google-services.json holds only public identifiers and is committed.
+*-firebase-adminsdk-*.json
+
 # typescript
 *.tsbuildinfo
 
