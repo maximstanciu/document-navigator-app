@@ -21,12 +21,18 @@ import { ThemedText } from './themed-text';
 
 type Icon = SymbolViewProps['name'];
 
+// The design's icons: a page with a folded corner, a clock, two sliders (SF Symbols has only three),
+// and a viewfinder with a plus. Material Symbols has no viewfinder with a plus: `AddIcon` draws the
+// plus inside the bare frame.
 const ICONS = {
-  documents: { ios: 'doc.text', android: 'description', web: 'description' },
+  documents: { ios: 'doc', android: 'draft', web: 'draft' },
   deadlines: { ios: 'clock', android: 'schedule', web: 'schedule' },
-  settings: { ios: 'slider.horizontal.3', android: 'tune', web: 'tune' },
-  add: { ios: 'doc.viewfinder', android: 'document_scanner', web: 'document_scanner' },
+  settings: { ios: 'slider.horizontal.3', android: 'page_info', web: 'page_info' },
+  add: { ios: 'plus.viewfinder', android: 'crop_free', web: 'crop_free' },
 } as const satisfies Record<string, Icon>;
+
+/** Each tab's width in the design; a tab narrows on a phone too narrow for all of them. */
+const TAB_WIDTH = { documents: 88, deadlines: 72, settings: 88 } as const;
 
 /**
  * The tabs (SPEC §5): a bar floating over the bottom of every tab, the same on iOS, Android and
@@ -41,14 +47,20 @@ export default function AppTabs() {
       <TabList asChild>
         <TabBar>
           <TabTrigger name="index" href="/" asChild>
-            <TabButton icon={ICONS.documents}>{t('tabs.documents')}</TabButton>
+            <TabButton icon={ICONS.documents} width={TAB_WIDTH.documents}>
+              {t('tabs.documents')}
+            </TabButton>
           </TabTrigger>
           <TabTrigger name="deadlines" href="/deadlines" asChild>
-            <TabButton icon={ICONS.deadlines}>{t('tabs.deadlines')}</TabButton>
+            <TabButton icon={ICONS.deadlines} width={TAB_WIDTH.deadlines}>
+              {t('tabs.deadlines')}
+            </TabButton>
           </TabTrigger>
           <AddDocumentTab />
           <TabTrigger name="settings" href="/settings" asChild>
-            <TabButton icon={ICONS.settings}>{t('tabs.settings')}</TabButton>
+            <TabButton icon={ICONS.settings} width={TAB_WIDTH.settings}>
+              {t('tabs.settings')}
+            </TabButton>
           </TabTrigger>
         </TabBar>
       </TabList>
@@ -106,9 +118,10 @@ function TabButton({
   children,
   isFocused = false,
   icon,
+  width,
   ref,
   ...props
-}: TabTriggerSlotProps & { icon: Icon }) {
+}: TabTriggerSlotProps & { icon: Icon; width: number }) {
   const theme = useTheme();
   const color = isFocused ? theme.text : theme.textSecondary;
 
@@ -121,6 +134,7 @@ function TabButton({
       aria-selected={isFocused}
       style={({ pressed }) => [
         styles.tab,
+        { flexBasis: width },
         isFocused && { backgroundColor: theme.background },
         pressed && styles.pressed,
       ]}>
@@ -149,12 +163,31 @@ function AddDocumentTab() {
         { backgroundColor: theme.tint },
         pressed && styles.pressed,
       ]}>
-      <SymbolView name={ICONS.add} size={24} tintColor={theme.onTint} />
+      <AddIcon color={theme.onTint} />
     </Pressable>
   );
 }
 
+/** A viewfinder with a plus: SF Symbols has it; on Android and web the plus is drawn in the frame. */
+function AddIcon({ color }: { color: string }) {
+  return (
+    <View style={styles.addIcon}>
+      <SymbolView name={ICONS.add} size={ADD_ICON_SIZE} tintColor={color} />
+      {process.env.EXPO_OS !== 'ios' && (
+        <>
+          <View style={[styles.plus, styles.plusAcross, { backgroundColor: color }]} />
+          <View style={[styles.plus, styles.plusDown, { backgroundColor: color }]} />
+        </>
+      )}
+    </View>
+  );
+}
+
 const ADD_SIZE = 56;
+const ADD_ICON_SIZE = 24;
+// The plus inside the frame: as long and as thick as the design's at this icon size.
+const PLUS_LENGTH = 8;
+const PLUS_THICKNESS = 2;
 const TAB_HEIGHT = 52;
 
 const styles = StyleSheet.create({
@@ -185,12 +218,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   tab: {
-    minWidth: 72,
+    flexShrink: 1,
+    minWidth: 0,
     height: TAB_HEIGHT,
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.half,
-    paddingHorizontal: Spacing.two,
+    // Little side padding: the design's widths are tight for «Deadlines» in English.
+    paddingHorizontal: Spacing.one,
     borderRadius: Radius.pill,
   },
   tabLabel: {
@@ -208,6 +243,24 @@ const styles = StyleSheet.create({
     borderRadius: ADD_SIZE / 2,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  addIcon: {
+    width: ADD_ICON_SIZE,
+    height: ADD_ICON_SIZE,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  plus: {
+    position: 'absolute',
+    borderRadius: PLUS_THICKNESS / 2,
+  },
+  plusAcross: {
+    width: PLUS_LENGTH,
+    height: PLUS_THICKNESS,
+  },
+  plusDown: {
+    width: PLUS_THICKNESS,
+    height: PLUS_LENGTH,
   },
   pressed: {
     opacity: 0.7,
