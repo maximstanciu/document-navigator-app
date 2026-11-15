@@ -21,6 +21,8 @@ describe('migrate', () => {
       'analysis_job_deletions',
       'cases',
       'deadlines',
+      'document_link_dismissals',
+      'document_refs',
       'documents',
       'pages',
       'scheduled_notifications',

@@ -44,7 +44,7 @@ function WarningBadge({
 }
 
 /** «In 3 days · 21 Oct 2026»: how soon, and when exactly. */
-function dueText(deadline: DeadlineSummary, today: string, t: TFunction, language: string) {
+export function dueText(deadline: DeadlineSummary, today: string, t: TFunction, language: string) {
   const date = formatCalendarDate(deadline.dueDate, language);
   return {
     when: formatDueIn(deadline.dueDate, today, t),
@@ -53,7 +53,8 @@ function dueText(deadline: DeadlineSummary, today: string, t: TFunction, languag
   };
 }
 
-function DueLine({ deadline, today }: { deadline: DeadlineSummary; today: string }) {
+/** A deadline as a card names it: how soon and when, then what to do (HOME-1, LINK-3). */
+export function DueLine({ deadline, today }: { deadline: DeadlineSummary; today: string }) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
   const { when, date, overdue } = dueText(deadline, today, t, i18n.language);

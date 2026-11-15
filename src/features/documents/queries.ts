@@ -6,11 +6,13 @@ import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 import {
   deleteDocument,
   dismissAttention,
+  dismissRelatedDocument,
   getDocument,
   getDocumentPages,
   listDocumentActions,
   listDocumentDeadlines,
   listDocuments,
+  listRelatedDocuments,
   renameDocument,
   searchDocuments,
 } from './api';
@@ -38,6 +40,13 @@ export const documentQueries = {
       queryFn: () => getDocument(id),
       ...localQueryDefaults,
     }),
+  /** Under the documents' keys: a new analysis, a case or a deletion changes what is related. */
+  related: (id: string) =>
+    queryOptions({
+      queryKey: dbKeys.documents.related(id),
+      queryFn: () => listRelatedDocuments(id),
+      ...localQueryDefaults,
+    }),
   pages: (id: string) =>
     queryOptions({
       queryKey: dbKeys.pages.byDocument(id),
@@ -63,6 +72,16 @@ export function useDismissAttention() {
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn: dismissAttention,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
+  });
+}
+
+/** «Not related» on the row of a related document (LINK-4): it goes from both documents' screens. */
+export function useDismissRelatedDocument() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, relatedId }: { id: string; relatedId: string }) =>
+      dismissRelatedDocument(id, relatedId),
     onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
   });
 }

@@ -810,6 +810,8 @@ describe('documents repository', () => {
       for (const table of [
         'analysis_job_deletions',
         'documents',
+        'document_refs',
+        'document_link_dismissals',
         'pages',
         'deadlines',
         'actions',

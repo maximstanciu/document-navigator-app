@@ -3,6 +3,7 @@ import type {
   DeadlineRecord,
   DocumentRecord,
   DocumentSummaryRecord,
+  RelatedDocumentRecord,
 } from '@/lib/db/types';
 
 /**
@@ -23,6 +24,11 @@ export type DocumentDetail = DocumentSummary &
     DocumentRecord,
     'documentDate' | 'mimeType' | 'errorCode' | 'fileSize' | 'analysis' | 'legalMemoCountry'
   >;
+
+/**
+ * A document that carries a number of this one (LINK-2), on a row of «Related documents» (LINK-3).
+ */
+export type RelatedDocument = RelatedDocumentRecord;
 
 /** A page of the original. `uri` is `null` when its file is gone from the device (STO-8). */
 export type DocumentPage = { id: string; index: number; uri: string | null };

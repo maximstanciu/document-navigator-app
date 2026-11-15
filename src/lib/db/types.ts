@@ -69,6 +69,18 @@ export type DocumentSummaryRecord = Pick<
   country: string | null;
 };
 
+/**
+ * A document related to another by a number both carry (LINK-2), as the other's screen lists it
+ * (LINK-3).
+ */
+export type RelatedDocumentRecord = Pick<
+  DocumentRecord,
+  'id' | 'title' | 'documentDate' | 'createdAt' | 'caseId'
+> & {
+  /** The shared number, normalized (LINK-1). */
+  sharedNumber: string;
+};
+
 /** Documents about one matter, grouped by the person: «Квартира», «Налоги 2026» (CASE-1). */
 export type CaseRecord = {
   id: string;

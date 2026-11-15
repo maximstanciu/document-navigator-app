@@ -231,6 +231,15 @@ export const ru = {
       page: 'Страница {{number}}',
       pageMissing: 'Страница {{number}} недоступна',
     },
+    // Documents that carry the same contract, invoice or case number (LINK-3, LINK-4).
+    related: {
+      title: 'Связанные документы',
+      sharedNumber: 'Общий номер: {{number}}',
+      allDone: 'Всё отмечено сделанным',
+      notRelated: 'Не связано',
+      notRelatedLabel: 'Не связано с документом «{{title}}»',
+      notRelatedFailed: 'Не удалось сохранить. Попробуйте ещё раз.',
+    },
   },
   cases: {
     title: 'Дела',
@@ -293,6 +302,14 @@ export const ru = {
       submitNone: 'Добавить',
       allInCase: 'Все документы уже в этом деле',
       failed: 'Не удалось добавить документы. Попробуйте ещё раз.',
+    },
+    // The case button on the row of a related document (LINK-4): this document goes to the case
+    // of the related one, or the related one comes to the case of this document.
+    related: {
+      moveHere: 'В дело «{{name}}»',
+      addRelated: 'Добавить в «{{name}}»',
+      addRelatedLabel: 'Добавить «{{title}}» в дело «{{name}}»',
+      newCaseLabel: 'Новое дело с документом «{{title}}»',
     },
   },
   deadlines: {

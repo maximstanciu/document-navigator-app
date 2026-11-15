@@ -739,12 +739,14 @@ describe('DocumentDetailScreen', () => {
 
       await user.press(await screen.findByRole('button', { name: 'Analyze the document' }));
 
+      // The card lists 14 days ahead, not the day after.
+      expect(await screen.findByText(/^Reminders: Oct 26, .* · Nov 9, [^·]*$/)).toBeOnTheScreen();
       // A submission and a response: 14, 7, 1 and 0 days before (REM-14) and the day after (REM-13).
+      // Last: under fake timers a `waitFor` with an async callback can resolve with its `act()`
+      // still in flight, and a query after it that has to wait would overlap that `act()`.
       await waitFor(async () =>
         expect(await remindersByDueDate()).toEqual({ '2026-11-06': 5, '2026-11-09': 5 })
       );
-      // The card lists 14 days ahead, not the day after.
-      expect(await screen.findByText(/^Reminders: Oct 26, .* · Nov 9, [^·]*$/)).toBeOnTheScreen();
     });
 
     it('cancels them for «Not relevant» and «Done», and brings them back on «Restore»', async () => {

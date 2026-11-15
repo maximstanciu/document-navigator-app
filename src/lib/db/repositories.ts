@@ -68,6 +68,8 @@ const ALL_TABLES = [
   'actions',
   'deadlines',
   'pages',
+  'document_link_dismissals',
+  'document_refs',
   'documents',
   'cases',
   'settings',

@@ -45,6 +45,12 @@ describe('Button', () => {
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
+  it('keeps its label as the name when the accessible name is left undefined', async () => {
+    await render(<Button label="Save" aria-label={undefined} onPress={jest.fn()} />);
+
+    expect(screen.getByRole('button', { name: 'Save' })).toHaveProp('accessibilityLabel', 'Save');
+  });
+
   it('widens its touch area sideways only, so a wrapped row of buttons does not overlap', async () => {
     await render(<Button label="OK" variant="plain" onPress={jest.fn()} />);
 

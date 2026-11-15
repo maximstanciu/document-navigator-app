@@ -16,16 +16,26 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 /**
  * «New case» (CASE-1), a modal with the name at the top, clear of the keyboard. The new case opens
  * in its place. Started from a document's screen (`documentId`), the document is filed in it and
- * the modal goes back to the document (CASE-2).
+ * the modal goes back to the document (CASE-2); started from the row of a document related to it
+ * (`withDocumentId`), both are filed, in one transaction (LINK-4).
  */
-export function NewCaseScreen({ documentId }: { documentId?: string }) {
+export function NewCaseScreen({
+  documentId,
+  withDocumentId,
+}: {
+  documentId?: string;
+  withDocumentId?: string;
+}) {
   const theme = useTheme();
   const { t } = useTranslation();
   const create = useCreateCase();
 
   const save = (name: string) =>
     create.mutate(
-      { name, documentIds: documentId ? [documentId] : [] },
+      {
+        name,
+        documentIds: documentId ? [documentId, ...(withDocumentId ? [withDocumentId] : [])] : [],
+      },
       {
         onSuccess: (id) => {
           if (documentId) leave();

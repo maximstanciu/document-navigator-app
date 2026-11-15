@@ -1,6 +1,7 @@
 import { openDatabaseAsync } from 'expo-sqlite';
 
 import { fromExpoDatabase, type SqlDatabase } from './database';
+import { backfillDocumentRefs } from './document-refs';
 import { migrate } from './migrations';
 import { createRepositories, purgeTombstones, setRepositories } from './repositories';
 
@@ -18,6 +19,8 @@ export async function openAppDatabase(): Promise<SqlDatabase> {
   await db.execAsync('PRAGMA foreign_keys = ON');
   await migrate(db);
   await purgeTombstones(db, new Date(Date.now() - TOMBSTONE_RETENTION_DAYS * 24 * 60 * 60 * 1000));
+  // The numbers of analyses stored before migration 7, once (LINK-1).
+  await backfillDocumentRefs(db);
   const repositories = createRepositories(db);
   // An analysis left by a version of the app before jobs has lost its request (ANL-4); one with a
   // job is asked about on the server once the app runs.

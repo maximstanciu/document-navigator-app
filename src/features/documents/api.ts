@@ -4,7 +4,7 @@ import type { DocumentRecord } from '@/lib/db/types';
 import { deleteDocumentFiles, pageFileExists, pageFileUri } from '@/lib/files/page-files';
 import { ANALYSIS_BOUNDS } from '@/shared/analysis/schema';
 
-import type { DocumentDetail, DocumentPage, DocumentSummary } from './types';
+import type { DocumentDetail, DocumentPage, DocumentSummary, RelatedDocument } from './types';
 
 /**
  * Data access for the documents feature: reads local documents through the repositories in
@@ -80,6 +80,19 @@ export async function getDocument(id: string): Promise<DocumentDetail | null> {
     analysis: document.analysis,
     legalMemoCountry: document.legalMemoCountry,
   };
+}
+
+/**
+ * The documents that share a contract, invoice or case number with this one (LINK-2), newest first,
+ * three at most (LINK-3). Found on the device each time: nothing about it leaves the phone.
+ */
+export function listRelatedDocuments(id: string): Promise<RelatedDocument[]> {
+  return getRepositories().documents.listRelated(id);
+}
+
+/** «Not related» (LINK-4): the two documents stop showing each other, after a new analysis too. */
+export function dismissRelatedDocument(id: string, relatedId: string): Promise<void> {
+  return getRepositories().documents.dismissLink(id, relatedId);
 }
 
 /** The pages of the original in order, each with its file or `null` if it is gone (STO-8). */

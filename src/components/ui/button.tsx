@@ -17,7 +17,13 @@ export type ButtonProps = Omit<PressableProps, 'children' | 'style'> & {
   variant?: 'primary' | 'secondary' | 'plain' | 'destructive' | 'inverse' | 'inverseOutline';
 };
 
-export function Button({ label, variant = 'primary', disabled, ...rest }: ButtonProps) {
+export function Button({
+  label,
+  variant = 'primary',
+  disabled,
+  'aria-label': accessibleName,
+  ...rest
+}: ButtonProps) {
   const theme = useTheme();
   const background = {
     primary: theme.tint,
@@ -39,7 +45,9 @@ export function Button({ label, variant = 'primary', disabled, ...rest }: Button
   return (
     <Pressable
       role="button"
-      aria-label={label}
+      // An `aria-label` passed as `undefined` (a name given only in some cases) must not take the
+      // name away: on web the button would have none.
+      aria-label={accessibleName ?? label}
       aria-disabled={disabled ?? undefined}
       disabled={disabled}
       // Sideways only: `minHeight` already makes it 44 pt tall, and a slop above and below would

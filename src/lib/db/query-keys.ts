@@ -13,6 +13,7 @@ export const dbKeys = {
     search: (query: string) => [...dbKeys.documents.all(), 'search', query] as const,
     titles: () => [...dbKeys.documents.all(), 'titles'] as const,
     detail: (id: string) => [...dbKeys.documents.all(), 'detail', id] as const,
+    related: (id: string) => [...dbKeys.documents.all(), 'related', id] as const,
   },
   cases: {
     all: () => ['db', 'cases'] as const,

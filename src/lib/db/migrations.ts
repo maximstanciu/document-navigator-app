@@ -137,6 +137,29 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 6,
     statements: [`ALTER TABLE deadlines ADD COLUMN snoozed_until TEXT`],
   },
+  {
+    // Related documents (LINK-1…LINK-5). `document_refs`: the numbers of a document's analysis,
+    // normalized, with its sender; derived from the analysis, so no tombstones. Analyses stored
+    // before this are filled by `backfillDocumentRefs()`: SQL can't normalize a number.
+    // `document_link_dismissals`: «Not related», the pair's ids in ascending order.
+    version: 7,
+    statements: [
+      `CREATE TABLE document_refs (
+        document_id TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+        value TEXT NOT NULL,
+        sender_key TEXT,
+        PRIMARY KEY (document_id, value)
+      )`,
+      `CREATE INDEX document_refs_value ON document_refs (value)`,
+      `CREATE TABLE document_link_dismissals (
+        document_id_a TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+        document_id_b TEXT NOT NULL REFERENCES documents (id) ON DELETE CASCADE,
+        created_at TEXT NOT NULL,
+        PRIMARY KEY (document_id_a, document_id_b)
+      )`,
+      `CREATE INDEX document_link_dismissals_b ON document_link_dismissals (document_id_b)`,
+    ],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

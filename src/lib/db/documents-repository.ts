@@ -3,6 +3,8 @@ import { queueJobDeletion } from './analysis-job-deletions-repository';
 import { fileDocuments } from './cases-repository';
 import type { SqlDatabase } from './database';
 import { insertDeadline, type NewDeadline } from './deadlines-repository';
+import { replaceDocumentRefs } from './document-refs';
+import { selectLinks } from './matter-numbers';
 import type { NewPage } from './pages-repository';
 import { buildSearchText, normalizeForSearch, searchablePartsOfAnalysis } from './search-text';
 import {
@@ -14,7 +16,7 @@ import {
   type Clock,
 } from './sql';
 import { mergeReanalysis, type ExistingAction, type ExistingDeadline } from './merge-reanalysis';
-import type { DocumentRecord, DocumentSummaryRecord } from './types';
+import type { DocumentRecord, DocumentSummaryRecord, RelatedDocumentRecord } from './types';
 
 type DocumentRow = {
   id: string;
@@ -202,6 +204,9 @@ export type AnalysisFailure = {
 /** Statuses an analysis can start from (SPEC §6.3): a `ready` document is analyzed again (ANL-8). */
 const ANALYZABLE = `('draft', 'failed', 'ready')`;
 
+/** How many related documents a document's screen lists (LINK-3). */
+export const MAX_RELATED_DOCUMENTS = 3;
+
 /**
  * The title a finished analysis leaves the document with: the analysis names it, unless the person
  * did — a title other than the previous analysis's, or any title before the first analysis.
@@ -310,6 +315,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
           `UPDATE documents SET ${sql ? `${sql}, ` : ''}search_text = ?, updated_at = ? WHERE id = ?`,
           [...params, searchTextOf(next), now().toISOString(), id]
         );
+        // The numbers are derived from the analysis (LINK-1): they change with it.
+        if (patch.analysis !== undefined) await replaceDocumentRefs(tx, id, next.analysis);
         const updated = await tx.getFirstAsync<DocumentRow>(
           `SELECT ${COLUMNS} FROM documents WHERE id = ?`,
           [id]
@@ -386,7 +393,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
      * deadlines and actions are wiped like deleted ones, and their scheduled reminders are left for
      * `syncReminders()` to cancel. One transaction, read and write, so «Done» pressed while the
      * analysis ran is not lost. The explanation language is the one the job asked for. The job is
-     * queued for deletion on the server in the same transaction (SPEC §7.2 «Опрос»).
+     * queued for deletion on the server in the same transaction (SPEC §7.2 «Опрос»). So are the
+     * document's numbers for related documents: those of the new analysis replace the old (LINK-1).
      * Only a document still `analyzing` under `outcome.jobId` is written: `false` when it was
      * deleted, its analysis cancelled, or started again under another job meanwhile.
      */
@@ -431,6 +439,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             id,
           ]
         );
+        await replaceDocumentRefs(tx, id, analysis);
 
         const deadlines = await tx.getAllAsync<{
           id: string;
@@ -541,8 +550,92 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     },
 
     /**
+     * The documents related to `id` (LINK-2): those that share a number with it, by the rule of
+     * `selectLinks()`, without the pairs marked «Not related» (LINK-4). Newest first, at most
+     * `MAX_RELATED_DOCUMENTS` (LINK-3). The link is not stored: it is found each time, among the
+     * documents with an analysis, which a document being analyzed again still has.
+     */
+    async listRelated(id: string): Promise<RelatedDocumentRecord[]> {
+      return db.transaction(async (tx) => {
+        const refs = await tx.getAllAsync<{
+          document_id: string;
+          value: string;
+          sender_key: string | null;
+          created_at: string;
+        }>(
+          `SELECT r.document_id, r.value, r.sender_key, d.created_at
+           FROM document_refs r JOIN documents d ON d.id = r.document_id
+           WHERE d.deleted_at IS NULL
+             AND r.value IN (SELECT value FROM document_refs WHERE document_id = ?)
+           ORDER BY r.rowid`,
+          [id]
+        );
+        const links = selectLinks(
+          id,
+          refs.map((row) => ({
+            documentId: row.document_id,
+            value: row.value,
+            senderKey: row.sender_key,
+          }))
+        );
+        if (links.size === 0) return [];
+
+        const dismissed = await tx.getAllAsync<{ other: string }>(
+          `SELECT CASE WHEN document_id_a = ? THEN document_id_b ELSE document_id_a END AS other
+           FROM document_link_dismissals WHERE document_id_a = ? OR document_id_b = ?`,
+          [id, id, id]
+        );
+        for (const pair of dismissed) links.delete(pair.other);
+        if (links.size === 0) return [];
+
+        // A number can stand in many documents (every invoice of one contract): only the newest
+        // few are read.
+        const createdAt = new Map(refs.map((row) => [row.document_id, row.created_at]));
+        const newest = [...links.keys()]
+          .sort((a, b) => {
+            const [left, right] = [createdAt.get(a) ?? '', createdAt.get(b) ?? ''];
+            if (left !== right) return left < right ? 1 : -1;
+            return a < b ? -1 : 1;
+          })
+          .slice(0, MAX_RELATED_DOCUMENTS);
+        const rows = await tx.getAllAsync<
+          Pick<DocumentRow, 'id' | 'title' | 'document_date' | 'created_at' | 'case_id'>
+        >(
+          `SELECT id, title, document_date, created_at, case_id FROM documents
+           WHERE id IN (${placeholders(newest.length)}) AND deleted_at IS NULL
+           ORDER BY created_at DESC, id`,
+          newest
+        );
+        return rows.map((row) => ({
+          id: row.id,
+          title: row.title,
+          documentDate: row.document_date,
+          createdAt: row.created_at,
+          caseId: row.case_id,
+          sharedNumber: links.get(row.id) as string,
+        }));
+      });
+    },
+
+    /**
+     * «Not related» (LINK-4): the two documents are never listed as related again, on the screen of
+     * either, after a new analysis too. Nothing is stored if one of them is gone.
+     */
+    async dismissLink(id: string, otherId: string): Promise<void> {
+      if (id === otherId) return;
+      const [a, b] = id < otherId ? [id, otherId] : [otherId, id];
+      await db.runAsync(
+        `INSERT OR IGNORE INTO document_link_dismissals (document_id_a, document_id_b, created_at)
+         SELECT ?, ?, ?
+         WHERE (SELECT COUNT(*) FROM documents WHERE id IN (?, ?) AND deleted_at IS NULL) = 2`,
+        [a, b, now().toISOString(), a, b]
+      );
+    },
+
+    /**
      * Deletes a document (STO-6): wipes its content and that of its deadlines and actions, removes
-     * its page rows and scheduled reminders, and keeps a tombstone for future sync. The job of an
+     * its page rows, scheduled reminders, numbers and «Not related» pairs (LINK-5), and keeps a
+     * tombstone for future sync. The job of an
      * analysis that is running, or whose upload may have reached the server before it broke off, is
      * queued for deletion there. The caller deletes the returned page files, cancels the returned
      * notifications and sends the queued deletions. Returns `null` if already gone.
@@ -567,6 +660,11 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
           [id]
         );
         await tx.runAsync('DELETE FROM pages WHERE document_id = ?', [id]);
+        await tx.runAsync('DELETE FROM document_refs WHERE document_id = ?', [id]);
+        await tx.runAsync(
+          'DELETE FROM document_link_dismissals WHERE document_id_a = ? OR document_id_b = ?',
+          [id, id]
+        );
 
         const deadlineIds = (
           await tx.getAllAsync<{ id: string }>('SELECT id FROM deadlines WHERE document_id = ?', [

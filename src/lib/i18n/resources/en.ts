@@ -216,6 +216,14 @@ export const en = {
       page: 'Page {{number}}',
       pageMissing: 'Page {{number}} is not available',
     },
+    related: {
+      title: 'Related documents',
+      sharedNumber: 'Shared number: {{number}}',
+      allDone: 'Everything is marked done',
+      notRelated: 'Not related',
+      notRelatedLabel: 'Not related to “{{title}}”',
+      notRelatedFailed: "Couldn't save that. Try again.",
+    },
   },
   cases: {
     title: 'Cases',
@@ -272,6 +280,12 @@ export const en = {
       submitNone: 'Add',
       allInCase: 'All documents are already in this case',
       failed: "Couldn't add the documents. Try again.",
+    },
+    related: {
+      moveHere: 'Move to “{{name}}”',
+      addRelated: 'Add to “{{name}}”',
+      addRelatedLabel: 'Add “{{title}}” to the case “{{name}}”',
+      newCaseLabel: 'New case with “{{title}}”',
     },
   },
   deadlines: {
