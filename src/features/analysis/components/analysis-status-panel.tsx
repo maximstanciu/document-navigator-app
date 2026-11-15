@@ -8,6 +8,7 @@ import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { ProgressBar } from '@/components/ui/progress-bar';
 import { Radius, Spacing } from '@/constants/theme';
+import { useNow } from '@/hooks/use-now';
 import { openNotificationSettings } from '@/features/reminders/notifications';
 import { reminderQueries } from '@/features/reminders/queries';
 import type { DocumentRecord } from '@/lib/db/types';
@@ -16,6 +17,7 @@ import { PDF_MIME_TYPE } from '@/shared/analysis/contract';
 import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
 
 import { isRetryable, type AnalysisError, type AnalysisErrorCode } from '../errors';
+import { etaOf, type Eta } from '../eta';
 import {
   useAnalyzeDocument,
   useCancelAnalysis,
@@ -46,6 +48,17 @@ function failureMessage(
     return t('analysis.error.too_large', { count, limit });
   }
   return t(`analysis.error.${code}`);
+}
+
+/** How often the time left is counted again: often enough for a count in minutes. */
+const ETA_TICK_MS = 15_000;
+
+/** «Ready in about 7 minutes», or that it takes longer than usual (ANL-3). */
+function etaMessage(eta: NonNullable<Eta>, t: TFunction): string {
+  if (eta === 'overdue') return t('analysis.eta.overdue');
+  return eta.unit === 'minutes'
+    ? t('analysis.eta.minutes', { count: eta.count })
+    : t('analysis.eta.hours', { count: eta.count });
 }
 
 /**
@@ -91,9 +104,9 @@ function NotifyWhenAnalyzed() {
 
 /**
  * An analysis in progress (ANL-3): while the pages upload, the app must stay open; then the job
- * waits on the server, in the queue or being analyzed, and the app may be closed: with
- * notifications allowed, a push tells when it ends (ANL-12). Either way it can be cancelled
- * (ANL-13).
+ * waits on the server, in the queue or being analyzed, with the server's estimate of when it ends
+ * if it has one, and the app may be closed: with notifications allowed, a push tells when it ends
+ * (ANL-12). Either way it can be cancelled (ANL-13).
  */
 function AnalysisProgress({
   documentId,
@@ -107,7 +120,9 @@ function AnalysisProgress({
   const progress = useJobProgress(documentId);
   const cancel = useCancelAnalysis();
   const { data: permission } = useQuery(reminderQueries.permission());
+  const now = useNow(ETA_TICK_MS);
 
+  const eta = uploading || !progress ? null : etaOf(progress, now.getTime());
   const queuedBehind = progress?.status === 'queued' && progress.ahead > 0 ? progress.ahead : 0;
   const status = uploading
     ? t('analysis.uploading')
@@ -119,6 +134,7 @@ function AnalysisProgress({
     <ThemedView type="backgroundElement" style={styles.panel} aria-live="polite">
       <View style={styles.progress}>
         <ThemedText type="smallBold">{status}</ThemedText>
+        {eta && <ThemedText type="small">{etaMessage(eta, t)}</ThemedText>}
         {/* The status above says it in words; the bar only shows that the work goes on. */}
         <ProgressBar aria-hidden />
       </View>
@@ -126,8 +142,8 @@ function AnalysisProgress({
         {uploading
           ? t('analysis.keepOpenWhileUploading')
           : permission === 'granted'
-            ? t('analysis.canCloseNotified')
-            : t('analysis.canClose')}
+            ? t(eta ? 'analysis.canCloseNotifiedWithEta' : 'analysis.canCloseNotified')
+            : t(eta ? 'analysis.canCloseWithEta' : 'analysis.canClose')}
       </ThemedText>
       {!uploading && <NotifyWhenAnalyzed />}
       {hasPrevious && (

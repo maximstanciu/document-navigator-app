@@ -1,6 +1,7 @@
 import { DAILY_ANALYSES_PER_DEVICE } from '@/shared/limits';
 
 import { onJobExpired } from './analysis/jobs/analysis-job';
+import { JobDurations, seedPageMs } from './analysis/jobs/job-durations';
 import { MemoryAnalysisJobStore, type AnalysisJobStore } from './analysis/jobs/job-store';
 import { parseAppVersion, type AppVersion } from './http/app-version';
 import { AnalysisUsage } from './limits/analysis-usage';
@@ -23,6 +24,8 @@ export type ServerDeps = {
   usage: AnalysisUsage;
   /** The analysis jobs of this process: the queue and the results (SPEC §7.1). */
   jobs: AnalysisJobStore;
+  /** How long analyses take in this process, for the estimate of a job's end (ANL-3). */
+  durations: JobDurations;
   /** Bearer token of `GET /api/v1/metrics`; `null` turns the route off. */
   metricsToken: string | null;
 };
@@ -47,6 +50,8 @@ const MIN_METRICS_TOKEN_LENGTH = 32;
  * - `IP_ATTEMPTS_PER_HOUR`: default 60. `DAILY_BUDGET_USD`: unset — no cap.
  * - `METRICS_TOKEN`: at least 32 characters; unset — `GET /api/v1/metrics` answers 404.
  * - `ANALYSIS_RESULT_TTL_HOURS`: how long a finished job waits for the app, default 24.
+ * - `ANALYSIS_ETA_ONE_PAGE_SECONDS`: how long a one-page analysis takes here, for the estimates of
+ *   a job's end (ANL-3) until the first analysis since the start ends. Unset — none until then.
  */
 export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
   const log = consoleServerLog;
@@ -65,6 +70,8 @@ export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
     resultTtlMs: resultTtlHours * HOUR_MS,
     onExpired: onJobExpired({ log, usage }),
   });
+  const onePageSeconds = positiveNumber(env, 'ANALYSIS_ETA_ONE_PAGE_SECONDS', false);
+  shared.__docnavigatorJobDurations ??= new JobDurations(seedPageMs(onePageSeconds));
   return {
     minAppVersion: readMinAppVersion(env),
     deviceHashKey: env.DEVICE_ID_HASH_KEY || DEVELOPMENT_HASH_KEY,
@@ -73,6 +80,7 @@ export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
     store,
     usage,
     jobs: shared.__docnavigatorAnalysisJobs,
+    durations: shared.__docnavigatorJobDurations,
     metricsToken: readMetricsToken(env),
   };
 }
@@ -83,6 +91,7 @@ export function createServerDeps(env: ServerEnv = process.env): ServerDeps {
 const shared = globalThis as typeof globalThis & {
   __docnavigatorCounters?: MemoryCounterStore;
   __docnavigatorAnalysisJobs?: AnalysisJobStore;
+  __docnavigatorJobDurations?: JobDurations;
 };
 
 function createStore(env: ServerEnv): CounterStore {

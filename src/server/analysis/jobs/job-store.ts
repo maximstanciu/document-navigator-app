@@ -19,8 +19,8 @@ export interface AnalysisJobStore {
   start(): AnalysisJob | undefined;
   /** Records how a started job ended. `false` if the job was removed meanwhile (cancelled). */
   finish(job: AnalysisJob, result: JobResult): boolean;
-  /** Jobs that will be analyzed before this queued one: those queued earlier and the running ones. */
-  ahead(job: AnalysisJob): number;
+  /** The jobs that will be analyzed before this queued one: the running ones and those queued earlier. */
+  before(job: AnalysisJob): AnalysisJob[];
   /** Jobs waiting in the queue, uploads holding a place in it included. */
   queued(): number;
   /**
@@ -100,15 +100,17 @@ export class MemoryAnalysisJobStore implements AnalysisJobStore {
     return true;
   }
 
-  ahead(job: AnalysisJob) {
+  before(job: AnalysisJob) {
     this.sweep();
-    let ahead = 0;
-    let before = true;
+    const before: AnalysisJob[] = [];
+    let earlier = true;
     for (const other of this.jobs.values()) {
-      if (other === job) before = false;
-      else if (other.status === 'processing' || (before && other.status === 'queued')) ahead++;
+      if (other === job) earlier = false;
+      else if (other.status === 'processing' || (earlier && other.status === 'queued')) {
+        before.push(other);
+      }
     }
-    return ahead;
+    return before;
   }
 
   queued() {

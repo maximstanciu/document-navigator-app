@@ -68,12 +68,24 @@ export type AnalyzeResponse = z.infer<typeof analyzeResponseSchema>;
 export const JOB_FAILURE_CODES = ['analysis_failed', 'unavailable'] as const;
 
 /**
+ * Seconds until the job ends, by the server's estimate from how long analyses took lately (ANL-3):
+ * for a queued job the jobs ahead of it are counted in. `0` once the analysis runs longer than
+ * estimated; `null` when the server has nothing to go by, as right after its start. A server older
+ * than SPEC v0.51 doesn't send it.
+ */
+const etaSecondsSchema = z.number().int().min(0).nullable().default(null);
+
+/**
  * State of a job, the `200` of GET and the `202` of PUT (SPEC §7.2). `ahead` counts the jobs that
  * will be analyzed before this one, the running ones included.
  */
 export const analysisJobStateSchema = z.discriminatedUnion('status', [
-  z.object({ status: z.literal('queued'), ahead: z.number().int().min(0) }),
-  z.object({ status: z.literal('processing') }),
+  z.object({
+    status: z.literal('queued'),
+    ahead: z.number().int().min(0),
+    etaSeconds: etaSecondsSchema,
+  }),
+  z.object({ status: z.literal('processing'), etaSeconds: etaSecondsSchema }),
   analyzeResponseSchema.extend({ status: z.literal('done') }),
   z.object({
     status: z.literal('failed'),

@@ -89,26 +89,6 @@ export function createAnalysisJob(job: NewAnalysisJob): AnalysisJob {
   };
 }
 
-const FAILURE_MESSAGES: Record<JobFailureCode, string> = {
-  analysis_failed: 'The model returned an invalid analysis.',
-  unavailable: 'The analysis service is unavailable.',
-};
-
-/** What GET and PUT answer about a job (SPEC §7.2). `ahead` comes from the store's queue. */
-export function jobState(job: AnalysisJob, ahead: () => number): AnalysisJobState {
-  const { result } = job;
-  if (result?.status === 'done') return { status: 'done', ...result.response };
-  if (result?.status === 'failed') {
-    return {
-      status: 'failed',
-      error: { code: result.code, message: FAILURE_MESSAGES[result.code] },
-    };
-  }
-  return job.status === 'processing'
-    ? { status: 'processing' }
-    : { status: 'queued', ahead: ahead() };
-}
-
 /** What the model call told about itself and its answer: metadata only (SPEC §7.1). */
 export type ModelFacts = {
   modelMs: number | null;

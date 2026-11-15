@@ -184,6 +184,53 @@ describe('AnalysisStatusPanel: the push about the end of the job (ANL-12)', () =
   });
 });
 
+describe('AnalysisStatusPanel: when the analysis should end (ANL-3)', () => {
+  it('shows the server’s estimate under the place in the queue', async () => {
+    server.GET = () => json(200, { status: 'queued', ahead: 1, etaSeconds: 25 * 60 });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(await screen.findByText('Ready in about 25 minutes')).toBeOnTheScreen();
+    expect(screen.getByText('In the queue: 1 document ahead of yours')).toBeOnTheScreen();
+    // The estimate says how long; «a few minutes» would only blur it.
+    expect(
+      screen.getByText('You can close the app: the result will be here when you open it again.')
+    ).toBeOnTheScreen();
+  });
+
+  it('counts long analyses in hours', async () => {
+    server.GET = () => json(200, { status: 'processing', etaSeconds: 2 * 60 * 60 });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(await screen.findByText('Ready in about 2 hours')).toBeOnTheScreen();
+    expect(screen.getByText('Analyzing the document…')).toBeOnTheScreen();
+  });
+
+  it('says so when the analysis runs past its estimate', async () => {
+    fakeNotifications.permission = 'granted';
+    server.GET = () => json(200, { status: 'processing', etaSeconds: 0 });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(await screen.findByText('This is taking longer than usual')).toBeOnTheScreen();
+    expect(
+      screen.getByText(
+        "You can close the app: you'll get a notification when the document is analyzed."
+      )
+    ).toBeOnTheScreen();
+  });
+
+  it('says only that it takes a few minutes while the server has no estimate', async () => {
+    server.GET = () => json(200, { status: 'processing' });
+    await seedDocument('analyzing');
+    await renderDocument();
+
+    expect(await screen.findByText(/This takes a few minutes/)).toBeOnTheScreen();
+    expect(screen.queryByText(/Ready in about/)).not.toBeOnTheScreen();
+  });
+});
+
 describe('AnalysisStatusPanel on the document screen', () => {
   it('uploads a draft, shows its place in the queue and then the result (ANL-3)', async () => {
     const user = userEvent.setup();

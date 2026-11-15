@@ -45,6 +45,7 @@ export function createAnalysisJobDeps(env: ServerEnv = process.env): AnalysisJob
   const { concurrency, queueMax } = readJobConfig(env);
   shared.__docnavigatorAnalysisWorker ??= new AnalysisWorker({
     store: deps.jobs,
+    durations: deps.durations,
     provider: createLlmProvider(env),
     usage: deps.usage,
     log: deps.log,

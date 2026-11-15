@@ -13,6 +13,7 @@ describe('createServerDeps', () => {
     // One store per process, so counters survive between requests, and one set of analysis jobs.
     expect(createServerDeps({}).store).toBe(deps.store);
     expect(createServerDeps({}).jobs).toBe(deps.jobs);
+    expect(createServerDeps({}).durations).toBe(deps.durations);
   });
 
   it('uses Upstash when both of its variables are set', () => {
@@ -40,6 +41,8 @@ describe('createServerDeps', () => {
     [{ MIN_APP_VERSION: 'v2' }, 'MIN_APP_VERSION'],
     [{ ANALYSIS_RESULT_TTL_HOURS: '0' }, 'ANALYSIS_RESULT_TTL_HOURS'],
     [{ ANALYSIS_RESULT_TTL_HOURS: 'a day' }, 'ANALYSIS_RESULT_TTL_HOURS'],
+    [{ ANALYSIS_ETA_ONE_PAGE_SECONDS: '0' }, 'ANALYSIS_ETA_ONE_PAGE_SECONDS'],
+    [{ ANALYSIS_ETA_ONE_PAGE_SECONDS: 'five minutes' }, 'ANALYSIS_ETA_ONE_PAGE_SECONDS'],
   ])('fails on a misconfigured %o, naming the variable', (env, name) => {
     expect(() => createServerDeps(env)).toThrow(name);
   });

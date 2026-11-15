@@ -395,8 +395,21 @@ export async function turnOnAnalysisPush(): Promise<NotificationPermission> {
   return permission;
 }
 
+/**
+ * When the server expects a job to end, as estimated at a check (ANL-3), in epoch ms: `endsAt`,
+ * `null` without an estimate, and `checkedAt`, the check. Kept as moments, they stay right while
+ * the server can't be asked.
+ */
+export type JobEstimate = { endsAt: number | null; checkedAt: number };
+
 /** Where a job that hasn't ended stands, for the status panel (ANL-3). */
-export type JobProgress = { status: 'queued'; ahead: number } | { status: 'processing' };
+export type JobProgress =
+  ({ status: 'queued'; ahead: number } & JobEstimate) | ({ status: 'processing' } & JobEstimate);
+
+function estimate(etaSeconds: number | null): JobEstimate {
+  const checkedAt = Date.now();
+  return { endsAt: etaSeconds === null ? null : checkedAt + etaSeconds * 1000, checkedAt };
+}
 
 /**
  * One check of the jobs. `progress` has an entry for every document whose job hasn't ended, by
@@ -420,9 +433,9 @@ async function applyJobState(
   const { documents } = getRepositories();
   switch (state.status) {
     case 'queued':
-      return { status: 'queued', ahead: state.ahead };
+      return { status: 'queued', ahead: state.ahead, ...estimate(state.etaSeconds) };
     case 'processing':
-      return { status: 'processing' };
+      return { status: 'processing', ...estimate(state.etaSeconds) };
     case 'done':
       try {
         await documents.saveAnalysis(job.id, {

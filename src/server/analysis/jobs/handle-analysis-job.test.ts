@@ -96,8 +96,12 @@ describe('an analysis job', () => {
     await put({ files: Array.from({ length: 4 }, () => jpeg()) });
     await put({ jobId: JOB_B });
 
-    expect(await stateOf(await get())).toEqual({ status: 'processing' });
-    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({ status: 'queued', ahead: 1 });
+    expect(await stateOf(await get())).toEqual({ status: 'processing', etaSeconds: null });
+    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
+      status: 'queued',
+      ahead: 1,
+      etaSeconds: null,
+    });
 
     calls[0].answer();
     await settle();
@@ -108,7 +112,10 @@ describe('an analysis job', () => {
       pageCount: 4,
       legalMemo: { country: 'DE', version: LEGAL_MEMOS.DE.version },
     });
-    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({ status: 'processing' });
+    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+    });
     expect(calls).toHaveLength(2);
   });
 
@@ -136,7 +143,7 @@ describe('an analysis job', () => {
 
       calls[0].answer(fromPortugal(), 0.01);
       await settle();
-      expect(await stateOf(await get())).toEqual({ status: 'processing' });
+      expect(await stateOf(await get())).toEqual({ status: 'processing', etaSeconds: null });
       expect(calls).toHaveLength(2);
       expect(calls[1].input.country).toBe('PT');
       expect(calls[1].input.files).toHaveLength(4);
@@ -224,7 +231,63 @@ describe('an analysis job', () => {
     await put({ jobId: third });
 
     expect(calls).toHaveLength(2);
-    expect(await stateOf(await get({ jobId: third }))).toEqual({ status: 'queued', ahead: 2 });
+    expect(await stateOf(await get({ jobId: third }))).toEqual({
+      status: 'queued',
+      ahead: 2,
+      etaSeconds: null,
+    });
+  });
+
+  it('estimates when a job ends from how long the analyses before it took (ANL-3)', async () => {
+    const { provider, calls } = gatedProvider();
+    deps = testJobDeps({ provider });
+    await put({ files: Array.from({ length: 4 }, () => jpeg()) });
+    await put({ jobId: JOB_B });
+    const third = crypto.randomUUID();
+    const accepted = await put({ jobId: third });
+    // Nothing to go by yet.
+    expect(accepted.status).toBe(202);
+    expect(await accepted.json()).toEqual({ status: 'queued', ahead: 2, etaSeconds: null });
+
+    // Four pages in 10 minutes: 2 a page, with the fixed part counted as one more page.
+    deps.advance(10 * 60_000);
+    calls[0].answer();
+    await settle();
+
+    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
+      status: 'processing',
+      etaSeconds: 4 * 60,
+    });
+    expect(await stateOf(await get({ jobId: third }))).toEqual({
+      status: 'queued',
+      ahead: 1,
+      etaSeconds: 8 * 60,
+    });
+
+    deps.advance(60_000);
+    expect(await stateOf(await get({ jobId: JOB_B }))).toMatchObject({ etaSeconds: 3 * 60 });
+    expect(await stateOf(await get({ jobId: third }))).toMatchObject({ etaSeconds: 7 * 60 });
+  });
+
+  it('learns nothing from a job that failed or was cancelled (ANL-3)', async () => {
+    const { provider, calls } = gatedProvider();
+    deps = testJobDeps({ provider });
+    await put();
+    await put({ jobId: JOB_B });
+    const third = crypto.randomUUID();
+    await put({ jobId: third });
+
+    deps.advance(10 * 60_000);
+    calls[0].fail(new LlmProviderError('unavailable', 'Down.'));
+    await settle();
+    deps.advance(10 * 60_000);
+    await remove({ jobId: JOB_B });
+    await settle();
+
+    expect(await stateOf(await get({ jobId: third }))).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+    });
   });
 
   it('post-processes the answer with the upload’s date and page count (SPEC §7.4)', async () => {
@@ -485,7 +548,10 @@ describe('DELETE /api/v1/analyses/{jobId}', () => {
     await settle();
 
     await expectError(await get(), 404, 'job_not_found');
-    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({ status: 'processing' });
+    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+    });
     expect(ofType('job.removed')[0]).toMatchObject({ reason: 'cancelled', state: 'processing' });
     expect(ofType('analysis.end')[0]).toMatchObject({
       code: 'cancelled',
@@ -762,7 +828,11 @@ describe('result retention', () => {
 
     deps.advance(3 * TEST_RESULT_TTL_MS);
 
-    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({ status: 'queued', ahead: 1 });
+    expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
+      status: 'queued',
+      ahead: 1,
+      etaSeconds: null,
+    });
   });
 });
 

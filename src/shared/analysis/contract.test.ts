@@ -51,18 +51,33 @@ describe('analyzeResponseSchema', () => {
 
 describe('analysisJobStateSchema', () => {
   it.each([
-    ['queued', { status: 'queued', ahead: 2 }],
-    ['processing', { status: 'processing' }],
+    ['queued', { status: 'queued', ahead: 2, etaSeconds: 900 }],
+    ['processing', { status: 'processing', etaSeconds: 0 }],
+    ['processing without an estimate', { status: 'processing', etaSeconds: null }],
     ['done', { status: 'done', analysis: invoice, pageCount: 2, legalMemo: null }],
     ['failed', { status: 'failed', error: { code: 'unavailable', message: 'Down.' } }],
   ])('accepts a %s job', (_status, state) => {
     expect(analysisJobStateSchema.parse(state)).toEqual(state);
   });
 
+  it('reads a server older than the estimate as having none (ANL-3)', () => {
+    expect(analysisJobStateSchema.parse({ status: 'queued', ahead: 1 })).toEqual({
+      status: 'queued',
+      ahead: 1,
+      etaSeconds: null,
+    });
+    expect(analysisJobStateSchema.parse({ status: 'processing' })).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+    });
+  });
+
   it.each([
     ['an unknown status', { status: 'lost' }],
     ['a queued job without its place', { status: 'queued' }],
     ['a negative place', { status: 'queued', ahead: -1 }],
+    ['a negative estimate', { status: 'processing', etaSeconds: -5 }],
+    ['an estimate in fractions of a second', { status: 'processing', etaSeconds: 1.5 }],
     ['a done job without the page count', { status: 'done', analysis: invoice }],
     ['a done job with a broken analysis', { status: 'done', analysis: { title: 1 }, pageCount: 1 }],
     [

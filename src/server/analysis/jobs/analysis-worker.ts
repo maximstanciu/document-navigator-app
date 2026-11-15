@@ -17,10 +17,13 @@ import {
   type ModelFacts,
 } from './analysis-job';
 import { analysisPushMessage, type PushSender } from './analysis-push';
+import type { JobDurations } from './job-durations';
 import type { AnalysisJobStore } from './job-store';
 
 export type AnalysisWorkerOptions = {
   store: AnalysisJobStore;
+  /** Learns how long analyses take, for the estimate of a job's end (ANL-3). */
+  durations: Pick<JobDurations, 'record'>;
   provider: LlmProvider;
   usage: AnalysisUsage;
   log: ServerLog;
@@ -38,7 +41,8 @@ type Ending = { code: JobEndCode; result: JobResult; error: string | null };
  * to the model, checks and post-processes its answer (SPEC §7.4) and records the result in the
  * store. Each job logs `analysis.start` and `analysis.end`. A job removed while the model works is
  * cancelled: its model call is aborted (`AbortSignal`) and its result, if any, dropped (ANL-13).
- * A job that ended otherwise sends the push about it, if the app gave a token (ANL-12).
+ * A job that ended otherwise sends the push about it, if the app gave a token (ANL-12), and one
+ * that ended with an analysis tells how long analyses take (`JobDurations`, ANL-3).
  */
 export class AnalysisWorker {
   private readonly running = new Set<Promise<void>>();
@@ -76,7 +80,7 @@ export class AnalysisWorker {
   }
 
   private async analyze(job: AnalysisJob) {
-    const { store, provider, usage, log, now } = this.options;
+    const { store, durations, provider, usage, log, now } = this.options;
     const startedAt = job.startedAt ?? now();
     log({ event: 'analysis.start', job: job.job, waitMs: startedAt - job.queuedAt });
 
@@ -88,7 +92,9 @@ export class AnalysisWorker {
     } catch (error) {
       ending = endingOf(error, job.controller.signal);
     }
+    const ms = now() - startedAt;
     if (store.finish(job, ending.result)) {
+      if (ending.code === 'ok') durations.record(job.pageCount, ms);
       this.notify(job, ending.result);
     } else {
       // Removed while the model worked: the app cancelled the analysis (ANL-13).
@@ -98,7 +104,7 @@ export class AnalysisWorker {
     log(
       analysisEndEvent(job, {
         code: ending.code,
-        ms: now() - startedAt,
+        ms,
         provider: provider.id,
         error: ending.error,
         facts,

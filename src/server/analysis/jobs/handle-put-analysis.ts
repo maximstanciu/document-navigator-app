@@ -7,9 +7,10 @@ import { isUploadEndCode, type UploadEndCode } from '../../limits/usage-keys';
 import { redactError } from '../../logs/server-log';
 import { hashClientIp, hashJobId } from '../../privacy/pseudonyms';
 import { countPages, readAnalyzeUpload } from '../read-analyze-upload';
-import { createAnalysisJob, jobState, type AnalysisJob } from './analysis-job';
+import { createAnalysisJob } from './analysis-job';
 import type { AnalysisJobDeps } from './job-deps';
 import { readJobRequest } from './job-request';
+import { jobState } from './job-state';
 
 /** What a full queue tells the app to wait (SPEC §7.2). */
 const QUEUE_FULL_RETRY_AFTER_SECONDS = 60;
@@ -118,7 +119,7 @@ async function upload(
 
   // A repeated upload (ANL-9): the first one got through, so this one isn't read.
   const existing = deps.jobs.get(device, jobId);
-  if (existing) return { state: stateOf(existing, deps), code: 'existing' };
+  if (existing) return { state: jobState(existing, deps), code: 'existing' };
 
   const ip = await hashClientIp(readClientIp(request.headers), deps.deviceHashKey);
   const { session, counts } = await deps.usage.begin({
@@ -145,7 +146,7 @@ async function upload(
     reservation.release();
     // The same upload twice at once: the one read first made the job.
     const raced = deps.jobs.get(device, jobId);
-    if (raced) return { state: stateOf(raced, deps), code: 'existing' };
+    if (raced) return { state: jobState(raced, deps), code: 'existing' };
 
     const { files, locale, today, timezone, uiLocale, pushToken, country } = upload;
     const job = createAnalysisJob({
@@ -163,14 +164,10 @@ async function upload(
     });
     deps.jobs.add(job);
     deps.worker.kick();
-    return { state: stateOf(job, deps), code: 'accepted' };
+    return { state: jobState(job, deps), code: 'accepted' };
   } finally {
     reservation.release();
   }
-}
-
-function stateOf(job: AnalysisJob, deps: AnalysisJobDeps) {
-  return jobState(job, () => deps.jobs.ahead(job));
 }
 
 function queueFull(deps: AnalysisJobDeps): ApiFailure | null {

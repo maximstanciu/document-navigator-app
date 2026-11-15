@@ -391,6 +391,16 @@ export const en = {
       'This takes a few minutes. You can close the app: the result will be here when you open it again.',
     canCloseNotified:
       "This takes a few minutes. You can close the app: you'll get a notification when the document is analyzed.",
+    canCloseWithEta: 'You can close the app: the result will be here when you open it again.',
+    canCloseNotifiedWithEta:
+      "You can close the app: you'll get a notification when the document is analyzed.",
+    eta: {
+      minutes_one: 'Ready in about {{count}} minute',
+      minutes_other: 'Ready in about {{count}} minutes',
+      hours_one: 'Ready in about {{count}} hour',
+      hours_other: 'Ready in about {{count}} hours',
+      overdue: 'This is taking longer than usual',
+    },
     notify: {
       turnOn: 'Notify me when ready',
       denied:

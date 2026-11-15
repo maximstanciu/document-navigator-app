@@ -53,14 +53,14 @@ describe('MemoryAnalysisJobStore', () => {
     const [a, b, c] = ['a', 'b', 'c'].map((id) => job('d1', id));
     for (const each of [a, b, c]) jobs.add(each);
 
-    expect([a, b, c].map((each) => jobs.ahead(each))).toEqual([0, 1, 2]);
+    expect([a, b, c].map((each) => jobs.before(each).length)).toEqual([0, 1, 2]);
     expect(jobs.start()).toBe(a);
     expect(a.status).toBe('processing');
     // The running job is still ahead of the others.
-    expect([b, c].map((each) => jobs.ahead(each))).toEqual([1, 2]);
+    expect([b, c].map((each) => jobs.before(each).length)).toEqual([1, 2]);
 
     expect(jobs.finish(a, DONE)).toBe(true);
-    expect([b, c].map((each) => jobs.ahead(each))).toEqual([0, 1]);
+    expect([b, c].map((each) => jobs.before(each).length)).toEqual([0, 1]);
     expect(jobs.start()).toBe(b);
     expect(jobs.start()).toBe(c);
     expect(jobs.start()).toBeUndefined();

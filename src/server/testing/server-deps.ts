@@ -4,6 +4,7 @@ import { onJobExpired } from '../analysis/jobs/analysis-job';
 import type { PushSender } from '../analysis/jobs/analysis-push';
 import { AnalysisWorker } from '../analysis/jobs/analysis-worker';
 import type { AnalysisJobDeps } from '../analysis/jobs/job-deps';
+import { JobDurations } from '../analysis/jobs/job-durations';
 import { MemoryAnalysisJobStore } from '../analysis/jobs/job-store';
 import type { LlmProvider } from '../analysis/llm-provider';
 import { MockLlmProvider } from '../analysis/providers/mock-llm-provider';
@@ -58,6 +59,7 @@ export function testServerDeps({
     store: counters,
     usage,
     jobs: new MemoryAnalysisJobStore({ now, resultTtlMs, onExpired: onJobExpired({ log, usage }) }),
+    durations: new JobDurations(),
     metricsToken,
     events,
     advance: (ms) => {
@@ -88,6 +90,7 @@ export function testJobDeps({
   const deps = testServerDeps(server);
   const worker = new AnalysisWorker({
     store: deps.jobs,
+    durations: deps.durations,
     provider,
     usage: deps.usage,
     log: deps.log,

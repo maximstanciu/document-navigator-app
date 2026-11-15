@@ -4,8 +4,9 @@ import { ApiFailure } from '../../http/api-failure';
 import { readJsonBody } from '../../http/json-body';
 import { redactError } from '../../logs/server-log';
 import type { ServerDeps } from '../../server-deps';
-import { analysisEndEvent, jobState, type AnalysisJob } from './analysis-job';
+import { analysisEndEvent, type AnalysisJob } from './analysis-job';
 import { readJobRequest } from './job-request';
+import { jobState } from './job-state';
 
 /** A push token and some room: the PATCH body is never bigger. */
 const MAX_PATCH_BYTES = 4 * 1024;
@@ -19,7 +20,7 @@ export function handleGetAnalysis(request: Request, jobId: unknown, deps: Server
   return answer(async () => {
     const { device, jobId: id } = await readJobRequest(request, jobId, deps);
     const job = findJob(deps, device, id);
-    const state = jobState(job, () => deps.jobs.ahead(job));
+    const state = jobState(job, deps);
     if (job.endedAt !== null && !job.fetched) {
       job.fetched = true;
       if (job.status === 'done') {
