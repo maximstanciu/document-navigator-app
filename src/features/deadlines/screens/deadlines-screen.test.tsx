@@ -86,7 +86,7 @@ function timeline() {
     if (node.props.role === 'heading') groups.push([String(name), []]);
     else groups.at(-1)?.[1].push(String(name));
   }
-  return groups.slice(1); // The first heading is the screen's title.
+  return groups;
 }
 
 describe('DeadlinesScreen', () => {
@@ -100,7 +100,7 @@ describe('DeadlinesScreen', () => {
 
     await renderTab();
 
-    expect(await screen.findByRole('heading', { name: 'Deadlines' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'Overdue' })).toBeOnTheScreen();
     expect(timeline()).toEqual([
       ['Overdue', ['Pay the old bill']],
       ['This week', ['Pay the bill', 'Send the documents']],
@@ -302,7 +302,9 @@ describe('DeadlinesScreen', () => {
     expect(screen).toHavePathname('/documents/letter');
     await user().press(screen.getByRole('button', { name: 'Back' }));
 
-    expect(await screen.findByRole('heading', { name: 'Deadlines' })).toBeOnTheScreen();
+    expect(
+      await screen.findByRole('checkbox', { name: 'Answer the tax office' })
+    ).toBeOnTheScreen();
     expect(screen.queryByText('Done: “Pay the bill”')).not.toBeOnTheScreen();
   });
 
@@ -341,8 +343,7 @@ describe('DeadlinesScreen', () => {
 
     await renderTab();
 
-    expect(await screen.findByRole('heading', { name: 'Сроки' })).toBeOnTheScreen();
-    expect(screen.getByRole('heading', { name: 'На этой неделе' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'На этой неделе' })).toBeOnTheScreen();
     expect(screen.getByText('Через 5 дней')).toBeOnTheScreen();
     expect(screen.getByText('Через 21 день')).toBeOnTheScreen();
   });

@@ -97,7 +97,7 @@ describe('SettingsScreen language (SET-1)', () => {
 
     await user.press(await screen.findByRole('radio', { name: 'Русский' }));
 
-    expect(await screen.findByRole('heading', { name: 'Настройки' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'Язык' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Русский' })).toBeChecked();
     expect((await repositories.settings.get()).locale).toBe('ru');
     expect(i18n.language).toBe('ru');
@@ -108,7 +108,7 @@ describe('SettingsScreen language (SET-1)', () => {
 
     await renderSettings();
 
-    expect(await screen.findByRole('heading', { name: 'Настройки' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'Язык' })).toBeOnTheScreen();
     expect(screen.getByRole('radio', { name: 'Русский' })).toBeChecked();
   });
 
@@ -120,7 +120,7 @@ describe('SettingsScreen language (SET-1)', () => {
     await user.press(await screen.findByRole('radio', { name: 'Как в системе' }));
 
     // The test device language is English.
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'Language' })).toBeOnTheScreen();
     expect((await repositories.settings.get()).locale).toBe('system');
   });
 
@@ -493,7 +493,7 @@ describe('SettingsScreen states', () => {
     expect(await screen.findByText('Something went wrong')).toBeOnTheScreen();
     await user.press(screen.getByRole('button', { name: 'Try again' }));
 
-    expect(await screen.findByRole('heading', { name: 'Settings' })).toBeOnTheScreen();
+    expect(await screen.findByRole('heading', { name: 'Language' })).toBeOnTheScreen();
   });
 
   it('shows the disclaimer and the version (SET-4)', async () => {

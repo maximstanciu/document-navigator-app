@@ -172,37 +172,36 @@ export function DeadlinesScreen() {
     <ThemedView style={styles.container}>
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         {/* Outside the list, so the offer to undo stays in sight however far it is scrolled. */}
-        <View style={styles.top}>
-          <ThemedText type="subtitle" role="heading" style={styles.heading}>
-            {t('deadlines.title')}
-          </ThemedText>
-          {offer && (
-            <ThemedView type="backgroundSelected" style={styles.undo}>
-              <ThemedText type="small" role="alert" style={styles.undoMessage}>
-                {offer.message}
+        {(offer || snoozedAt || failed) && (
+          <View style={styles.top}>
+            {offer && (
+              <ThemedView type="backgroundSelected" style={styles.undo}>
+                <ThemedText type="small" role="alert" style={styles.undoMessage}>
+                  {offer.message}
+                </ThemedText>
+                <Button
+                  label={t('deadlines.undo.action')}
+                  aria-label={offer.label}
+                  variant="plain"
+                  disabled={busy}
+                  onPress={offer.run}
+                />
+              </ThemedView>
+            )}
+            {snoozedAt && (
+              <ThemedView type="backgroundSelected" style={styles.undo}>
+                <ThemedText type="small" role="alert" style={styles.undoMessage}>
+                  {t('deadlines.snoozed', { time: snoozedAt })}
+                </ThemedText>
+              </ThemedView>
+            )}
+            {failed && (
+              <ThemedText type="small" role="alert">
+                {t('deadlines.changeFailed')}
               </ThemedText>
-              <Button
-                label={t('deadlines.undo.action')}
-                aria-label={offer.label}
-                variant="plain"
-                disabled={busy}
-                onPress={offer.run}
-              />
-            </ThemedView>
-          )}
-          {snoozedAt && (
-            <ThemedView type="backgroundSelected" style={styles.undo}>
-              <ThemedText type="small" role="alert" style={styles.undoMessage}>
-                {t('deadlines.snoozed', { time: snoozedAt })}
-              </ThemedText>
-            </ThemedView>
-          )}
-          {failed && (
-            <ThemedText type="small" role="alert">
-              {t('deadlines.changeFailed')}
-            </ThemedText>
-          )}
-        </View>
+            )}
+          </View>
+        )}
         <SectionList
           sections={sections}
           keyExtractor={(deadline) => deadline.id}
@@ -251,11 +250,8 @@ const styles = StyleSheet.create({
   },
   top: {
     gap: Spacing.two,
-    paddingBottom: Spacing.two,
+    paddingTop: Spacing.two,
     paddingHorizontal: Spacing.three,
-  },
-  heading: {
-    paddingTop: Spacing.three,
   },
   undo: {
     flexDirection: 'row',
@@ -274,6 +270,7 @@ const styles = StyleSheet.create({
   },
   content: {
     gap: Spacing.two,
+    paddingTop: Spacing.one,
     paddingHorizontal: Spacing.three,
   },
 });

@@ -34,7 +34,6 @@ export const ru = {
     goToDocuments: 'К документам',
   },
   documents: {
-    title: 'Документы',
     addDocument: 'Добавить документ',
     loadingList: 'Загружаем документы',
     loadingOne: 'Загружаем документ',
@@ -313,7 +312,6 @@ export const ru = {
     },
   },
   deadlines: {
-    title: 'Сроки',
     loading: 'Загружаем сроки',
     emptyTitle: 'Открытых сроков нет',
     emptyMessage: 'Здесь появятся сроки из ваших документов, ближайшие сверху.',
@@ -550,7 +548,6 @@ export const ru = {
     },
   },
   settings: {
-    title: 'Настройки',
     sections: {
       language: 'Язык',
       reminders: 'Напоминания',

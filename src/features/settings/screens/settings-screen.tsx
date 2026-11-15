@@ -48,9 +48,6 @@ export function SettingsScreen() {
   } else {
     content = (
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}>
-        <ThemedText type="subtitle" role="heading" style={styles.heading}>
-          {t('settings.title')}
-        </ThemedText>
         <SettingsSection title={t('settings.sections.language')}>
           <LanguagePicker />
           <ExplanationLanguagePicker />
@@ -98,11 +95,9 @@ const styles = StyleSheet.create({
     flex: 1,
     maxWidth: MaxContentWidth,
   },
-  heading: {
-    paddingTop: Spacing.three,
-  },
   content: {
     gap: Spacing.five,
+    paddingTop: Spacing.three,
     paddingHorizontal: Spacing.three,
   },
   row: {

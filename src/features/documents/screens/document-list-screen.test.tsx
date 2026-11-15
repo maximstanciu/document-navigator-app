@@ -150,8 +150,7 @@ describe('DocumentListScreen', () => {
 
       await renderWithProviders(<DocumentListScreen />);
 
-      expect(await screen.findByRole('heading', { name: 'Документы' })).toBeOnTheScreen();
-      expect(screen.getByRole('heading', { name: 'Все документы' })).toBeOnTheScreen();
+      expect(await screen.findByRole('heading', { name: 'Все документы' })).toBeOnTheScreen();
       for (const text of ['1 страница', '2 страницы', '5 страниц', '21 страница']) {
         expect(screen.getByText(new RegExp(`· ${text} · Не разобран$`))).toBeOnTheScreen();
       }

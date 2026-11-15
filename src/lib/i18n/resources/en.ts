@@ -34,7 +34,6 @@ export const en = {
     goToDocuments: 'Go to documents',
   },
   documents: {
-    title: 'Documents',
     addDocument: 'Add a document',
     loadingList: 'Loading documents',
     loadingOne: 'Loading document',
@@ -289,7 +288,6 @@ export const en = {
     },
   },
   deadlines: {
-    title: 'Deadlines',
     loading: 'Loading deadlines',
     emptyTitle: 'No open deadlines',
     emptyMessage: 'Deadlines from your documents appear here, soonest first.',
@@ -485,7 +483,6 @@ export const en = {
     },
   },
   settings: {
-    title: 'Settings',
     sections: {
       language: 'Language',
       reminders: 'Reminders',

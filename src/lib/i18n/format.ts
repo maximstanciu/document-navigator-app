@@ -19,15 +19,6 @@ export function formatTimestampDateTime(isoTimestamp: string, language: string):
   }).format(new Date(isoTimestamp));
 }
 
-/** Today on top of a tab: «пт, 13 ноября» or «Fri, November 13», in the device's time zone. */
-export function formatWeekdayDate(date: Date, language: string): string {
-  return new Intl.DateTimeFormat(language, {
-    weekday: 'short',
-    day: 'numeric',
-    month: 'long',
-  }).format(date);
-}
-
 /**
  * A calendar date (YYYY-MM-DD) split for a date tile: the day of the month and the short month,
  * «16» and «нояб.». In UTC, as `formatCalendarDate`.

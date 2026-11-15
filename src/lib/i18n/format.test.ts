@@ -6,7 +6,6 @@ import {
   formatFileSize,
   formatShortCalendarDate,
   formatTimestampDate,
-  formatWeekdayDate,
 } from './format';
 
 describe('date formatting', () => {
@@ -37,11 +36,6 @@ describe('date formatting', () => {
   it('names the weekday of a calendar date in any time zone', () => {
     expect(formatCalendarWeekday('2026-11-16', 'en')).toBe('Mon');
     expect(formatCalendarWeekday('2026-11-16', 'ru')).toBe('пн');
-  });
-
-  it('names the weekday with today on top of a tab', () => {
-    expect(formatWeekdayDate(new Date(2026, 10, 13, 12), 'en')).toBe('Fri, November 13');
-    expect(formatWeekdayDate(new Date(2026, 10, 13, 12), 'ru')).toBe('пт, 13 ноября');
   });
 
   it('shows a time of day as it is, whatever the time zone', () => {

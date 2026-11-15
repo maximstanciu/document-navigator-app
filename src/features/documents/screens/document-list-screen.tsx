@@ -14,7 +14,6 @@ import { deadlineQueries } from '@/features/deadlines/queries';
 import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
-import { formatWeekdayDate } from '@/lib/i18n/format';
 import { localCalendarDate } from '@/shared/calendar-date';
 
 import { deadlinesByDocument, selectAttention } from '../attention';
@@ -43,7 +42,7 @@ function countByCase(documents: readonly DocumentSummary[]): Map<string, number>
  */
 export function DocumentListScreen() {
   const theme = useTheme();
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const bottomInset = useBottomTabInset();
   const now = useNow();
   const [query, setQuery] = useState('');
@@ -88,26 +87,12 @@ export function DocumentListScreen() {
   const caseNames = new Map(cases.data.map((item) => [item.id, item.name]));
   const caseChips = <CaseChips cases={cases.data} counts={countByCase(documents.data)} />;
 
-  const header = (
-    <View style={styles.heading}>
-      <ThemedText type="label" themeColor="textSecondary">
-        {formatWeekdayDate(now, i18n.language)}
-      </ThemedText>
-      <ThemedText type="subtitle" role="heading">
-        {t('documents.title')}
-      </ThemedText>
-    </View>
-  );
-
   if (documents.data.length === 0) {
     return (
       <ThemedView style={styles.container}>
         <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-          <View style={styles.top}>
-            {header}
-            {/* Cases left without documents stay in reach. */}
-            {cases.data.length > 0 && caseChips}
-          </View>
+          {/* Cases left without documents stay in reach. */}
+          {cases.data.length > 0 && <View style={styles.top}>{caseChips}</View>}
           <EmptyDocuments />
         </SafeAreaView>
       </ThemedView>
@@ -146,7 +131,6 @@ export function DocumentListScreen() {
       <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
         {/* Outside the list, so the search stays in reach however far it is scrolled. */}
         <View style={styles.top}>
-          {header}
           <SearchField value={query} onChangeText={setQuery} />
         </View>
         <FlatList
@@ -193,13 +177,9 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
   },
   top: {
-    gap: Spacing.two,
+    paddingTop: Spacing.two,
     paddingBottom: Spacing.two,
     paddingHorizontal: Spacing.three,
-  },
-  heading: {
-    gap: Spacing.one,
-    paddingTop: Spacing.three,
   },
   listHeader: {
     gap: Spacing.three,
