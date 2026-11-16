@@ -8,7 +8,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { NameForm } from '@/components/ui/name-form';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { CaseActionsButton, CaseActionsSheet } from '@/features/cases/components/case-actions';
 import { caseQueries, useDeleteCase, useRenameCase } from '@/features/cases/queries';
 import { MAX_CASE_NAME_LENGTH } from '@/features/cases/types';
@@ -163,9 +163,7 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing.two,
     padding: Spacing.four,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
   },
   header: {
     gap: Spacing.three,

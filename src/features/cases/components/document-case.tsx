@@ -8,7 +8,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { ThemedText } from '@/components/themed-text';
 import { BottomSheet } from '@/components/ui/bottom-sheet';
 import { Button } from '@/components/ui/button';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { caseQueries, useMoveToCase } from '../queries';
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   options: {
     flexGrow: 0,

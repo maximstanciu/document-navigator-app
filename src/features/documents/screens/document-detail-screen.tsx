@@ -8,7 +8,7 @@ import { ScrollView, StyleSheet, type ScrollViewInstance } from 'react-native';
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { NameForm } from '@/components/ui/name-form';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { AnalysisStatusPanel } from '@/features/analysis/components/analysis-status-panel';
 import type { DocumentCountryChoice } from '@/features/analysis/document-country';
 import { useAnalyzeDocument } from '@/features/analysis/queries';
@@ -175,8 +175,6 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing.four,
     padding: Spacing.four,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
   },
 });

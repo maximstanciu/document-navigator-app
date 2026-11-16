@@ -1,10 +1,10 @@
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
+import { MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type QuoteProps = {
@@ -52,15 +52,7 @@ export function QuoteDisclosure({ quote, page }: QuoteProps) {
         <ThemedText type="small" themeColor="tint">
           {label}
         </ThemedText>
-        <SymbolView
-          name={
-            open
-              ? { ios: 'chevron.up', android: 'expand_less', web: 'expand_less' }
-              : { ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }
-          }
-          size={16}
-          tintColor={theme.tint}
-        />
+        <DisclosureChevron open={open} color={theme.tint} />
       </Pressable>
       {open && (
         <ThemedText type="small" style={[styles.quote, styles.text, { borderColor: theme.border }]}>
@@ -91,6 +83,6 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

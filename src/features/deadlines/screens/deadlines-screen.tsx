@@ -3,13 +3,13 @@ import { useFocusEffect } from 'expo-router';
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { SectionList, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
+import { TabScreen } from '@/components/tab-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { useNow } from '@/hooks/use-now';
 import type { ActionRecord, DeadlineRecord } from '@/lib/db/types';
@@ -169,85 +169,74 @@ export function DeadlinesScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        {/* Outside the list, so the offer to undo stays in sight however far it is scrolled. */}
-        {(offer || snoozedAt || failed) && (
-          <View style={styles.top}>
-            {offer && (
-              <ThemedView type="backgroundSelected" style={styles.undo}>
-                <ThemedText type="small" role="alert" style={styles.undoMessage}>
-                  {offer.message}
-                </ThemedText>
-                <Button
-                  label={t('deadlines.undo.action')}
-                  aria-label={offer.label}
-                  variant="plain"
-                  disabled={busy}
-                  onPress={offer.run}
-                />
-              </ThemedView>
-            )}
-            {snoozedAt && (
-              <ThemedView type="backgroundSelected" style={styles.undo}>
-                <ThemedText type="small" role="alert" style={styles.undoMessage}>
-                  {t('deadlines.snoozed', { time: snoozedAt })}
-                </ThemedText>
-              </ThemedView>
-            )}
-            {failed && (
-              <ThemedText type="small" role="alert">
-                {t('deadlines.changeFailed')}
+    <TabScreen>
+      {/* Outside the list, so the offer to undo stays in sight however far it is scrolled. */}
+      {(offer || snoozedAt || failed) && (
+        <View style={styles.top}>
+          {offer && (
+            <ThemedView type="backgroundSelected" style={styles.undo}>
+              <ThemedText type="small" role="alert" style={styles.undoMessage}>
+                {offer.message}
               </ThemedText>
-            )}
-          </View>
-        )}
-        <SectionList
-          sections={sections}
-          keyExtractor={(deadline) => deadline.id}
-          renderSectionHeader={({ section }) => (
-            // «Overdue» in the risk color; its words say it anyway.
-            <ThemedText
-              type="label"
-              role="heading"
-              themeColor={section.key === 'overdue' ? 'riskHigh' : 'textSecondary'}
-              style={styles.sectionHeader}>
-              {section.title}
+              <Button
+                label={t('deadlines.undo.action')}
+                aria-label={offer.label}
+                variant="plain"
+                disabled={busy}
+                onPress={offer.run}
+              />
+            </ThemedView>
+          )}
+          {snoozedAt && (
+            <ThemedView type="backgroundSelected" style={styles.undo}>
+              <ThemedText type="small" role="alert" style={styles.undoMessage}>
+                {t('deadlines.snoozed', { time: snoozedAt })}
+              </ThemedText>
+            </ThemedView>
+          )}
+          {failed && (
+            <ThemedText type="small" role="alert">
+              {t('deadlines.changeFailed')}
             </ThemedText>
           )}
-          renderItem={({ item }) => (
-            <TimelineItem
-              deadline={item}
-              actions={actionsByDeadline.get(item.id) ?? []}
-              documentTitle={titles.data.get(item.documentId)?.trim() || t('documents.untitled')}
-              today={today}
-              busy={busy}
-              onDeadlineDone={() => markDeadlineDone(item)}
-              onActionDone={(action, done) => markActionDone(item, action, done)}
-              onDismiss={() => markNotRelevant(item)}
-            />
-          )}
-          ListEmptyComponent={
-            <EmptyState title={t('deadlines.emptyTitle')} message={t('deadlines.emptyMessage')} />
-          }
-          stickySectionHeadersEnabled={false}
-          contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
-        />
-      </SafeAreaView>
-    </ThemedView>
+        </View>
+      )}
+      <SectionList
+        sections={sections}
+        keyExtractor={(deadline) => deadline.id}
+        renderSectionHeader={({ section }) => (
+          // «Overdue» in the risk color; its words say it anyway.
+          <ThemedText
+            type="label"
+            role="heading"
+            themeColor={section.key === 'overdue' ? 'riskHigh' : 'textSecondary'}
+            style={styles.sectionHeader}>
+            {section.title}
+          </ThemedText>
+        )}
+        renderItem={({ item }) => (
+          <TimelineItem
+            deadline={item}
+            actions={actionsByDeadline.get(item.id) ?? []}
+            documentTitle={titles.data.get(item.documentId)?.trim() || t('documents.untitled')}
+            today={today}
+            busy={busy}
+            onDeadlineDone={() => markDeadlineDone(item)}
+            onActionDone={(action, done) => markActionDone(item, action, done)}
+            onDismiss={() => markNotRelevant(item)}
+          />
+        )}
+        ListEmptyComponent={
+          <EmptyState title={t('deadlines.emptyTitle')} message={t('deadlines.emptyMessage')} />
+        }
+        stickySectionHeadersEnabled={false}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+      />
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
   top: {
     gap: Spacing.two,
     paddingTop: Spacing.two,

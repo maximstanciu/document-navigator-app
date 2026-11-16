@@ -13,7 +13,14 @@ import { useTranslation } from 'react-i18next';
 import { Keyboard, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { Fonts, Radius, Spacing, TabBarHeight, TabBarMaxWidth } from '@/constants/theme';
+import {
+  Fonts,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  TabBarHeight,
+  TabBarMaxWidth,
+} from '@/constants/theme';
 import { tabBarBottom } from '@/hooks/use-bottom-tab-inset';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -263,6 +270,6 @@ const styles = StyleSheet.create({
     height: PLUS_LENGTH,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

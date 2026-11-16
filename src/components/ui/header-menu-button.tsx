@@ -1,7 +1,7 @@
 import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet } from 'react-native';
 
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 /** «⋯» in a screen's header: opens the actions of what the screen shows. */
@@ -32,6 +32,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

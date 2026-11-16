@@ -6,7 +6,7 @@ import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
-import { DatePicker } from '@/components/ui/date-picker';
+import { DatePicker } from '@/components/ui/date-time-picker';
 import { Radius, Spacing } from '@/constants/theme';
 import { AddToCalendarButton } from '@/features/deadlines/components/add-to-calendar-button';
 import {
@@ -23,6 +23,19 @@ import { formatCalendarDate } from '@/lib/i18n/format';
 import { localCalendarDate } from '@/shared/calendar-date';
 
 import { QuoteDisclosure } from './quote';
+
+/** The actions to tick, each saved at once; a deadline's status follows its actions (REM-9). */
+function ActionChecklist({ actions }: { actions: readonly ActionRecord[] }) {
+  const setActionDone = useSetActionDone();
+  return actions.map((action) => (
+    <Checkbox
+      key={action.id}
+      label={action.description}
+      checked={action.done}
+      onChange={(done) => setActionDone.mutate({ id: action.id, done })}
+    />
+  ));
+}
 
 function useDueDate(deadline: DeadlineRecord) {
   const { i18n } = useTranslation();
@@ -95,7 +108,6 @@ export function DeadlineCard({ deadline, actions = [], documentTitle }: Deadline
   const { t } = useTranslation();
   const date = useDueDate(deadline);
   const [changingDate, setChangingDate] = useState(false);
-  const setActionDone = useSetActionDone();
   const setDeadlineDone = useSetDeadlineDone();
   const changeDate = useChangeDeadlineDate();
   const dismiss = useDismissDeadline();
@@ -110,14 +122,7 @@ export function DeadlineCard({ deadline, actions = [], documentTitle }: Deadline
         />
       )}
       <DeadlineFacts deadline={deadline} />
-      {actions.map((action) => (
-        <Checkbox
-          key={action.id}
-          label={action.description}
-          checked={action.done}
-          onChange={(done) => setActionDone.mutate({ id: action.id, done })}
-        />
-      ))}
+      <ActionChecklist actions={actions} />
       <DeadlineReminders deadline={deadline} />
       {changingDate ? (
         <DatePicker
@@ -163,17 +168,9 @@ export function DeadlineCard({ deadline, actions = [], documentTitle }: Deadline
 
 /** Actions the document asks for without a date (DET-3). */
 export function UndatedActions({ actions }: { actions: readonly ActionRecord[] }) {
-  const setActionDone = useSetActionDone();
   return (
     <ThemedView type="backgroundElement" style={styles.card}>
-      {actions.map((action) => (
-        <Checkbox
-          key={action.id}
-          label={action.description}
-          checked={action.done}
-          onChange={(done) => setActionDone.mutate({ id: action.id, done })}
-        />
-      ))}
+      <ActionChecklist actions={actions} />
     </ThemedView>
   );
 }

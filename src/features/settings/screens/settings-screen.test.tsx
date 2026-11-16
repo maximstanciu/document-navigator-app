@@ -17,8 +17,8 @@ import { SettingsScreen } from './settings-screen';
 
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));
 jest.mock('@/lib/api/client-headers', () => ({ getClientHeaders: async () => ({}) }));
-jest.mock('@/components/ui/time-picker', () =>
-  jest.requireActual('@/components/ui/time-picker.web')
+jest.mock('@/components/ui/date-time-picker', () =>
+  jest.requireActual('@/components/ui/date-time-picker.web')
 );
 
 let repositories: Repositories;

@@ -1,16 +1,17 @@
-import { insertAction, type NewAction } from './actions-repository';
+import { insertAction, WIPE_ACTION_CONTENT, type NewAction } from './actions-repository';
 import { queueJobDeletion } from './analysis-job-deletions-repository';
 import { fileDocuments } from './cases-repository';
-import type { SqlDatabase } from './database';
-import { insertDeadline, type NewDeadline } from './deadlines-repository';
+import type { SqlDatabase, SqlExecutor } from './database';
+import { insertDeadline, WIPE_DEADLINE_CONTENT, type NewDeadline } from './deadlines-repository';
 import { replaceDocumentRefs } from './document-refs';
 import { selectLinks } from './matter-numbers';
-import type { NewPage } from './pages-repository';
+import { insertPages, type NewPage } from './pages-repository';
+import { takeScheduledNotifications } from './scheduled-notifications-repository';
 import { buildSearchText, normalizeForSearch, searchablePartsOfAnalysis } from './search-text';
 import {
+  analysisFromJson,
   buildAssignments,
   containsPattern,
-  fromJson,
   placeholders,
   toJson,
   type Clock,
@@ -62,8 +63,7 @@ function toRecord(row: DocumentRow): DocumentRecord {
     mimeType: row.mime_type,
     pageCount: row.page_count,
     fileSize: row.file_size,
-    // Only an analysis that passed the shared schema is written; a new shape bumps `schemaVersion`.
-    analysis: fromJson(row.analysis) as DocumentRecord['analysis'],
+    analysis: analysisFromJson(row.analysis),
     analysisLocale: row.analysis_locale,
     legalMemoCountry: row.legal_memo_country,
     analyzedAt: row.analyzed_at,
@@ -92,7 +92,7 @@ type DocumentSummaryRow = Pick<
 /**
  * Active documents matching `where`, newest first, as summaries: SQLite works out the three facts
  * about the analysis, so the list never moves the analysis JSON or the search text into JS
- * (HOME-2). An analysis that isn't valid JSON reads as none, like `fromJson()`.
+ * (HOME-2). An analysis that isn't valid JSON reads as none, like `analysisFromJson()`.
  */
 function selectSummaries(where = '') {
   return `SELECT id, title, status, document_type, sender_name, page_count, created_at,
@@ -104,6 +104,18 @@ function selectSummaries(where = '') {
     FROM (SELECT *, CASE WHEN json_valid(analysis) THEN analysis END AS analysis_json
       FROM documents WHERE deleted_at IS NULL ${where})
     ORDER BY created_at DESC, id`;
+}
+
+/**
+ * The document `id` through `executor`, so also inside a transaction: deleted or not, or with
+ * `active` only while it isn't deleted.
+ */
+async function selectDocument(executor: SqlExecutor, id: string, { active = false } = {}) {
+  const row = await executor.getFirstAsync<DocumentRow>(
+    `SELECT ${COLUMNS} FROM documents WHERE id = ?${active ? ' AND deleted_at IS NULL' : ''}`,
+    [id]
+  );
+  return row ? toRecord(row) : null;
 }
 
 function toSummaryRecord(row: DocumentSummaryRow): DocumentSummaryRecord {
@@ -222,16 +234,9 @@ function titleAfterAnalysis(
 }
 
 export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
-  async function get(id: string): Promise<DocumentRecord | null> {
-    const row = await db.getFirstAsync<DocumentRow>(
-      `SELECT ${COLUMNS} FROM documents WHERE id = ? AND deleted_at IS NULL`,
-      [id]
-    );
-    return row ? toRecord(row) : null;
-  }
-
   return {
-    get,
+    /** The document, `null` when it doesn't exist or was deleted. */
+    get: (id: string): Promise<DocumentRecord | null> => selectDocument(db, id, { active: true }),
 
     /**
      * Creates a document together with its pages in order, in one transaction: a draft never exists
@@ -240,7 +245,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
      */
     async create(input: NewDocument, pages: readonly NewPage[] = []): Promise<DocumentRecord> {
       const timestamp = now().toISOString();
-      const row = await db.transaction(async (tx) => {
+      const document = await db.transaction(async (tx) => {
         await tx.runAsync(
           `INSERT INTO documents (id, title, status, case_id, source, mime_type, page_count,
             file_size, search_text, created_at, updated_at)
@@ -260,19 +265,11 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             timestamp,
           ]
         );
-        for (const [index, page] of pages.entries()) {
-          await tx.runAsync(
-            `INSERT INTO pages (id, document_id, page_index, relative_path, width, height)
-             VALUES (?, ?, ?, ?, ?, ?)`,
-            [page.id, input.id, index, page.relativePath, page.width, page.height]
-          );
-        }
-        return tx.getFirstAsync<DocumentRow>(`SELECT ${COLUMNS} FROM documents WHERE id = ?`, [
-          input.id,
-        ]);
+        await insertPages(tx, input.id, pages);
+        return selectDocument(tx, input.id);
       });
-      if (!row) throw new Error(`Document ${input.id} was not saved`);
-      return toRecord(row);
+      if (!document) throw new Error(`Document ${input.id} was not saved`);
+      return document;
     },
 
     /** Active documents, newest first, without their analyses (HOME-2). */
@@ -304,12 +301,9 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
 
     async update(id: string, patch: DocumentPatch): Promise<DocumentRecord> {
       return db.transaction(async (tx) => {
-        const row = await tx.getFirstAsync<DocumentRow>(
-          `SELECT ${COLUMNS} FROM documents WHERE id = ? AND deleted_at IS NULL`,
-          [id]
-        );
-        if (!row) throw new Error(`Document ${id} not found`);
-        const next = { ...toRecord(row), ...patch };
+        const current = await selectDocument(tx, id, { active: true });
+        if (!current) throw new Error(`Document ${id} not found`);
+        const next = { ...current, ...patch };
         const { sql, params } = buildAssignments(patch, PATCH_COLUMNS);
         await tx.runAsync(
           `UPDATE documents SET ${sql ? `${sql}, ` : ''}search_text = ?, updated_at = ? WHERE id = ?`,
@@ -317,11 +311,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         );
         // The numbers are derived from the analysis (LINK-1): they change with it.
         if (patch.analysis !== undefined) await replaceDocumentRefs(tx, id, next.analysis);
-        const updated = await tx.getFirstAsync<DocumentRow>(
-          `SELECT ${COLUMNS} FROM documents WHERE id = ?`,
-          [id]
-        );
-        return toRecord(updated as DocumentRow);
+        return (await selectDocument(tx, id)) as DocumentRecord;
       });
     },
 
@@ -411,10 +401,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         const { analysis } = outcome;
         const named = {
           title: titleAfterAnalysis(
-            {
-              title: current.title,
-              analysis: fromJson(current.analysis) as DocumentRecord['analysis'],
-            },
+            { title: current.title, analysis: analysisFromJson(current.analysis) },
             analysis
           ),
           senderName: analysis.sender?.name ?? null,
@@ -476,15 +463,14 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         );
         if (merge.removeDeadlineIds.length > 0) {
           await tx.runAsync(
-            `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
-               computation = NULL, updated_at = ?, deleted_at = ?
+            `UPDATE deadlines SET ${WIPE_DEADLINE_CONTENT}, updated_at = ?, deleted_at = ?
              WHERE id IN (${placeholders(merge.removeDeadlineIds.length)})`,
             [timestamp, timestamp, ...merge.removeDeadlineIds]
           );
         }
         if (merge.removeActionIds.length > 0) {
           await tx.runAsync(
-            `UPDATE actions SET description = '', updated_at = ?, deleted_at = ?
+            `UPDATE actions SET ${WIPE_ACTION_CONTENT}, updated_at = ?, deleted_at = ?
              WHERE id IN (${placeholders(merge.removeActionIds.length)})`,
             [timestamp, timestamp, ...merge.removeActionIds]
           );
@@ -635,10 +621,10 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     /**
      * Deletes a document (STO-6): wipes its content and that of its deadlines and actions, removes
      * its page rows, scheduled reminders, numbers and «Not related» pairs (LINK-5), and keeps a
-     * tombstone for future sync. The job of an
-     * analysis that is running, or whose upload may have reached the server before it broke off, is
-     * queued for deletion there. The caller deletes the returned page files, cancels the returned
-     * notifications and sends the queued deletions. Returns `null` if already gone.
+     * tombstone for future sync. The job of an analysis that is running, or whose upload may have
+     * reached the server before it broke off, is queued for deletion there. The caller deletes the
+     * returned page files, cancels the returned notifications and sends the queued deletions.
+     * Returns `null` if already gone.
      */
     async remove(id: string): Promise<RemovedDocument | null> {
       return db.transaction(async (tx) => {
@@ -671,29 +657,17 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
             id,
           ])
         ).map((row) => row.id);
-        let notificationIds: string[] = [];
-        if (deadlineIds.length > 0) {
-          const inList = placeholders(deadlineIds.length);
-          notificationIds = (
-            await tx.getAllAsync<{ notification_id: string }>(
-              `SELECT notification_id FROM scheduled_notifications WHERE deadline_id IN (${inList})`,
-              deadlineIds
-            )
-          ).map((row) => row.notification_id);
-          await tx.runAsync(
-            `DELETE FROM scheduled_notifications WHERE deadline_id IN (${inList})`,
-            deadlineIds
-          );
-        }
+        const notificationIds = await takeScheduledNotifications(tx, deadlineIds);
 
         await tx.runAsync(
-          `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
-             computation = NULL, updated_at = ?, deleted_at = COALESCE(deleted_at, ?)
+          `UPDATE deadlines SET ${WIPE_DEADLINE_CONTENT}, updated_at = ?,
+             deleted_at = COALESCE(deleted_at, ?)
            WHERE document_id = ?`,
           [timestamp, timestamp, id]
         );
         await tx.runAsync(
-          `UPDATE actions SET description = '', updated_at = ?, deleted_at = COALESCE(deleted_at, ?)
+          `UPDATE actions SET ${WIPE_ACTION_CONTENT}, updated_at = ?,
+             deleted_at = COALESCE(deleted_at, ?)
            WHERE document_id = ?`,
           [timestamp, timestamp, id]
         );

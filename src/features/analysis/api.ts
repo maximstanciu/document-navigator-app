@@ -6,24 +6,25 @@ import {
   requestNotificationPermission,
   type NotificationPermission,
 } from '@/features/reminders/notifications';
-import { ApiError, apiClient } from '@/lib/api/client';
+import { ApiError, apiClient, isRefusedRequest } from '@/lib/api/client';
 import { getRepositories } from '@/lib/db/repositories';
 import type { DocumentMimeType, DocumentRecord } from '@/lib/db/types';
 import { pageFileExists, pageFileUri } from '@/lib/files/page-files';
 import { currentLanguage } from '@/lib/i18n/i18n';
 import { isOnline } from '@/lib/network';
+import { createSerialQueue } from '@/lib/serial-queue';
 import {
   ANALYZE_FIELDS,
   analysisJobStateSchema,
   apiErrorBodySchema,
   type AnalysisJobState,
+  type AnalyzeFormFields,
 } from '@/shared/analysis/contract';
 import { localCalendarDate } from '@/shared/calendar-date';
 import type { ExplanationLocale } from '@/shared/explanation-locales';
 import type { MemoCountry } from '@/shared/legal-memo-countries';
 import { ACTIVE_JOBS_PER_DEVICE } from '@/shared/limits';
 import { limitsResponseSchema, type LimitsResponse } from '@/shared/limits-contract';
-import type { UiLocale } from '@/shared/ui-locales';
 
 import { analysisRecords } from './analysis-records';
 import { memoCountryFor, type DocumentCountryChoice } from './document-country';
@@ -56,19 +57,7 @@ const JOB_REQUEST_TIMEOUT_MS = 30_000;
 
 const jobPath = (jobId: string) => `${JOBS_PATH}/${encodeURIComponent(jobId)}`;
 
-export type UploadRequest = {
-  files: readonly UploadFile[];
-  locale: ExplanationLocale;
-  /** The device's date, `YYYY-MM-DD`, and IANA time zone, for relative deadlines (ANL-5). */
-  today: string;
-  timezone: string;
-  /** The interface language, for the push about the finished job (ANL-12). */
-  uiLocale: UiLocale;
-  /** The Expo push token for that push, if notifications are allowed (ANL-12). */
-  pushToken: string | null;
-  /** Whose legal memo the analysis starts with (ANL-14); `null` for none. */
-  country: MemoCountry | null;
-};
+export type UploadRequest = AnalyzeFormFields & { files: readonly UploadFile[] };
 
 /** A state the shared schema rejects counts as `analysis_failed` (SPEC §7.2). */
 function parseJobState(body: unknown): AnalysisJobState {
@@ -194,18 +183,9 @@ type Upload = { controller: AbortController; ended: Promise<void> };
  */
 const uploads = new Map<string, Upload>();
 
-/** Runs `work` after the previous call has finished: one check of the jobs at a time. */
-function serialQueue() {
-  let last: Promise<unknown> = Promise.resolve();
-  return <T>(work: () => Promise<T>): Promise<T> => {
-    const run = last.then(work, work);
-    last = run.catch(() => undefined);
-    return run;
-  };
-}
-
-const oneCheckAtATime = serialQueue();
-const oneDeletionRunAtATime = serialQueue();
+/** One check of the jobs at a time, and one run of the queued deletions. */
+const oneCheckAtATime = createSerialQueue();
+const oneDeletionRunAtATime = createSerialQueue();
 
 /**
  * Analyzes a draft or a failed document, or a ready one again (ANL-1, ANL-3, ANL-8, SPEC §6.3).
@@ -330,13 +310,6 @@ export async function deleteAllAnalysisJobs(): Promise<void> {
   for (const jobId of jobIds) void deleteJob(jobId).catch(() => undefined);
 }
 
-/** A `4xx` other than `429` won't change by asking again: the request itself is refused. */
-function isRefused(error: unknown): error is ApiError {
-  return (
-    error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429
-  );
-}
-
 /**
  * Sends `DELETE` for every job waiting to be deleted (SPEC §6.2) and forgets the ones the server
  * answered. A job the server refuses to delete (e.g. `426`) is forgotten too: it expires there by
@@ -349,7 +322,7 @@ export function sendJobDeletions(): Promise<void> {
       try {
         await deleteJob(jobId);
       } catch (error) {
-        if (!isRefused(error)) continue;
+        if (!isRefusedRequest(error)) continue;
       }
       await analysisJobDeletions.remove(jobId);
     }
@@ -471,7 +444,7 @@ async function checkJob(job: { id: string; jobId: string }): Promise<JobProgress
         return 'ended';
       }
     }
-    if (error instanceof AnalysisError || isRefused(error)) {
+    if (error instanceof AnalysisError || isRefusedRequest(error)) {
       const failure = toAnalysisError(error);
       await documents.failAnalysis(job.id, { ...job, code: failure.code, removeJob: true });
       return 'ended';

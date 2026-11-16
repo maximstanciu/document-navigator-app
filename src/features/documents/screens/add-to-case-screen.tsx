@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, Stack } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, Pressable, StyleSheet, View } from 'react-native';
@@ -10,7 +9,8 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { MaxContentWidth, MinTouchTarget, Spacing } from '@/constants/theme';
+import { CheckboxMark } from '@/components/ui/checkbox';
+import { ContentColumn, MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { caseQueries, useMoveToCase } from '@/features/cases/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTimestampDate } from '@/lib/i18n/format';
@@ -34,7 +34,6 @@ function DocumentChoice({
   selected: boolean;
   onToggle: () => void;
 }) {
-  const theme = useTheme();
   const { t, i18n } = useTranslation();
   const title = displayTitle(document.title, t);
   const detail = otherCase
@@ -48,20 +47,7 @@ function DocumentChoice({
       aria-label={`${title}, ${detail}`}
       onPress={onToggle}
       style={({ pressed }) => [styles.choice, pressed && styles.pressed]}>
-      {/* The mark, not only its color, tells a chosen document. */}
-      <SymbolView
-        name={
-          selected
-            ? { ios: 'checkmark.square.fill', android: 'check_box', web: 'check_box' }
-            : {
-                ios: 'square',
-                android: 'check_box_outline_blank',
-                web: 'check_box_outline_blank',
-              }
-        }
-        size={24}
-        tintColor={selected ? theme.tint : theme.textSecondary}
-      />
+      <CheckboxMark checked={selected} />
       <View style={styles.choiceText}>
         <ThemedText type="smallBold" numberOfLines={2}>
           {title}
@@ -173,9 +159,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     gap: Spacing.one,
     padding: Spacing.four,
   },
@@ -194,12 +178,10 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   footer: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     gap: Spacing.two,
     paddingHorizontal: Spacing.four,
     paddingTop: Spacing.three,

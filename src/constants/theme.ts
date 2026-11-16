@@ -119,3 +119,14 @@ export const TabBarMaxWidth = 480;
 /** Minimum touch target size (Apple HIG 44pt, Material 48dp). */
 export const MinTouchTarget = 44;
 export const MaxContentWidth = 800;
+
+/** A screen's content as a centred column: the full width on a phone, `MaxContentWidth` at most. */
+export const ContentColumn = {
+  width: '100%',
+  maxWidth: MaxContentWidth,
+  alignSelf: 'center',
+} as const;
+
+/** How a pressable shows the press, and that it is disabled (the label still says so too). */
+export const PressedOpacity = 0.7;
+export const DisabledOpacity = 0.4;

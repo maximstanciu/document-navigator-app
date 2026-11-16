@@ -2,7 +2,7 @@ import { SymbolView } from 'expo-symbols';
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { DisabledOpacity, MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export type CheckboxProps = Omit<PressableProps, 'children' | 'style' | 'role' | 'onPress'> & {
@@ -12,10 +12,24 @@ export type CheckboxProps = Omit<PressableProps, 'children' | 'style' | 'role' |
   onChange: (checked: boolean) => void;
 };
 
+/** The mark of a checkbox: a ticked or an empty square, so a choice never shows by color alone. */
+export function CheckboxMark({ checked }: { checked: boolean }) {
+  const theme = useTheme();
+  return (
+    <SymbolView
+      name={
+        checked
+          ? { ios: 'checkmark.square.fill', android: 'check_box', web: 'check_box' }
+          : { ios: 'square', android: 'check_box_outline_blank', web: 'check_box_outline_blank' }
+      }
+      size={24}
+      tintColor={checked ? theme.tint : theme.textSecondary}
+    />
+  );
+}
+
 /** A labelled checkbox; a checked item reads as done (struck through, secondary color). */
 export function Checkbox({ label, checked, onChange, disabled, ...rest }: CheckboxProps) {
-  const theme = useTheme();
-
   return (
     <Pressable
       role="checkbox"
@@ -26,19 +40,7 @@ export function Checkbox({ label, checked, onChange, disabled, ...rest }: Checkb
       onPress={() => onChange(!checked)}
       style={({ pressed }) => [styles.row, pressed && styles.pressed, disabled && styles.disabled]}
       {...rest}>
-      <SymbolView
-        name={
-          checked
-            ? { ios: 'checkmark.square.fill', android: 'check_box', web: 'check_box' }
-            : {
-                ios: 'square',
-                android: 'check_box_outline_blank',
-                web: 'check_box_outline_blank',
-              }
-        }
-        size={24}
-        tintColor={checked ? theme.tint : theme.textSecondary}
-      />
+      <CheckboxMark checked={checked} />
       <ThemedText
         type="small"
         themeColor={checked ? 'textSecondary' : 'text'}
@@ -63,9 +65,9 @@ const styles = StyleSheet.create({
     textDecorationLine: 'line-through',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: DisabledOpacity,
   },
 });

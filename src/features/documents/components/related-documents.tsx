@@ -5,10 +5,11 @@ import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { Section } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Radius, Spacing } from '@/constants/theme';
+import { PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { RelatedCaseButton } from '@/features/cases/components/related-case-button';
 import { useTheme } from '@/hooks/use-theme';
 import { matterNumbersOf } from '@/lib/db/matter-numbers';
@@ -21,7 +22,6 @@ import { documentQueries, useDismissRelatedDocument } from '../queries';
 import { relatedState } from '../related';
 import type { RelatedDocument } from '../types';
 import { DueLine, dueText } from './attention-block';
-import { DetailSection } from './detail-section';
 import { InlineError } from './inline-error';
 
 type RelatedRowProps = {
@@ -148,9 +148,9 @@ export function RelatedDocuments({ documentId, caseId, analysis }: RelatedDocume
   if (related.isPending) return null;
   if (related.error) {
     return (
-      <DetailSection title={t('documents.related.title')}>
+      <Section title={t('documents.related.title')}>
         <InlineError onRetry={() => related.refetch()} />
-      </DetailSection>
+      </Section>
     );
   }
   if (related.data.length === 0) return null;
@@ -158,7 +158,7 @@ export function RelatedDocuments({ documentId, caseId, analysis }: RelatedDocume
   const written = new Map(matterNumbersOf(analysis).map(({ value, display }) => [value, display]));
 
   return (
-    <DetailSection title={t('documents.related.title')}>
+    <Section title={t('documents.related.title')}>
       {related.data.map((item) => (
         <RelatedRow
           key={item.id}
@@ -168,7 +168,7 @@ export function RelatedDocuments({ documentId, caseId, analysis }: RelatedDocume
           number={written.get(item.sharedNumber) ?? item.sharedNumber}
         />
       ))}
-    </DetailSection>
+    </Section>
   );
 }
 
@@ -182,7 +182,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   done: {
     flexDirection: 'row',

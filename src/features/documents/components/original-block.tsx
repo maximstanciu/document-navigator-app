@@ -4,6 +4,7 @@ import { SymbolView } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
+import { Section } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Spacing } from '@/constants/theme';
@@ -12,7 +13,6 @@ import { useTheme } from '@/hooks/use-theme';
 
 import { documentQueries } from '../queries';
 import type { DocumentDetail, DocumentPage } from '../types';
-import { DetailSection } from './detail-section';
 import { InlineError } from './inline-error';
 
 function PageTile({ page }: { page: DocumentPage }) {
@@ -82,7 +82,7 @@ export function OriginalBlock({ document }: { document: DocumentDetail }) {
     );
   }
 
-  return <DetailSection title={t('documents.section.original')}>{content}</DetailSection>;
+  return <Section title={t('documents.section.original')}>{content}</Section>;
 }
 
 const styles = StyleSheet.create({

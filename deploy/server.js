@@ -68,6 +68,17 @@ for (const signal of ['SIGTERM', 'SIGINT']) {
   });
 }
 
+// Node prints the error of a crash whole, and its message could quote a document (SPEC §7.1): log
+// it redacted instead, then exit as Node would, so the container restarts (`restart:` in compose).
+process.on('uncaughtException', (error) => {
+  logError(error);
+  process.exit(1);
+});
+process.on('unhandledRejection', (reason) => {
+  logError(reason);
+  process.exit(1);
+});
+
 /** Replaces client-supplied forwarding headers with the address of the TCP peer. */
 function useSocketAddress(req) {
   const dropped = new Set(['x-real-ip', 'x-forwarded-for']);

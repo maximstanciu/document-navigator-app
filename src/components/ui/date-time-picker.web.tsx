@@ -3,26 +3,35 @@ import { useTranslation } from 'react-i18next';
 import { StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { Button } from '@/components/ui/button';
 import { MinTouchTarget, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { isCalendarDate } from '@/shared/calendar-date';
 
-import type { DatePickerProps } from './date-picker';
+import {
+  PICKER_MODES,
+  PickerButtons,
+  type PickerMode,
+  type PickerProps,
+} from './date-time-picker-parts';
 
 /**
- * Web preview: `@expo/ui` has no date picker on web, so the date is typed as `YYYY-MM-DD`. Jest uses
- * this one too, since the native pickers can't run there.
+ * Web preview: `@expo/ui` has no date or time picker on web, so the value is typed (`YYYY-MM-DD`,
+ * `HH:mm`) and checked on «Save». Jest uses this one too: the native pickers can't run there.
  */
-export function DatePicker({ value, label, onConfirm, onCancel }: DatePickerProps) {
+function TextPicker({
+  mode,
+  value,
+  label,
+  onConfirm,
+  onCancel,
+}: PickerProps & { mode: PickerMode }) {
   const theme = useTheme();
   const { t } = useTranslation();
   const [text, setText] = useState(value);
   const [invalid, setInvalid] = useState(false);
 
   const save = () => {
-    const date = text.trim();
-    if (isCalendarDate(date)) onConfirm(date);
+    const typed = text.trim();
+    if (PICKER_MODES[mode].isValid(typed)) onConfirm(typed);
     else setInvalid(true);
   };
 
@@ -36,7 +45,7 @@ export function DatePicker({ value, label, onConfirm, onCancel }: DatePickerProp
           setInvalid(false);
         }}
         onSubmitEditing={save}
-        placeholder={t('datePicker.placeholder')}
+        placeholder={t(`${mode}Picker.placeholder`)}
         placeholderTextColor={theme.textSecondary}
         autoFocus
         style={[
@@ -46,15 +55,22 @@ export function DatePicker({ value, label, onConfirm, onCancel }: DatePickerProp
       />
       {invalid && (
         <ThemedText type="small" role="alert" style={{ color: theme.riskHigh }}>
-          {t('datePicker.invalid')}
+          {t(`${mode}Picker.invalid`)}
         </ThemedText>
       )}
-      <View style={styles.buttons}>
-        <Button label={t('common.save')} onPress={save} />
-        <Button label={t('common.cancel')} variant="secondary" onPress={onCancel} />
-      </View>
+      <PickerButtons onSave={save} onCancel={onCancel} />
     </View>
   );
+}
+
+/** Picks a calendar date (`YYYY-MM-DD`). */
+export function DatePicker(props: PickerProps) {
+  return <TextPicker mode="date" {...props} />;
+}
+
+/** Picks a time of day (`HH:mm`). */
+export function TimePicker(props: PickerProps) {
+  return <TextPicker mode="time" {...props} />;
 }
 
 const styles = StyleSheet.create({
@@ -67,10 +83,5 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.three,
     borderRadius: Spacing.two,
     borderWidth: 1,
-  },
-  buttons: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.two,
   },
 });

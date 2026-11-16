@@ -1,5 +1,6 @@
 import { getRepositories } from '@/lib/db/repositories';
 import { currentLanguage, i18n } from '@/lib/i18n/i18n';
+import { createSerialQueue } from '@/lib/serial-queue';
 
 import {
   cancelNotification,
@@ -62,7 +63,7 @@ async function sync(now: Date): Promise<SyncResult> {
   return { scheduled: schedule.length, cancelled: cancel.length };
 }
 
-let queue: Promise<unknown> = Promise.resolve();
+const oneSyncAtATime = createSerialQueue();
 
 /**
  * Makes the reminders scheduled in the OS match the open deadlines and settings (REM-7): the nearest
@@ -70,9 +71,7 @@ let queue: Promise<unknown> = Promise.resolve();
  * one at a time, so overlapping calls never schedule or record the same reminder twice.
  */
 export function syncReminders(now?: Date): Promise<SyncResult> {
-  const run = queue.then(() => sync(now ?? new Date()));
-  queue = run.catch(() => undefined);
-  return run;
+  return oneSyncAtATime(() => sync(now ?? new Date()));
 }
 
 /**

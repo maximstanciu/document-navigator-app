@@ -10,6 +10,7 @@ import {
 import { reminderKeys } from '@/features/reminders/queries';
 import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
+import { invalidateKeys } from '@/lib/query-client';
 
 import {
   analyzeDocument,
@@ -48,12 +49,13 @@ export function limitsQuery() {
  */
 function refreshAfterAnalysis(queryClient: QueryClient) {
   syncRemindersInBackground();
-  return Promise.all([
-    queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-    queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() }),
-    queryClient.invalidateQueries({ queryKey: dbKeys.actions.all() }),
-    queryClient.invalidateQueries({ queryKey: analysisKeys.limits() }),
-  ]);
+  return invalidateKeys(
+    queryClient,
+    dbKeys.documents.all(),
+    dbKeys.deadlines.all(),
+    dbKeys.actions.all(),
+    analysisKeys.limits()
+  );
 }
 
 /**
@@ -153,11 +155,12 @@ export function useCancelAnalysis() {
     mutationFn: cancelAnalysis,
     networkMode: 'always',
     onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-        queryClient.invalidateQueries({ queryKey: analysisKeys.jobs() }),
-        queryClient.invalidateQueries({ queryKey: analysisKeys.limits() }),
-      ]),
+      invalidateKeys(
+        queryClient,
+        dbKeys.documents.all(),
+        analysisKeys.jobs(),
+        analysisKeys.limits()
+      ),
   });
 }
 

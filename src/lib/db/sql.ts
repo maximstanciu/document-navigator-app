@@ -1,3 +1,5 @@
+import type { AnalysisResult } from '@/shared/analysis/schema';
+
 import type { SqlValue } from './database';
 
 export type Clock = () => Date;
@@ -26,6 +28,14 @@ export function fromJson(value: string | null): unknown {
   } catch {
     return null;
   }
+}
+
+/**
+ * The stored analysis of a document: only one that passed the shared schema is written, and a new
+ * shape bumps `schemaVersion`. A corrupted value reads as none.
+ */
+export function analysisFromJson(value: string | null): AnalysisResult | null {
+  return fromJson(value) as AnalysisResult | null;
 }
 
 export function toFlag(value: boolean): SqlValue {

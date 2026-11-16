@@ -1,6 +1,7 @@
 import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
+import { invalidateKeys } from '@/lib/query-client';
 
 import { createCase, deleteCase, getCase, listCases, moveToCase, renameCase } from './api';
 
@@ -33,11 +34,7 @@ function useCasesMutation<TVariables, TResult>(
   const queryClient = useQueryClient();
   return useMutation({
     mutationFn,
-    onSettled: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: dbKeys.cases.all() }),
-        queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-      ]),
+    onSettled: () => invalidateKeys(queryClient, dbKeys.cases.all(), dbKeys.documents.all()),
   });
 }
 

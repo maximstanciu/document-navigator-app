@@ -46,11 +46,12 @@ src/
                        #   reminders, onboarding, settings (see the plan's target structure)
     types.ts api.ts queries.ts
     components/ screens/
-  components/          # shared UI; ui/ for primitives (Button), screen-state.tsx for loading/error/empty
-  constants/theme.ts   # colors (light/dark), Spacing, Fonts, layout constants
+  components/          # shared UI: ui/ for primitives (Button, Checkbox, date/time pickers),
+                       #   screen-state.tsx (loading/error/empty), tab-screen.tsx, section.tsx
+  constants/theme.ts   # colors (light/dark), Spacing, Fonts, layout and press constants
   hooks/               # shared hooks (useTheme, useColorScheme)
-  lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts, device-id.ts,
-                       #   network.ts
+  lib/                 # client infrastructure: env.ts, api/client.ts, query-client.ts,
+                       #   device-id.ts, network.ts, serial-queue.ts
     db/                # SQLite: migrations, repositories (getRepositories()), query keys (dbKeys)
     files/             # page files under Paths.document/documents/<id>/ (relative paths in the DB)
     i18n/              # i18next instance, Intl polyfills, ru/en dictionaries (resources/),
@@ -79,7 +80,7 @@ scripts/eval/          # analysis quality evaluation: synthetic test documents w
 
 - **Routes are thin.** `src/app/**` files only read params and render a screen from `src/features/*/screens/`. API route files (`+api.ts`) only parse the request and delegate to a handler in `src/server/`. Never put components, hooks, utils, or tests in `src/app/`.
 - **Files** kebab-case; **exports** named (default exports only for route files). Import with the `@/` alias (`@/components/...`); relative imports only within a feature folder. No barrel `index.ts` files.
-- **Styling**: `StyleSheet.create`; colors from `useTheme()` / `ThemedText` / `ThemedView` only — no hex literals outside `src/constants/theme.ts` (ESLint fails on them); spacing from `Spacing`. Support light and dark mode. New color tokens need AA contrast in both themes — add the pair to `src/constants/theme.test.ts`. Risk levels and the fraud warning have their own tokens (`riskHigh`/`riskMedium`/`riskLow`/`fraudWarning` + `…Background`).
+- **Styling**: `StyleSheet.create`; colors from `useTheme()` / `ThemedText` / `ThemedView` only — no hex literals outside `src/constants/theme.ts` (ESLint fails on them); spacing from `Spacing`, press feedback from `PressedOpacity`/`DisabledOpacity`, a screen's centred column from `ContentColumn`. Support light and dark mode. New color tokens need AA contrast in both themes — add the pair to `src/constants/theme.test.ts`. Risk levels and the fraud warning have their own tokens (`riskHigh`/`riskMedium`/`riskLow`/`fraudWarning` + `…Background`).
 - **Data is local-first.** Documents, pages, deadlines, actions and settings live on the device in SQLite; access them only through repositories in `src/lib/db/` (`getRepositories()`), read and written through React Query (`queryOptions` for reads, mutations that invalidate the affected `dbKeys`). Local queries spread `localQueryDefaults` (`staleTime: Infinity`, no retries). The only HTTP calls are to this app's own API routes (`/api/v1/*`) through `apiClient`. No `fetch`, direct DB calls, or `useEffect` data loading in components. Every data screen handles loading, error (with retry), and empty states.
   - `features/documents` is the reference implementation of a local-data feature.
 - **Feature dependencies**: features may import another feature's components and explicitly shared functions (e.g. `syncReminders()`), never in a cycle (`import/no-cycle` on `src/features/**`). DB access always goes through `src/lib/db`, never another feature's internals.

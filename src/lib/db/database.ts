@@ -1,5 +1,7 @@
 import type { SQLiteDatabase } from 'expo-sqlite';
 
+import { createSerialQueue } from '@/lib/serial-queue';
+
 export type SqlValue = string | number | null;
 export type SqlParams = readonly SqlValue[];
 
@@ -18,20 +20,11 @@ export type SqlDatabase = SqlExecutor & {
 };
 
 /**
- * Runs tasks one at a time. expo-sqlite's `withTransactionAsync` pulls any query that runs meanwhile
- * into the transaction, and `withExclusiveTransactionAsync` opens a second connection that can fail
- * with "database is locked" (and doesn't exist on web). Serializing all access avoids both.
+ * Wraps an executor so that every call and every transaction runs through one serial queue.
+ * expo-sqlite's `withTransactionAsync` pulls any query that runs meanwhile into the transaction,
+ * and `withExclusiveTransactionAsync` opens a second connection that can fail with "database is
+ * locked" (and doesn't exist on web). Serializing all access avoids both.
  */
-export function createSerialQueue() {
-  let tail: Promise<unknown> = Promise.resolve();
-  return function enqueue<T>(task: () => Promise<T>): Promise<T> {
-    const result = tail.then(task);
-    tail = result.catch(() => undefined);
-    return result;
-  };
-}
-
-/** Wraps an executor so that every call and every transaction runs through one serial queue. */
 export function createSerialDatabase(
   executor: SqlExecutor,
   runInTransaction: <T>(work: () => Promise<T>) => Promise<T>

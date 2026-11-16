@@ -24,6 +24,16 @@ export class ApiTimeoutError extends Error {
   }
 }
 
+/**
+ * A `4xx` other than `429`: the server refused the request itself, so asking again won't change the
+ * answer. Network failures, timeouts, `429` and `5xx` may.
+ */
+export function isRefusedRequest(error: unknown): error is ApiError {
+  return (
+    error instanceof ApiError && error.status >= 400 && error.status < 500 && error.status !== 429
+  );
+}
+
 type QueryParams = Record<string, string | number | boolean | undefined>;
 
 export type RequestOptions = Omit<RequestInit, 'body' | 'headers' | 'method'> & {

@@ -7,7 +7,7 @@ import { EmptyState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useAnalyzeDocument } from '@/features/analysis/queries';
 import type { DocumentSource } from '@/lib/db/types';
 import { MAX_IMAGE_PAGES } from '@/shared/limits';
@@ -118,9 +118,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     gap: Spacing.two,
     padding: Spacing.three,
   },
@@ -128,9 +126,7 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   footer: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     gap: Spacing.two,
     paddingHorizontal: Spacing.three,
     paddingTop: Spacing.two,

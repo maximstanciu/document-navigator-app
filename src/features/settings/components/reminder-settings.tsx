@@ -4,7 +4,7 @@ import { StyleSheet, Switch, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
-import { TimePicker } from '@/components/ui/time-picker';
+import { TimePicker } from '@/components/ui/date-time-picker';
 import { Spacing } from '@/constants/theme';
 import { PREPARATION_OFFSET_DAYS } from '@/features/reminders/plan-reminders';
 import { useTheme } from '@/hooks/use-theme';

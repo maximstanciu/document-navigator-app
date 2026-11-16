@@ -2,12 +2,11 @@ import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import { useDeferredValue, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
+import { TabScreen } from '@/components/tab-screen';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { CaseChips } from '@/features/cases/components/case-chips';
 import { caseQueries } from '@/features/cases/queries';
 import { deadlineQueries } from '@/features/deadlines/queries';
@@ -89,13 +88,11 @@ export function DocumentListScreen() {
 
   if (documents.data.length === 0) {
     return (
-      <ThemedView style={styles.container}>
-        <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-          {/* Cases left without documents stay in reach. */}
-          {cases.data.length > 0 && <View style={styles.top}>{caseChips}</View>}
-          <EmptyDocuments />
-        </SafeAreaView>
-      </ThemedView>
+      <TabScreen>
+        {/* Cases left without documents stay in reach. */}
+        {cases.data.length > 0 && <View style={styles.top}>{caseChips}</View>}
+        <EmptyDocuments />
+      </TabScreen>
     );
   }
 
@@ -127,55 +124,44 @@ export function DocumentListScreen() {
   }
 
   return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        {/* Outside the list, so the search stays in reach however far it is scrolled. */}
-        <View style={styles.top}>
-          <SearchField value={query} onChangeText={setQuery} />
-        </View>
-        <FlatList
-          data={shown}
-          keyExtractor={(item) => item.id}
-          renderItem={({ item }) => (
-            <DocumentListItem
-              document={item}
-              nearestDeadline={nearest.get(item.id)?.[0]}
-              today={today}
-              caseName={item.caseId === null ? undefined : caseNames.get(item.caseId)}
-            />
-          )}
-          ListHeaderComponent={
-            <View style={styles.listHeader}>
-              <AttentionBlock items={attention} today={today} />
-              {!searching && caseChips}
-              <ThemedText type="label" role="heading" themeColor="textSecondary">
-                {searching ? t('documents.search.results') : t('documents.allDocuments')}
-              </ThemedText>
-              {types.length > 1 && (
-                <TypeFilterBar types={types} selected={activeFilter} onSelect={setTypeFilter} />
-              )}
-            </View>
-          }
-          ListEmptyComponent={empty}
-          keyboardShouldPersistTaps="handled"
-          keyboardDismissMode="on-drag"
-          contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
-        />
-      </SafeAreaView>
-    </ThemedView>
+    <TabScreen>
+      {/* Outside the list, so the search stays in reach however far it is scrolled. */}
+      <View style={styles.top}>
+        <SearchField value={query} onChangeText={setQuery} />
+      </View>
+      <FlatList
+        data={shown}
+        keyExtractor={(item) => item.id}
+        renderItem={({ item }) => (
+          <DocumentListItem
+            document={item}
+            nearestDeadline={nearest.get(item.id)?.[0]}
+            today={today}
+            caseName={item.caseId === null ? undefined : caseNames.get(item.caseId)}
+          />
+        )}
+        ListHeaderComponent={
+          <View style={styles.listHeader}>
+            <AttentionBlock items={attention} today={today} />
+            {!searching && caseChips}
+            <ThemedText type="label" role="heading" themeColor="textSecondary">
+              {searching ? t('documents.search.results') : t('documents.allDocuments')}
+            </ThemedText>
+            {types.length > 1 && (
+              <TypeFilterBar types={types} selected={activeFilter} onSelect={setTypeFilter} />
+            )}
+          </View>
+        }
+        ListEmptyComponent={empty}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}
+      />
+    </TabScreen>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
   top: {
     paddingTop: Spacing.two,
     paddingBottom: Spacing.two,

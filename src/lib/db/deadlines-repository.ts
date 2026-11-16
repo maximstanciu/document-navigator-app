@@ -1,6 +1,7 @@
 import { isCalendarDate } from '@/shared/calendar-date';
 
 import type { SqlDatabase, SqlExecutor, SqlValue } from './database';
+import { takeScheduledNotifications } from './scheduled-notifications-repository';
 import { buildAssignments, fromJson, placeholders, toJson, type Clock } from './sql';
 import type { DeadlineRecord, DeadlineStatus } from './types';
 
@@ -106,6 +107,13 @@ const PATCH_COLUMNS = {
   },
   snoozedUntil: { column: 'snoozed_until', toSql: text },
 } as const;
+
+/**
+ * `SET` assignments that wipe what a deleted deadline said (STO-6): its description, the analysis's
+ * date, quote and computation. The row stays as a tombstone for future sync.
+ */
+export const WIPE_DEADLINE_CONTENT =
+  "description = '', original_date = NULL, source_quote = NULL, computation = NULL";
 
 export type DeadlineFilter = { documentId?: string; statuses?: readonly DeadlineStatus[] };
 
@@ -242,17 +250,10 @@ export function createDeadlinesRepository(db: SqlDatabase, now: Clock) {
     /** Soft-deletes a deadline, wipes its description and drops its scheduled reminders, returning their ids. */
     async remove(id: string): Promise<string[]> {
       return db.transaction(async (tx) => {
-        const notificationIds = (
-          await tx.getAllAsync<{ notification_id: string }>(
-            'SELECT notification_id FROM scheduled_notifications WHERE deadline_id = ?',
-            [id]
-          )
-        ).map((row) => row.notification_id);
-        await tx.runAsync('DELETE FROM scheduled_notifications WHERE deadline_id = ?', [id]);
+        const notificationIds = await takeScheduledNotifications(tx, [id]);
         const timestamp = now().toISOString();
         await tx.runAsync(
-          `UPDATE deadlines SET description = '', original_date = NULL, source_quote = NULL,
-             computation = NULL, updated_at = ?, deleted_at = ?
+          `UPDATE deadlines SET ${WIPE_DEADLINE_CONTENT}, updated_at = ?, deleted_at = ?
            WHERE id = ? AND deleted_at IS NULL`,
           [timestamp, timestamp, id]
         );

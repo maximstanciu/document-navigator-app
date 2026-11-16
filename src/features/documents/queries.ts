@@ -67,32 +67,32 @@ export const documentQueries = {
     }),
 };
 
-/** «Got it» on a warning in «Needs attention» (HOME-1). */
-export function useDismissAttention() {
+/** A change to documents alone: everything read under the documents' keys reads again. */
+function useDocumentsMutation<TVariables>(mutationFn: (variables: TVariables) => Promise<void>) {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: dismissAttention,
+    mutationFn,
     onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
   });
+}
+
+/** «Got it» on a warning in «Needs attention» (HOME-1). */
+export function useDismissAttention() {
+  return useDocumentsMutation(dismissAttention);
 }
 
 /** «Not related» on the row of a related document (LINK-4): it goes from both documents' screens. */
 export function useDismissRelatedDocument() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, relatedId }: { id: string; relatedId: string }) =>
-      dismissRelatedDocument(id, relatedId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-  });
+  return useDocumentsMutation(({ id, relatedId }: { id: string; relatedId: string }) =>
+    dismissRelatedDocument(id, relatedId)
+  );
 }
 
 /** «Rename» on the document screen (DET-9). */
 export function useRenameDocument() {
-  const queryClient = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, title }: { id: string; title: string }) => renameDocument(id, title),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-  });
+  return useDocumentsMutation(({ id, title }: { id: string; title: string }) =>
+    renameDocument(id, title)
+  );
 }
 
 /**

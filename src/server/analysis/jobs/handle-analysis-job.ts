@@ -1,8 +1,7 @@
 import { analysisJobPatchSchema } from '@/shared/analysis/contract';
 
-import { ApiFailure } from '../../http/api-failure';
+import { ApiFailure, handleApiFailures } from '../../http/api-failure';
 import { readJsonBody } from '../../http/json-body';
-import { redactError } from '../../logs/server-log';
 import type { ServerDeps } from '../../server-deps';
 import { analysisEndEvent, type AnalysisJob } from './analysis-job';
 import { readJobRequest } from './job-request';
@@ -17,7 +16,7 @@ const MAX_PATCH_BYTES = 4 * 1024;
  * `analysis.delivered`; asking again returns the same result for free.
  */
 export function handleGetAnalysis(request: Request, jobId: unknown, deps: ServerDeps) {
-  return answer(async () => {
+  return handleApiFailures(async () => {
     const { device, jobId: id } = await readJobRequest(request, jobId, deps);
     const job = findJob(deps, device, id);
     const state = jobState(job, deps);
@@ -42,7 +41,7 @@ export function handleGetAnalysis(request: Request, jobId: unknown, deps: Server
  * the job, given after the upload or changed since (ANL-12). `204`, or `404 job_not_found`.
  */
 export function handlePatchAnalysis(request: Request, jobId: unknown, deps: ServerDeps) {
-  return answer(async () => {
+  return handleApiFailures(async () => {
     const { device, jobId: id } = await readJobRequest(request, jobId, deps);
     const body = analysisJobPatchSchema.safeParse(await readJsonBody(request, MAX_PATCH_BYTES));
     if (!body.success) {
@@ -59,7 +58,7 @@ export function handlePatchAnalysis(request: Request, jobId: unknown, deps: Serv
  * its result and push token are gone. `204` for an unknown job too, so a repeat is safe.
  */
 export function handleDeleteAnalysis(request: Request, jobId: unknown, deps: ServerDeps) {
-  return answer(async () => {
+  return handleApiFailures(async () => {
     const { device, jobId: id } = await readJobRequest(request, jobId, deps);
     const job = deps.jobs.remove(device, id);
     if (job) await removed(job, deps);
@@ -84,14 +83,4 @@ function findJob(deps: ServerDeps, device: string, jobId: string): AnalysisJob {
   const job = deps.jobs.get(device, jobId);
   if (!job) throw new ApiFailure('job_not_found', 'This device has no job with this id.');
   return job;
-}
-
-/** Turns a failed check into its SPEC §7.2 body; anything else is rethrown without its message. */
-async function answer(handle: () => Promise<Response>): Promise<Response> {
-  try {
-    return await handle();
-  } catch (error) {
-    if (error instanceof ApiFailure) return error.toResponse();
-    throw redactError(error);
-  }
 }

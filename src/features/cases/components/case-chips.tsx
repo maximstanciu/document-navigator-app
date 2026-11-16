@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, ScrollView, StyleSheet, View, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import { MinTouchTarget, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import type { CaseSummary } from '../types';
@@ -120,6 +120,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

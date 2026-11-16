@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Spacing } from '@/constants/theme';
+import { DisabledOpacity, MinTouchTarget, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const REMOVE_SIZE = 32;
@@ -115,6 +115,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disabled: {
-    opacity: 0.4,
+    opacity: DisabledOpacity,
   },
 });

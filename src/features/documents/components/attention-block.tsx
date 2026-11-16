@@ -7,7 +7,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { Radius, Spacing, type ThemeColor } from '@/constants/theme';
+import { PressedOpacity, Radius, Spacing, type ThemeColor } from '@/constants/theme';
 import { formatDueIn } from '@/features/deadlines/format';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -403,7 +403,7 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   badges: {
     flexDirection: 'row',

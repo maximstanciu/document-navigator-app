@@ -2,12 +2,13 @@ import { useQuery } from '@tanstack/react-query';
 import Constants from 'expo-constants';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { ErrorState, LoadingState } from '@/components/screen-state';
+import { Section } from '@/components/section';
+import { TabScreen } from '@/components/tab-screen';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useBottomTabInset } from '@/hooks/use-bottom-tab-inset';
 import { RemainingAnalyses } from '@/features/analysis/components/remaining-analyses';
 import { settingsQuery } from '@/lib/db/settings-query';
@@ -17,7 +18,6 @@ import { DeleteAllData } from '../components/delete-all-data';
 import { DocumentCountryPicker } from '../components/document-country-picker';
 import { ExplanationLanguagePicker, LanguagePicker } from '../components/language-picker';
 import { ReminderSettings } from '../components/reminder-settings';
-import { SettingsSection } from '../components/settings-section';
 
 function InfoRow({ label, value }: { label: string; value: string }) {
   return (
@@ -48,21 +48,21 @@ export function SettingsScreen() {
   } else {
     content = (
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: bottomInset }]}>
-        <SettingsSection title={t('settings.sections.language')}>
+        <Section gap={Spacing.three} title={t('settings.sections.language')}>
           <LanguagePicker />
           <ExplanationLanguagePicker />
-        </SettingsSection>
-        <SettingsSection title={t('settings.sections.reminders')}>
+        </Section>
+        <Section gap={Spacing.three} title={t('settings.sections.reminders')}>
           <ReminderSettings />
-        </SettingsSection>
-        <SettingsSection title={t('settings.sections.analysis')}>
+        </Section>
+        <Section gap={Spacing.three} title={t('settings.sections.analysis')}>
           <DocumentCountryPicker />
           <RemainingAnalyses />
-        </SettingsSection>
-        <SettingsSection title={t('settings.sections.data')}>
+        </Section>
+        <Section gap={Spacing.three} title={t('settings.sections.data')}>
           <DeleteAllData />
-        </SettingsSection>
-        <SettingsSection title={t('settings.sections.about')}>
+        </Section>
+        <Section gap={Spacing.three} title={t('settings.sections.about')}>
           <ThemedText type="small" themeColor="textSecondary">
             {t('documents.disclaimer')}
           </ThemedText>
@@ -71,30 +71,15 @@ export function SettingsScreen() {
             value={Constants.expoConfig?.version ?? t('settings.unknown')}
           />
           <InfoRow label={t('settings.api')} value={env.apiUrl || t('settings.apiNotConfigured')} />
-        </SettingsSection>
+        </Section>
       </ScrollView>
     );
   }
 
-  return (
-    <ThemedView style={styles.container}>
-      <SafeAreaView edges={['top', 'left', 'right']} style={styles.safeArea}>
-        {content}
-      </SafeAreaView>
-    </ThemedView>
-  );
+  return <TabScreen>{content}</TabScreen>;
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'center',
-  },
-  safeArea: {
-    flex: 1,
-    maxWidth: MaxContentWidth,
-  },
   content: {
     gap: Spacing.five,
     paddingTop: Spacing.three,

@@ -1,6 +1,7 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 
 import { dbKeys } from '@/lib/db/query-keys';
+import { invalidateKeys } from '@/lib/query-client';
 import type { DocumentSource } from '@/lib/db/types';
 
 import { saveDraft } from './api';
@@ -19,10 +20,6 @@ export function useSaveDraft() {
       pages: readonly CapturedPage[];
       caseId?: string | null;
     }) => saveDraft(source, pages, caseId),
-    onSuccess: () =>
-      Promise.all([
-        queryClient.invalidateQueries({ queryKey: dbKeys.documents.all() }),
-        queryClient.invalidateQueries({ queryKey: dbKeys.pages.all() }),
-      ]),
+    onSuccess: () => invalidateKeys(queryClient, dbKeys.documents.all(), dbKeys.pages.all()),
   });
 }

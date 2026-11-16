@@ -1,7 +1,13 @@
 import { Pressable, StyleSheet, type PressableProps } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
-import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import {
+  DisabledOpacity,
+  MinTouchTarget,
+  PressedOpacity,
+  Radius,
+  Spacing,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 const HIT_SLOP = { left: Spacing.two, right: Spacing.two };
@@ -93,9 +99,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: DisabledOpacity,
   },
 });

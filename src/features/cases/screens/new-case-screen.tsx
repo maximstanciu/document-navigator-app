@@ -4,7 +4,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { NameForm } from '@/components/ui/name-form';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 import { useCreateCase } from '../queries';
@@ -76,8 +76,6 @@ const styles = StyleSheet.create({
   content: {
     gap: Spacing.three,
     padding: Spacing.four,
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
   },
 });

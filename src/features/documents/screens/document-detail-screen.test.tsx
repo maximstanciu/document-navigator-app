@@ -22,8 +22,8 @@ import { copyToClipboard } from '../clipboard';
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));
 jest.mock('../clipboard', () => ({ copyToClipboard: jest.fn(async () => {}) }));
 // The native date pickers can't run in Jest; the web field stands in for them.
-jest.mock('@/components/ui/date-picker', () =>
-  jest.requireActual('@/components/ui/date-picker.web')
+jest.mock('@/components/ui/date-time-picker', () =>
+  jest.requireActual('@/components/ui/date-time-picker.web')
 );
 
 const copy = jest.mocked(copyToClipboard);

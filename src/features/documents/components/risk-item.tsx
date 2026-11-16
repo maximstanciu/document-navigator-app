@@ -5,7 +5,14 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radius, Spacing, type ThemeColor } from '@/constants/theme';
+import { DisclosureChevron } from '@/components/ui/disclosure-chevron';
+import {
+  MinTouchTarget,
+  PressedOpacity,
+  Radius,
+  Spacing,
+  type ThemeColor,
+} from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { AnalysisResult, Level } from '@/shared/analysis/schema';
 
@@ -63,15 +70,7 @@ export function RiskItem({ risk }: { risk: Risk }) {
           <ThemedText type="smallBold" style={styles.title}>
             {risk.title}
           </ThemedText>
-          <SymbolView
-            name={
-              open
-                ? { ios: 'chevron.up', android: 'expand_less', web: 'expand_less' }
-                : { ios: 'chevron.down', android: 'expand_more', web: 'expand_more' }
-            }
-            size={16}
-            tintColor={theme.textSecondary}
-          />
+          <DisclosureChevron open={open} color={theme.textSecondary} />
         </View>
       </Pressable>
       {open && (
@@ -115,6 +114,6 @@ const styles = StyleSheet.create({
     gap: Spacing.two,
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

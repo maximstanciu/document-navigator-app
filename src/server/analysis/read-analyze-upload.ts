@@ -3,13 +3,14 @@ import {
   IMAGE_MIME_TYPE,
   isPushToken,
   PDF_MIME_TYPE,
+  type AnalyzeFormFields,
   type UploadMimeType,
 } from '@/shared/analysis/contract';
 import { isCalendarDate } from '@/shared/calendar-date';
-import { isExplanationLocale, type ExplanationLocale } from '@/shared/explanation-locales';
-import { isCountryCode, isMemoCountry, type MemoCountry } from '@/shared/legal-memo-countries';
+import { isExplanationLocale } from '@/shared/explanation-locales';
+import { isCountryCode, isMemoCountry } from '@/shared/legal-memo-countries';
 import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
-import { isUiLocale, type UiLocale } from '@/shared/ui-locales';
+import { isUiLocale } from '@/shared/ui-locales';
 
 import { ApiFailure } from '../http/api-failure';
 import { isFormFile, readMultipartForm, type FormFile } from '../http/multipart';
@@ -19,17 +20,8 @@ import type { LlmFile } from './llm-provider';
 /** Room for the text fields and part headers on top of the files themselves. */
 const MULTIPART_OVERHEAD_BYTES = 64 * 1024;
 
-export type AnalyzeUpload = {
-  kind: 'pdf' | 'images';
-  files: LlmFile[];
-  locale: ExplanationLocale;
-  today: string;
-  timezone: string;
-  uiLocale: UiLocale;
-  pushToken: string | null;
-  /** The memo the app asked for (ANL-14); a country without one counts as none. */
-  country: MemoCountry | null;
-};
+/** A checked upload; a `country` without a memo reads as none (ANL-14). */
+export type AnalyzeUpload = AnalyzeFormFields & { kind: 'pdf' | 'images'; files: LlmFile[] };
 
 /**
  * Reads and checks the body of `PUT /api/v1/analyses/{jobId}` (SPEC §7.2): one PDF or 1–30 JPEG

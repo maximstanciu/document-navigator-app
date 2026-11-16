@@ -6,7 +6,7 @@ import { ScrollView, StyleSheet } from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import type { DocumentSource } from '@/lib/db/types';
 
 import { useCaptureSession } from '../capture-session';
@@ -95,9 +95,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   content: {
-    width: '100%',
-    maxWidth: MaxContentWidth,
-    alignSelf: 'center',
+    ...ContentColumn,
     gap: Spacing.two,
     padding: Spacing.three,
   },

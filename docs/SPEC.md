@@ -862,7 +862,7 @@ interface LlmProvider {
 | `expo-task-manager` (уровень C, если понадобится)                   | Получить результат анализа в фоне сразу по приходу push (ANL-12)                                                                                                                                                                                                                                                                                                       | да                        |
 | `@expo/app-integrity` (перед релизом)                               | Аттестация приложения                                                                                                                                                                                                                                                                                                                                                  | да                        |
 
-Всё, что идёт с SDK Expo, ставится через `npx expo install`. Дата-пикер берётся из `@expo/ui` (установлен): `@expo/ui/community/datetime-picker` с API `@react-native-community/datetimepicker` — SwiftUI на iOS, Material 3 на Android. На web он ничего не рисует, поэтому там простое поле даты (`src/components/ui/date-picker.web.tsx`).
+Всё, что идёт с SDK Expo, ставится через `npx expo install`. Дата-пикер берётся из `@expo/ui` (установлен): `@expo/ui/community/datetime-picker` с API `@react-native-community/datetimepicker` — SwiftUI на iOS, Material 3 на Android. На web он ничего не рисует, поэтому там простые поля даты и времени (`src/components/ui/date-time-picker.web.tsx`).
 
 ## 11. Открытые вопросы
 

@@ -46,6 +46,9 @@ const PATCH_COLUMNS = {
   done: { column: 'done', toSql: (value: boolean | null) => toFlag(Boolean(value)) },
 } as const;
 
+/** `SET` assignments that wipe what a deleted action said (STO-6); the row stays as a tombstone. */
+export const WIPE_ACTION_CONTENT = "description = ''";
+
 /** Inserts one action through `tx`, so other repositories can add actions inside their transaction. */
 export async function insertAction(tx: SqlExecutor, action: NewAction, timestamp: string) {
   await tx.runAsync(`INSERT INTO actions (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)`, [
@@ -145,7 +148,7 @@ export function createActionsRepository(db: SqlDatabase, now: Clock) {
     async remove(id: string): Promise<void> {
       const timestamp = now().toISOString();
       await db.runAsync(
-        `UPDATE actions SET description = '', updated_at = ?, deleted_at = ?
+        `UPDATE actions SET ${WIPE_ACTION_CONTENT}, updated_at = ?, deleted_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
         [timestamp, timestamp, id]
       );

@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import { DisabledOpacity, MinTouchTarget, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type SourceOptionProps = {
@@ -58,6 +58,6 @@ const styles = StyleSheet.create({
     gap: Spacing.half,
   },
   disabled: {
-    opacity: 0.4,
+    opacity: DisabledOpacity,
   },
 });

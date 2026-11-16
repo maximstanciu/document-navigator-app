@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
-import { COUNTRY_CODE } from '../legal-memo-countries';
+import type { ExplanationLocale } from '../explanation-locales';
+import { COUNTRY_CODE, type MemoCountry } from '../legal-memo-countries';
+import type { UiLocale } from '../ui-locales';
 import { isUuidV4 } from '../uuid';
 import { analysisResultSchema } from './schema';
 
@@ -19,7 +21,21 @@ export const ANALYZE_FIELDS = {
   pushToken: 'pushToken',
   /** Optional: the country whose legal memo to start with, ISO 3166-1 alpha-2 (ANL-14). */
   country: 'country',
-} as const;
+} as const satisfies Record<'files' | keyof AnalyzeFormFields, string>;
+
+/** The PUT body's fields beside its files, as the app sends them and the server reads them back. */
+export type AnalyzeFormFields = {
+  locale: ExplanationLocale;
+  /** The device's date, `YYYY-MM-DD`, and IANA time zone, for relative deadlines (ANL-5). */
+  today: string;
+  timezone: string;
+  /** The interface language, for the push about the finished job (ANL-12). */
+  uiLocale: UiLocale;
+  /** The Expo push token for that push, if notifications are allowed (ANL-12). */
+  pushToken: string | null;
+  /** Whose legal memo the analysis starts with (ANL-14); `null` for none. */
+  country: MemoCountry | null;
+};
 
 /** What a document is uploaded as: one PDF as it is, or pages the app made JPEG (CAP-4, D-4). */
 export const PDF_MIME_TYPE = 'application/pdf';

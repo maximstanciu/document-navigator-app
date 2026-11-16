@@ -1,6 +1,6 @@
 import type { SqlDatabase, SqlExecutor } from './database';
 import { matterNumbersOf, toSenderKey } from './matter-numbers';
-import { fromJson } from './sql';
+import { analysisFromJson } from './sql';
 import type { DocumentRecord } from './types';
 
 /** The row of `settings` that tells `document_refs` was filled for earlier analyses (SPEC §6.2). */
@@ -42,11 +42,7 @@ export async function backfillDocumentRefs(db: SqlDatabase): Promise<void> {
       'SELECT id, analysis FROM documents WHERE deleted_at IS NULL AND analysis IS NOT NULL'
     );
     for (const document of documents) {
-      await replaceDocumentRefs(
-        tx,
-        document.id,
-        fromJson(document.analysis) as DocumentRecord['analysis']
-      );
+      await replaceDocumentRefs(tx, document.id, analysisFromJson(document.analysis));
     }
     await tx.runAsync(`INSERT INTO settings (key, value) VALUES (?, 'true')`, [BACKFILLED_KEY]);
   });

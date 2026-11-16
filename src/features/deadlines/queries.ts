@@ -2,6 +2,7 @@ import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query
 
 import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
+import { invalidateKeys } from '@/lib/query-client';
 
 import {
   changeDeadlineDate,
@@ -56,10 +57,7 @@ function useDeadlinesMutation<TVariables, TData = void>(
     mutationFn,
     onSuccess: () => {
       syncRemindersInBackground();
-      return Promise.all([
-        queryClient.invalidateQueries({ queryKey: dbKeys.deadlines.all() }),
-        queryClient.invalidateQueries({ queryKey: dbKeys.actions.all() }),
-      ]);
+      return invalidateKeys(queryClient, dbKeys.deadlines.all(), dbKeys.actions.all());
     },
   });
 }

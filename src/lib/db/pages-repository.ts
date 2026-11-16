@@ -1,4 +1,4 @@
-import type { SqlDatabase } from './database';
+import type { SqlDatabase, SqlExecutor } from './database';
 import type { PageRecord } from './types';
 
 type PageRow = {
@@ -25,6 +25,27 @@ function toRecord(row: PageRow): PageRecord {
 
 export type NewPage = Omit<PageRecord, 'documentId' | 'index'>;
 
+/**
+ * Inserts a document's pages in the given order through `tx`, so other repositories can add pages
+ * inside their transaction (a new draft, CAP-5).
+ */
+export async function insertPages(
+  tx: SqlExecutor,
+  documentId: string,
+  pages: readonly NewPage[]
+): Promise<void> {
+  for (const [index, page] of pages.entries()) {
+    await tx.runAsync(`INSERT INTO pages (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`, [
+      page.id,
+      documentId,
+      index,
+      page.relativePath,
+      page.width,
+      page.height,
+    ]);
+  }
+}
+
 export function createPagesRepository(db: SqlDatabase) {
   return {
     /** Pages of a document in order. A PDF has one row with index 0 (D-4). */
@@ -47,16 +68,7 @@ export function createPagesRepository(db: SqlDatabase) {
           [documentId]
         );
         await tx.runAsync('DELETE FROM pages WHERE document_id = ?', [documentId]);
-        for (const [index, page] of pages.entries()) {
-          await tx.runAsync(`INSERT INTO pages (${COLUMNS}) VALUES (?, ?, ?, ?, ?, ?)`, [
-            page.id,
-            documentId,
-            index,
-            page.relativePath,
-            page.width,
-            page.height,
-          ]);
-        }
+        await insertPages(tx, documentId, pages);
         const kept = new Set(pages.map((page) => page.relativePath));
         return previous.map((row) => row.relative_path).filter((path) => !kept.has(path));
       });

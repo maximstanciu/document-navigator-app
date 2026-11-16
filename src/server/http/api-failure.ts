@@ -1,5 +1,7 @@
 import type { ApiErrorBody, ApiErrorCode } from '@/shared/analysis/contract';
 
+import { redactError } from '../logs/server-log';
+
 /** HTTP status of every error code (SPEC §7.2). */
 const STATUS: Record<ApiErrorCode, number> = {
   invalid_request: 400,
@@ -15,7 +17,7 @@ const STATUS: Record<ApiErrorCode, number> = {
 };
 
 /** The JSON error body of SPEC §7.2. `message` is for developers; the app shows text by `code`. */
-export function errorResponse(code: ApiErrorCode, message: string, headers?: HeadersInit) {
+function errorResponse(code: ApiErrorCode, message: string, headers?: HeadersInit) {
   const body: ApiErrorBody = { error: { code, message } };
   return Response.json(body, { status: STATUS[code], headers });
 }
@@ -37,5 +39,18 @@ export class ApiFailure extends Error {
 
   toResponse() {
     return errorResponse(this.code, this.message, this.headers);
+  }
+}
+
+/**
+ * Runs a route handler: a failed check becomes its SPEC §7.2 body, and anything else is rethrown
+ * without its message (`redactError()`), which could quote the request (SPEC §7.1).
+ */
+export async function handleApiFailures(handle: () => Promise<Response>): Promise<Response> {
+  try {
+    return await handle();
+  } catch (error) {
+    if (error instanceof ApiFailure) return error.toResponse();
+    throw redactError(error);
   }
 }

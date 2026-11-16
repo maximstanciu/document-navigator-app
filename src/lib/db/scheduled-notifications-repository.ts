@@ -1,4 +1,4 @@
-import type { SqlDatabase } from './database';
+import type { SqlDatabase, SqlExecutor } from './database';
 import { placeholders } from './sql';
 import type { ScheduledNotificationRecord } from './types';
 
@@ -6,6 +6,28 @@ type ScheduledNotificationRow = { notification_id: string; deadline_id: string; 
 
 function toRecord(row: ScheduledNotificationRow): ScheduledNotificationRecord {
   return { notificationId: row.notification_id, deadlineId: row.deadline_id, fireAt: row.fire_at };
+}
+
+/**
+ * Drops the bookkeeping of the reminders of `deadlineIds` through `tx`, so other repositories can
+ * do it inside their transaction, and returns the notification ids for the caller to cancel in the
+ * OS.
+ */
+export async function takeScheduledNotifications(
+  tx: SqlExecutor,
+  deadlineIds: readonly string[]
+): Promise<string[]> {
+  if (deadlineIds.length === 0) return [];
+  const inList = placeholders(deadlineIds.length);
+  const rows = await tx.getAllAsync<{ notification_id: string }>(
+    `SELECT notification_id FROM scheduled_notifications WHERE deadline_id IN (${inList})`,
+    deadlineIds
+  );
+  await tx.runAsync(
+    `DELETE FROM scheduled_notifications WHERE deadline_id IN (${inList})`,
+    deadlineIds
+  );
+  return rows.map((row) => row.notification_id);
 }
 
 /** Bookkeeping of reminders scheduled in the OS, reconciled by `syncReminders()` (REM-7). */

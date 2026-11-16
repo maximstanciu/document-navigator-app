@@ -1,22 +1,27 @@
-import { focusManager, QueryClient } from '@tanstack/react-query';
+import { focusManager, QueryClient, type QueryKey } from '@tanstack/react-query';
 import { useEffect } from 'react';
 import { AppState, Platform } from 'react-native';
 
-import { ApiError } from '@/lib/api/client';
-
-const NO_RETRY_STATUSES = new Set([400, 401, 403, 404, 409, 422]);
+import { isRefusedRequest } from '@/lib/api/client';
 
 export function createQueryClient() {
   return new QueryClient({
     defaultOptions: {
       queries: {
         staleTime: 30_000,
-        // Client errors won't fix themselves; only retry network failures and 5xx.
-        retry: (failureCount, error) =>
-          !(error instanceof ApiError && NO_RETRY_STATUSES.has(error.status)) && failureCount < 2,
+        // A refused request won't fix itself; only network failures, 429 and 5xx are retried.
+        retry: (failureCount, error) => !isRefusedRequest(error) && failureCount < 2,
       },
     },
   });
+}
+
+/**
+ * Marks the queries under each of `keys` stale, refetching the active ones, all at once: what a
+ * mutation does for every table (`dbKeys.<table>.all()`) or remote resource it changed.
+ */
+export async function invalidateKeys(queryClient: QueryClient, ...keys: QueryKey[]) {
+  await Promise.all(keys.map((queryKey) => queryClient.invalidateQueries({ queryKey })));
 }
 
 /**

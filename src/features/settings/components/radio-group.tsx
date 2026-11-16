@@ -5,7 +5,7 @@ import { Spacing } from '@/constants/theme';
 
 import { ChoiceRow } from './choice-row';
 
-type RadioGroupProps<T extends string> = {
+export type RadioGroupProps<T extends string> = {
   label: string;
   /** Shown under the label: what the choice changes. */
   hint?: string;

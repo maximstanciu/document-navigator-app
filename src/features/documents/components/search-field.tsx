@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { Pressable, StyleSheet, TextInput } from 'react-native';
 
 import { ThemedView } from '@/components/themed-view';
-import { Fonts, MinTouchTarget, Radius, Spacing } from '@/constants/theme';
+import { Fonts, MinTouchTarget, PressedOpacity, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type SearchFieldProps = {
@@ -76,6 +76,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   pressed: {
-    opacity: 0.7,
+    opacity: PressedOpacity,
   },
 });

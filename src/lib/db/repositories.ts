@@ -39,6 +39,9 @@ export function getRepositories(): Repositories {
   return active;
 }
 
+/** Tables that keep tombstones (STO-6, CASE-5), children before their parents. */
+const TOMBSTONE_TABLES = ['actions', 'deadlines', 'documents', 'cases'] as const;
+
 /**
  * Physically deletes tombstones older than `cutoff` (STO-6 keeps them 30 days for future sync), of
  * cases too (CASE-5). Child rows of a purged document go with it through `ON DELETE CASCADE`.
@@ -46,18 +49,11 @@ export function getRepositories(): Repositories {
 export async function purgeTombstones(db: SqlDatabase, cutoff: Date): Promise<void> {
   const before = cutoff.toISOString();
   await db.transaction(async (tx) => {
-    await tx.runAsync('DELETE FROM actions WHERE deleted_at IS NOT NULL AND deleted_at < ?', [
-      before,
-    ]);
-    await tx.runAsync('DELETE FROM deadlines WHERE deleted_at IS NOT NULL AND deleted_at < ?', [
-      before,
-    ]);
-    await tx.runAsync('DELETE FROM documents WHERE deleted_at IS NOT NULL AND deleted_at < ?', [
-      before,
-    ]);
-    await tx.runAsync('DELETE FROM cases WHERE deleted_at IS NOT NULL AND deleted_at < ?', [
-      before,
-    ]);
+    for (const table of TOMBSTONE_TABLES) {
+      await tx.runAsync(`DELETE FROM ${table} WHERE deleted_at IS NOT NULL AND deleted_at < ?`, [
+        before,
+      ]);
+    }
   });
 }
 
