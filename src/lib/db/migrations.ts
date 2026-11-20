@@ -165,6 +165,11 @@ export const MIGRATIONS: readonly Migration[] = [
     version: 8,
     statements: [`ALTER TABLE cases ADD COLUMN archived_at TEXT`],
   },
+  {
+    // HOME-6: the instant a document went to the archive; `NULL` for one that isn't archived.
+    version: 9,
+    statements: [`ALTER TABLE documents ADD COLUMN archived_at TEXT`],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -39,6 +39,7 @@ type DocumentRow = {
   analyzed_at: string | null;
   search_text: string;
   attention_dismissed_at: string | null;
+  archived_at: string | null;
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
@@ -46,7 +47,7 @@ type DocumentRow = {
 
 const COLUMNS = `id, title, document_type, sender_name, document_date, status, error_code,
   analysis_job_id, case_id, source, mime_type, page_count, file_size, analysis, analysis_locale, legal_memo_country, analyzed_at,
-  search_text, attention_dismissed_at, created_at, updated_at, deleted_at`;
+  search_text, attention_dismissed_at, archived_at, created_at, updated_at, deleted_at`;
 
 function toRecord(row: DocumentRow): DocumentRecord {
   return {
@@ -69,6 +70,7 @@ function toRecord(row: DocumentRow): DocumentRecord {
     analyzedAt: row.analyzed_at,
     searchText: row.search_text,
     attentionDismissedAt: row.attention_dismissed_at,
+    archivedAt: row.archived_at,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
@@ -87,6 +89,7 @@ type DocumentSummaryRow = Pick<
   | 'analyzed_at'
   | 'attention_dismissed_at'
   | 'case_id'
+  | 'archived_at'
 > & {
   has_fraud_signals: number;
   has_high_risk: number;
@@ -101,7 +104,7 @@ type DocumentSummaryRow = Pick<
  */
 function selectSummaries(where = '') {
   return `SELECT id, title, status, document_type, sender_name, page_count, created_at,
-      analyzed_at, attention_dismissed_at, case_id,
+      analyzed_at, attention_dismissed_at, case_id, archived_at,
       COALESCE(json_array_length(analysis_json, '$.fraudSignals'), 0) > 0 AS has_fraud_signals,
       EXISTS (SELECT 1 FROM json_each(analysis_json, '$.risks')
         WHERE json_extract(value, '$.severity') = 'high') AS has_high_risk,
@@ -137,6 +140,7 @@ function toSummaryRecord(row: DocumentSummaryRow): DocumentSummaryRecord {
     analyzedAt: row.analyzed_at,
     attentionDismissedAt: row.attention_dismissed_at,
     caseId: row.case_id,
+    archivedAt: row.archived_at,
     hasFraudSignals: row.has_fraud_signals === 1,
     hasHighRisk: row.has_high_risk === 1,
     country: row.country,
@@ -342,6 +346,24 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         `UPDATE documents SET attention_dismissed_at = ?, updated_at = ?
          WHERE id = ? AND deleted_at IS NULL`,
         [timestamp, timestamp, id]
+      );
+      return result.changes > 0;
+    },
+
+    /**
+     * Puts a document in the archive or takes it out (HOME-6). Its deadlines, reminders and case
+     * stay as they are; an archived document keeps the instant it was archived. `false` if the
+     * document is gone.
+     */
+    async setArchived(id: string, archived: boolean): Promise<boolean> {
+      const timestamp = now().toISOString();
+      const result = await db.runAsync(
+        archived
+          ? `UPDATE documents SET archived_at = COALESCE(archived_at, ?), updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`
+          : `UPDATE documents SET archived_at = NULL, updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`,
+        archived ? [timestamp, timestamp, id] : [timestamp, id]
       );
       return result.changes > 0;
     },
@@ -684,7 +706,8 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
           `UPDATE documents SET title = '', document_type = NULL, sender_name = NULL,
              document_date = NULL, error_code = NULL, analysis_job_id = NULL,
              analysis_job_locale = NULL, case_id = NULL, analysis = NULL, analysis_locale = NULL,
-             legal_memo_country = NULL, search_text = '', updated_at = ?, deleted_at = ?
+             legal_memo_country = NULL, search_text = '', archived_at = NULL, updated_at = ?,
+             deleted_at = ?
            WHERE id = ?`,
           [timestamp, timestamp, id]
         );

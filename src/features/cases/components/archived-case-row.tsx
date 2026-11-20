@@ -26,7 +26,7 @@ export function ArchivedCaseRow({ item, documentCount }: ArchivedCaseRowProps) {
   const { t, i18n } = useTranslation();
   const documents = t('cases.documents', { count: documentCount });
   const since = item.archivedAt
-    ? t('cases.archive.since', { date: formatTimestampDate(item.archivedAt, i18n.language) })
+    ? t('archive.since', { date: formatTimestampDate(item.archivedAt, i18n.language) })
     : null;
   const detail = [documents, since].filter(Boolean).join(' · ');
 

@@ -62,15 +62,26 @@ type CaseChipsProps = {
   /** How many documents each case has, by its id. */
   counts: ReadonlyMap<string, number>;
   /** How many cases are in the archive (CASE-6). */
-  archivedCount: number;
+  archivedCases: number;
+  /** How many documents are in the archive themselves (HOME-6). */
+  archivedDocuments: number;
 };
 
 /**
  * «Cases» on the Documents tab (CASE-3): a chip per case with its number of documents, newest case
- * first, each opening the case; then «New case», and «Archive» while it holds cases (CASE-6).
+ * first, each opening the case; then «New case», and «Archive» while it holds cases or documents
+ * (CASE-6, HOME-6).
  */
-export function CaseChips({ cases, counts, archivedCount }: CaseChipsProps) {
+export function CaseChips({ cases, counts, archivedCases, archivedDocuments }: CaseChipsProps) {
   const { t } = useTranslation();
+  const archived = archivedCases + archivedDocuments;
+  // «Archive: 1 case, 2 documents».
+  const archiveContents = [
+    archivedCases > 0 && t('archive.cases', { count: archivedCases }),
+    archivedDocuments > 0 && t('cases.documents', { count: archivedDocuments }),
+  ]
+    .filter(Boolean)
+    .join(', ');
 
   return (
     <View style={styles.section}>
@@ -103,14 +114,14 @@ export function CaseChips({ cases, counts, archivedCount }: CaseChipsProps) {
           accessibleLabel={t('cases.newCase')}
           onPress={() => router.push('/cases/new')}
         />
-        {archivedCount > 0 && (
-          <Link href="/cases/archive" asChild>
+        {archived > 0 && (
+          <Link href="/archive" asChild>
             <Chip
               role="link"
               icon={ARCHIVE}
-              label={t('cases.archive.title')}
-              detail={String(archivedCount)}
-              accessibleLabel={t('cases.archive.chipLabel', { count: archivedCount })}
+              label={t('archive.title')}
+              detail={String(archived)}
+              accessibleLabel={t('archive.chipLabel', { contents: archiveContents })}
             />
           </Link>
         )}

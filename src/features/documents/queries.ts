@@ -15,6 +15,7 @@ import {
   listRelatedDocuments,
   renameDocument,
   searchDocuments,
+  setDocumentArchived,
 } from './api';
 
 /**
@@ -92,6 +93,16 @@ export function useDismissRelatedDocument() {
 export function useRenameDocument() {
   return useDocumentsMutation(({ id, title }: { id: string; title: string }) =>
     renameDocument(id, title)
+  );
+}
+
+/**
+ * «Archive» / «Restore from archive» on the document screen (HOME-6). Its deadlines don't change,
+ * so neither do the Deadlines tab or reminders.
+ */
+export function useSetDocumentArchived() {
+  return useDocumentsMutation(({ id, archived }: { id: string; archived: boolean }) =>
+    setDocumentArchived(id, archived)
   );
 }
 

@@ -61,7 +61,7 @@ export const en = {
     allDocuments: 'All documents',
     allArchivedTitle: 'All documents are archived',
     allArchivedMessage:
-      'They are in archived cases. Open “Archive” under “Cases”, or find a document with search.',
+      'They are archived, on their own or with their cases. Open “Archive” under “Cases”, or find a document with search.',
     origin: {
       memo: {
         PT: 'with the guide to Portuguese law',
@@ -87,6 +87,23 @@ export const en = {
       deleteMessage:
         "The document, its pages, deadlines and reminders are deleted from this device. This can't be undone.",
       deleteFailed: "Couldn't delete the document. Try again.",
+      archive: 'Archive',
+      archiveTitle: 'Archive the document?',
+      archiveMessage: 'It leaves “All documents”; search still finds it.',
+      archiveDeadlines_one:
+        'The document has {{count}} open deadline. It stays on the Deadlines tab, and reminders keep coming.',
+      archiveDeadlines_other:
+        'The document has {{count}} open deadlines. They stay on the Deadlines tab, and reminders keep coming.',
+      archiveHint: 'If a deadline no longer matters, mark it “Done” or “Not relevant”.',
+      archiveFailed: "Couldn't archive the document. Try again.",
+    },
+    // An archived document (HOME-6).
+    archive: {
+      mark: 'Archived',
+      archived: 'This document is archived',
+      archivedHint:
+        "It isn't under “All documents”, but search finds it. Deadlines and reminders work as before.",
+      restoreFailed: "Couldn't restore the document. Try again.",
     },
     rename: {
       label: 'Document title',
@@ -239,6 +256,21 @@ export const en = {
       notRelatedFailed: "Couldn't save that. Try again.",
     },
   },
+  // The archive of cases and documents (CASE-6, HOME-6).
+  archive: {
+    title: 'Archive',
+    screenTitle: 'Archive',
+    chipLabel: 'Archive: {{contents}}',
+    cases_one: '{{count}} case',
+    cases_other: '{{count}} cases',
+    documents: 'Documents',
+    loading: 'Loading the archive',
+    emptyTitle: 'The archive is empty',
+    emptyMessage:
+      'Put a finished case, or a document you no longer need in view, here: “⋯” on its screen, then “Archive”.',
+    since: 'Archived {{date}}',
+    restore: 'Restore from archive',
+  },
   cases: {
     title: 'Cases',
     newCase: 'New case',
@@ -281,20 +313,12 @@ export const en = {
       archiveHint: 'If a deadline no longer matters, mark it “Done” or “Not relevant”.',
       archiveFailed: "Couldn't archive the case. Try again.",
     },
+    // An archived case (CASE-6).
     archive: {
-      title: 'Archive',
-      screenTitle: 'Archived cases',
-      chipLabel_one: 'Archive, {{count}} case',
-      chipLabel_other: 'Archive, {{count}} cases',
-      loading: 'Loading the archive',
-      emptyTitle: 'No archived cases',
-      emptyMessage: 'Put a finished case here: “⋯” on the case screen, then “Archive”.',
-      since: 'Archived {{date}}',
       archivedName: '{{name}} · archived',
       archived: 'This case is archived',
       archivedHint:
         "Its documents aren't under “All documents”, but search finds them. Deadlines and reminders work as before.",
-      restore: 'Restore from archive',
       restoreFailed: "Couldn't restore the case. Try again.",
       emptyCaseTitle: 'No documents in this case',
       emptyCaseMessage: 'To add documents, restore the case from the archive first.',

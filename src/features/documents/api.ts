@@ -24,6 +24,7 @@ function toSummary(document: DocumentRecord): Omit<DocumentSummary, 'caseArchive
     analyzedAt: document.analyzedAt,
     attentionDismissedAt: document.attentionDismissedAt,
     caseId: document.caseId,
+    archivedAt: document.archivedAt,
     hasFraudSignals: (document.analysis?.fraudSignals.length ?? 0) > 0,
     hasHighRisk: document.analysis?.risks.some((risk) => risk.severity === 'high') ?? false,
     country: document.analysis?.documentCountry ?? null,
@@ -41,6 +42,15 @@ export function listDocuments(): Promise<DocumentSummary[]> {
  */
 export function searchDocuments(query: string): Promise<DocumentSummary[]> {
   return getRepositories().documents.searchSummaries(query);
+}
+
+/**
+ * «Archive» and «Restore from archive» (HOME-6). The document keeps its case, deadlines and
+ * reminders.
+ */
+export async function setDocumentArchived(id: string, archived: boolean): Promise<void> {
+  const changed = await getRepositories().documents.setArchived(id, archived);
+  if (!changed) throw new Error('The document is gone');
 }
 
 /** «Got it» in «Needs attention»: the document's fraud signs or high risk are seen (HOME-1). */

@@ -32,6 +32,7 @@ function document(id: string, overrides: Partial<DocumentSummary> = {}): Documen
     hasHighRisk: false,
     country: null,
     caseArchived: false,
+    archivedAt: null,
     ...overrides,
   };
 }
@@ -220,5 +221,26 @@ describe('selectAttention in an archived case (CASE-6)', () => {
     );
 
     expect(items.map((item) => item.document.id)).toEqual(['due']);
+  });
+});
+
+describe('selectAttention for an archived document (HOME-6)', () => {
+  it('drops the warnings of an archived document but keeps its deadlines', () => {
+    const items = selectAttention(
+      [
+        document('fraud', { hasFraudSignals: true, archivedAt: daysAgo(0) }),
+        document('risk', { hasHighRisk: true, archivedAt: daysAgo(0) }),
+        document('due', { hasFraudSignals: true, archivedAt: daysAgo(0) }),
+      ],
+      [deadline('d1', 'due', '2026-10-20')],
+      NOW
+    );
+
+    expect(items).toEqual([
+      expect.objectContaining({
+        document: expect.objectContaining({ id: 'due' }),
+        dismissible: false,
+      }),
+    ]);
   });
 });

@@ -16,6 +16,7 @@ import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { localCalendarDate } from '@/shared/calendar-date';
 
+import { archivedDocuments, isArchived } from '../archive';
 import { deadlinesByDocument, selectAttention } from '../attention';
 import { AttentionBlock } from '../components/attention-block';
 import { DocumentListItem } from '../components/document-list-item';
@@ -38,8 +39,8 @@ function countByCase(documents: readonly DocumentSummary[]): Map<string, number>
 /**
  * The documents tab (SPEC §4.5): «Needs attention» (HOME-1), the cases (CASE-3), then all documents
  * newest first (HOME-2), with search (HOME-3) and a filter by type (HOME-4); before the first
- * document, an invitation to scan one (HOME-5). Documents of archived cases are left out of the
- * list and the filter, and come back in search, marked (CASE-6).
+ * document, an invitation to scan one (HOME-5). Archived documents and those of archived cases are
+ * left out of the list and the filter, and come back in search, marked (HOME-6, CASE-6).
  */
 export function DocumentListScreen() {
   const theme = useTheme();
@@ -79,13 +80,13 @@ export function DocumentListScreen() {
   }
 
   const today = localCalendarDate(now);
-  const listed = documents.data.filter((document) => !document.caseArchived);
+  const listed = documents.data.filter((document) => !isArchived(document));
   const types = availableTypeFilters(listed);
   // A filter left over from a type that is no longer there filters nothing.
   const activeFilter = typeFilter !== null && types.includes(typeFilter) ? typeFilter : null;
   const nearest = deadlinesByDocument(deadlines.data);
   const shown = filterByType(searching ? (results.data ?? []) : listed, activeFilter);
-  // All documents: one of an archived case still needs attention for its deadlines (CASE-6).
+  // All documents: an archived one still needs attention for its deadlines (HOME-6, CASE-6).
   const attention = searching ? [] : selectAttention(documents.data, deadlines.data, now);
   // A document found in an archived case says so on its card: «Apartment · archived».
   const caseNames = new Map(
@@ -99,7 +100,8 @@ export function DocumentListScreen() {
     <CaseChips
       cases={active}
       counts={countByCase(documents.data)}
-      archivedCount={cases.data.length - active.length}
+      archivedCases={cases.data.length - active.length}
+      archivedDocuments={archivedDocuments(documents.data).length}
     />
   );
 
@@ -162,6 +164,7 @@ export function DocumentListScreen() {
             nearestDeadline={nearest.get(item.id)?.[0]}
             today={today}
             caseName={item.caseId === null ? undefined : caseNames.get(item.caseId)}
+            archiveNote={item.archivedAt === null ? undefined : t('documents.archive.mark')}
           />
         )}
         ListHeaderComponent={

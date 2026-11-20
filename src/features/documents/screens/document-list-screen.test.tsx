@@ -2,10 +2,10 @@ import { screen, userEvent, waitFor, within } from '@testing-library/react-nativ
 import { Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
+import ArchiveRoute from '@/app/archive';
 import CaptureRoute from '@/app/capture';
 import CaptureLayout from '@/app/capture/_layout';
 import CaseRoute from '@/app/cases/[id]';
-import ArchivedCasesRoute from '@/app/cases/archive';
 import DocumentRoute from '@/app/documents/[id]';
 import { Spacing } from '@/constants/theme';
 import { analysisRecords } from '@/features/analysis/analysis-records';
@@ -523,7 +523,7 @@ describe('DocumentListScreen', () => {
       expect(screen.queryByRole('link', { name: /^Договор аренды/ })).not.toBeOnTheScreen();
       expect(screen.queryByRole('link', { name: /^Квартира, / })).not.toBeOnTheScreen();
       expect(screen.getByRole('link', { name: 'Машина, 1 document' })).toBeOnTheScreen();
-      expect(screen.getByRole('link', { name: 'Archive, 1 case' })).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Archive: 1 case' })).toBeOnTheScreen();
     });
 
     it('has no «Archive» chip while the archive is empty', async () => {
@@ -555,7 +555,7 @@ describe('DocumentListScreen', () => {
       await renderWithProviders(<DocumentListScreen />);
 
       expect(await screen.findByText('All documents are archived')).toBeOnTheScreen();
-      expect(screen.getByRole('link', { name: 'Archive, 1 case' })).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Archive: 1 case' })).toBeOnTheScreen();
     });
 
     it('keeps a deadline of an archived case in «Needs attention», but not its warnings', async () => {
@@ -583,15 +583,15 @@ describe('DocumentListScreen', () => {
         {
           _layout: () => <Stack />,
           index: DocumentListScreen,
-          'cases/archive': ArchivedCasesRoute,
+          archive: ArchiveRoute,
           'cases/[id]': CaseRoute,
         },
         { initialUrl: '/', wrapper: createTestProviders() }
       );
 
-      await user.press(await screen.findByRole('link', { name: 'Archive, 2 cases' }));
+      await user.press(await screen.findByRole('link', { name: 'Archive: 2 cases' }));
 
-      expect(screen).toHavePathname('/cases/archive');
+      expect(screen).toHavePathname('/archive');
       // The most recently archived first.
       const rows = await screen.findAllByRole('link', { name: /, 1 document · Archived / });
       expect(rows.map((row) => row.props.accessibilityLabel.split(',')[0])).toEqual([
@@ -609,11 +609,119 @@ describe('DocumentListScreen', () => {
 
     it('says when the archive is empty', async () => {
       await renderRouter(
-        { _layout: () => <Stack />, 'cases/archive': ArchivedCasesRoute },
-        { initialUrl: '/cases/archive', wrapper: createTestProviders() }
+        { _layout: () => <Stack />, archive: ArchiveRoute },
+        { initialUrl: '/archive', wrapper: createTestProviders() }
       );
 
-      expect(await screen.findByText('No archived cases')).toBeOnTheScreen();
+      expect(await screen.findByText('The archive is empty')).toBeOnTheScreen();
+    });
+  });
+
+  describe('archived documents (HOME-6)', () => {
+    it('leaves an archived document out of the list and the filter, and counts it in «Archive»', async () => {
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 40));
+      await addAnalyzed('contract', dueIn(ANALYSIS_FIXTURES.contract, 60, 120));
+      await addDocument('draft', 'Счёт за газ');
+      await repositories.documents.setArchived('contract', true);
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('link', { name: /^Счёт за газ/ })).toBeOnTheScreen();
+      const rows = listRows();
+      expect(rows).toHaveLength(2);
+      expect(rows[0]).toHaveAccessibleName(/^Счёт за газ, /);
+      expect(rows[1]).toHaveAccessibleName(new RegExp(`^${INVOICE}, `));
+      // Two types are left, but the contract's isn't one of them.
+      expect(screen.queryByRole('radio', { name: 'Contract' })).not.toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Archive: 1 document' })).toBeOnTheScreen();
+    });
+
+    it('counts archived cases and documents together on the «Archive» chip', async () => {
+      await repositories.cases.create({ id: 'flat', name: 'Квартира' });
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await addDocument('gas', 'Счёт за газ');
+      await addDocument('bank', 'Письмо из банка');
+      await repositories.cases.setArchived('flat', true);
+      await repositories.documents.setArchived('gas', true);
+      await repositories.documents.setArchived('bank', true);
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(
+        await screen.findByRole('link', { name: 'Archive: 1 case, 2 documents' })
+      ).toBeOnTheScreen();
+      expect(screen.getByText('3')).toBeOnTheScreen();
+      expect(screen.getByText('All documents are archived')).toBeOnTheScreen();
+    });
+
+    it('finds an archived document and marks it', async () => {
+      const user = userEvent.setup();
+      await addDocument('gas', 'Счёт за газ');
+      await repositories.documents.setArchived('gas', true);
+      await renderWithProviders(<DocumentListScreen />);
+
+      await user.type(await screen.findByRole('searchbox'), 'газ');
+
+      expect(
+        await screen.findByRole('link', { name: /^Счёт за газ, .*, Archived$/ })
+      ).toBeOnTheScreen();
+    });
+
+    it('keeps the deadline of an archived document in «Needs attention», but not its warnings', async () => {
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 3));
+      await addAnalyzed('fraud', dueIn(ANALYSIS_FIXTURES.fraudulentInvoice, 60));
+      await repositories.documents.setArchived('invoice', true);
+      await repositories.documents.setArchived('fraud', true);
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('heading', { name: 'Needs attention' })).toBeOnTheScreen();
+      expect(screen.getAllByRole('link', { name: new RegExp(`^${INVOICE}`) })).toHaveLength(1);
+      expect(screen.queryByRole('link', { name: new RegExp(`^${FRAUD}`) })).not.toBeOnTheScreen();
+      expect(listRows()).toHaveLength(0);
+    });
+
+    it('lists archived cases and documents in the archive, and opens a document from there', async () => {
+      const user = userEvent.setup();
+      await repositories.cases.create({ id: 'flat', name: 'Квартира' });
+      await addDocument('gas', 'Счёт за газ');
+      await addDocument('bank', 'Письмо из банка', 'flat');
+      await repositories.cases.setArchived('flat', true);
+      await repositories.documents.setArchived('gas', true);
+      clock.advance(60_000);
+      await repositories.documents.setArchived('bank', true);
+      await renderRouter(
+        {
+          _layout: () => <Stack />,
+          index: DocumentListScreen,
+          archive: ArchiveRoute,
+          'documents/[id]': DocumentRoute,
+        },
+        { initialUrl: '/', wrapper: createTestProviders() }
+      );
+
+      await user.press(await screen.findByRole('link', { name: 'Archive: 1 case, 2 documents' }));
+
+      expect(screen).toHavePathname('/archive');
+      expect(await screen.findByRole('heading', { name: 'Cases' })).toBeOnTheScreen();
+      expect(screen.getByRole('heading', { name: 'Documents' })).toBeOnTheScreen();
+      expect(
+        screen.getByRole('link', { name: /^Квартира, 1 document · Archived / })
+      ).toBeOnTheScreen();
+      // The most recently archived first, each with its case and since when it is archived.
+      const rows = screen.getAllByRole('link', { name: /, Archived \w+ \d+, \d{4}$/ });
+      expect(rows.map((row) => row.props.accessibilityLabel.split(',')[0])).toEqual([
+        'Письмо из банка',
+        'Счёт за газ',
+      ]);
+      expect(rows[0]).toHaveAccessibleName(/, Case: Квартира · archived, Archived /);
+
+      await user.press(rows[1]);
+
+      expect(screen).toHavePathname('/documents/gas');
+      expect(
+        await screen.findByRole('heading', { name: 'This document is archived' })
+      ).toBeOnTheScreen();
     });
   });
 });

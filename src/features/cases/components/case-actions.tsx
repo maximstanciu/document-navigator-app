@@ -86,11 +86,7 @@ export function CaseActionsSheet({
           </ThemedText>
           <Button label={t('cases.actions.rename')} variant="secondary" onPress={run(onRename)} />
           {archived ? (
-            <Button
-              label={t('cases.archive.restore')}
-              variant="secondary"
-              onPress={run(onRestore)}
-            />
+            <Button label={t('archive.restore')} variant="secondary" onPress={run(onRestore)} />
           ) : (
             <Button
               label={t('cases.actions.archive')}

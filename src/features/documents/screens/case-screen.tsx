@@ -1,16 +1,15 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, Stack } from 'expo-router';
-import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet, View } from 'react-native';
 
+import { ArchivedNotice } from '@/components/archived-notice';
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
-import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { NameForm } from '@/components/ui/name-form';
-import { ContentColumn, Radius, Spacing } from '@/constants/theme';
+import { ContentColumn, Spacing } from '@/constants/theme';
 import { CaseActionsButton, CaseActionsSheet } from '@/features/cases/components/case-actions';
 import {
   caseQueries,
@@ -24,6 +23,7 @@ import { useNow } from '@/hooks/use-now';
 import { useTheme } from '@/hooks/use-theme';
 import { localCalendarDate } from '@/shared/calendar-date';
 
+import { isArchived } from '../archive';
 import { deadlinesByDocument, selectAttention } from '../attention';
 import { AttentionBlock } from '../components/attention-block';
 import { DocumentListItem } from '../components/document-list-item';
@@ -32,41 +32,12 @@ import { documentQueries } from '../queries';
 // Opened by a direct URL (web preview), the screen has nothing to go back to.
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
-/** «This case is archived» with «Restore from archive», under the case's name (CASE-6). */
-function ArchivedNotice({ busy, onRestore }: { busy: boolean; onRestore: () => void }) {
-  const theme = useTheme();
-  const { t } = useTranslation();
-
-  return (
-    <ThemedView type="backgroundElement" style={styles.notice}>
-      <View style={styles.noticeTitle}>
-        <SymbolView
-          name={{ ios: 'archivebox', android: 'inventory_2', web: 'inventory_2' }}
-          size={20}
-          tintColor={theme.text}
-        />
-        <ThemedText type="smallBold" role="heading" style={styles.noticeText}>
-          {t('cases.archive.archived')}
-        </ThemedText>
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {t('cases.archive.archivedHint')}
-      </ThemedText>
-      <Button
-        label={t('cases.archive.restore')}
-        variant="secondary"
-        disabled={busy}
-        onPress={onRestore}
-      />
-    </ThemedView>
-  );
-}
-
 /**
  * A case (CASE-3…CASE-6): what in its documents needs attention by the rule of HOME-1, then its
  * documents newest first. «Add document» captures a new one into the case, «Choose from documents»
  * files ones already in the app; «⋯» in the header renames, archives or deletes the case. An
- * archived case says so and takes no documents until it is restored.
+ * archived case says so and takes no documents until it is restored. The case shows all its
+ * documents, archived ones too, marked (HOME-6).
  */
 export function CaseScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -111,9 +82,9 @@ export function CaseScreen({ id }: { id: string }) {
   const archived = found.data.archivedAt !== null;
   const today = localCalendarDate(now);
   const inCase = documents.data.filter((document) => document.caseId === id);
-  // Documents of archived cases aren't offered to another case (CASE-4, CASE-6).
+  // Archived documents and those of archived cases aren't offered (CASE-4, HOME-6, CASE-6).
   const hasOthers = documents.data.some(
-    (document) => document.caseId !== id && !document.caseArchived
+    (document) => document.caseId !== id && !isArchived(document)
   );
   const nearest = deadlinesByDocument(deadlines.data);
   const attention = selectAttention(inCase, deadlines.data, now);
@@ -163,6 +134,7 @@ export function CaseScreen({ id }: { id: string }) {
             document={item}
             nearestDeadline={nearest.get(item.id)?.[0]}
             today={today}
+            archiveNote={item.archivedAt === null ? undefined : t('documents.archive.mark')}
           />
         )}
         ListHeaderComponent={
@@ -189,7 +161,12 @@ export function CaseScreen({ id }: { id: string }) {
               </ThemedText>
             )}
             {archived ? (
-              <ArchivedNotice busy={archive.isPending} onRestore={() => setArchived(false)} />
+              <ArchivedNotice
+                title={t('cases.archive.archived')}
+                hint={t('cases.archive.archivedHint')}
+                busy={archive.isPending}
+                onRestore={() => setArchived(false)}
+              />
             ) : (
               <View style={styles.buttons}>
                 <Button
@@ -245,18 +222,5 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
-  },
-  notice: {
-    gap: Spacing.two,
-    padding: Spacing.three,
-    borderRadius: Radius.card,
-  },
-  noticeTitle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.two,
-  },
-  noticeText: {
-    flexShrink: 1,
   },
 });

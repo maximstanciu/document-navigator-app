@@ -39,6 +39,8 @@ export type DocumentRecord = {
   analyzedAt: string | null;
   searchText: string;
   attentionDismissedAt: string | null;
+  /** In the archive since then (HOME-6), `null` — not archived. */
+  archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
@@ -60,6 +62,7 @@ export type DocumentSummaryRecord = Pick<
   | 'analyzedAt'
   | 'attentionDismissedAt'
   | 'caseId'
+  | 'archivedAt'
 > & {
   /** The analysis found signs of fraud (ANL-11). */
   hasFraudSignals: boolean;

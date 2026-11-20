@@ -29,6 +29,7 @@ describe('type filter (HOME-4)', () => {
         hasHighRisk: false,
         country: null,
         caseArchived: false,
+        archivedAt: null,
       })
     );
 

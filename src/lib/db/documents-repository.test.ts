@@ -130,6 +130,71 @@ describe('documents repository', () => {
     expect(await repos.documents.dismissAttention('doc-1')).toBe(false);
   });
 
+  describe('archive (HOME-6)', () => {
+    it('archives a document and restores it, with the time from the clock', async () => {
+      await repos.documents.create(newDocument('doc-1'));
+      clock.advance(5000);
+
+      await expect(repos.documents.setArchived('doc-1', true)).resolves.toBe(true);
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        archivedAt: '2026-10-17T09:00:05.000Z',
+        updatedAt: '2026-10-17T09:00:05.000Z',
+      });
+      // Still listed and found: the screens leave it out of «All documents» themselves.
+      expect(await repos.documents.listSummaries()).toEqual([
+        expect.objectContaining({ id: 'doc-1', archivedAt: '2026-10-17T09:00:05.000Z' }),
+      ]);
+      expect(await repos.documents.searchSummaries('электричество')).toEqual([
+        expect.objectContaining({ id: 'doc-1', archivedAt: '2026-10-17T09:00:05.000Z' }),
+      ]);
+
+      clock.advance(1000);
+      await expect(repos.documents.setArchived('doc-1', false)).resolves.toBe(true);
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        archivedAt: null,
+        updatedAt: '2026-10-17T09:00:06.000Z',
+      });
+    });
+
+    it('keeps the instant a document was first archived', async () => {
+      await repos.documents.create(newDocument('doc-1'));
+      await repos.documents.setArchived('doc-1', true);
+      clock.advance(DAY);
+
+      await repos.documents.setArchived('doc-1', true);
+
+      expect(await repos.documents.get('doc-1')).toMatchObject({
+        archivedAt: '2026-10-17T09:00:00.000Z',
+      });
+    });
+
+    it('keeps its case, and the archive of its case apart from its own', async () => {
+      await repos.cases.create({ id: 'flat', name: 'Квартира' });
+      await repos.documents.create({ ...newDocument('doc-1'), caseId: 'flat' });
+      await repos.documents.setArchived('doc-1', true);
+      await repos.cases.setArchived('flat', true);
+      await repos.cases.setArchived('flat', false);
+
+      expect(await repos.documents.listSummaries()).toEqual([
+        expect.objectContaining({
+          caseId: 'flat',
+          caseArchived: false,
+          archivedAt: '2026-10-17T09:00:00.000Z',
+        }),
+      ]);
+    });
+
+    it('refuses to archive or restore a deleted or missing document', async () => {
+      await repos.documents.create(newDocument('doc-1'));
+      await repos.documents.remove('doc-1');
+
+      await expect(repos.documents.setArchived('doc-1', true)).resolves.toBe(false);
+      await expect(repos.documents.setArchived('doc-1', false)).resolves.toBe(false);
+      await expect(repos.documents.setArchived('missing', true)).resolves.toBe(false);
+    });
+  });
+
   describe('search (HOME-3)', () => {
     beforeEach(async () => {
       await repos.documents.create(newDocument('fine', 'Штраф за парковку'));
@@ -226,6 +291,7 @@ describe('documents repository', () => {
           analyzedAt: '2026-10-17T09:00:01.000Z',
           attentionDismissedAt: null,
           caseId: null,
+          archivedAt: null,
           hasFraudSignals: true,
           hasHighRisk: true,
           country: 'DE',
@@ -242,6 +308,7 @@ describe('documents repository', () => {
           analyzedAt: null,
           attentionDismissedAt: null,
           caseId: null,
+          archivedAt: null,
           hasFraudSignals: false,
           hasHighRisk: false,
           country: null,
@@ -742,6 +809,7 @@ describe('documents repository', () => {
     });
 
     it('leaves only a tombstone without content', async () => {
+      await repos.documents.setArchived('doc-1', true);
       clock.advance(1000);
       await repos.documents.remove('doc-1');
 
@@ -753,7 +821,8 @@ describe('documents repository', () => {
       expect(await repos.scheduledNotifications.list()).toEqual([]);
 
       const tombstone = await db.getFirstAsync<Record<string, unknown>>(
-        'SELECT title, sender_name, analysis, search_text, deleted_at FROM documents WHERE id = ?',
+        `SELECT title, sender_name, analysis, search_text, archived_at, deleted_at
+         FROM documents WHERE id = ?`,
         ['doc-1']
       );
       expect({ ...tombstone }).toEqual({
@@ -761,6 +830,7 @@ describe('documents repository', () => {
         sender_name: null,
         analysis: null,
         search_text: '',
+        archived_at: null,
         deleted_at: '2026-10-17T09:00:01.000Z',
       });
       const deadline = await db.getFirstAsync<{ description: string; deleted_at: string }>(

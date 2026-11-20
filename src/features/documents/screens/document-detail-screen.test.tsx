@@ -699,6 +699,88 @@ describe('DocumentDetailScreen', () => {
     });
   });
 
+  describe('archive (HOME-6)', () => {
+    async function openActions() {
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Document actions' }));
+      return user;
+    }
+
+    it('archives a document without open deadlines at once, and restores it from the notice', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      for (const deadline of await repositories.deadlines.list({ documentId: 'doc-1' })) {
+        await repositories.deadlines.update(deadline.id, { status: 'done' });
+      }
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(
+        await screen.findByRole('heading', { name: 'This document is archived' })
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByText(/isn't under “All documents”, but search finds it/)
+      ).toBeOnTheScreen();
+      expect((await repositories.documents.get('doc-1'))?.archivedAt).not.toBeNull();
+
+      await user.press(screen.getByRole('button', { name: 'Restore from archive' }));
+
+      await waitFor(() =>
+        expect(
+          screen.queryByRole('heading', { name: 'This document is archived' })
+        ).not.toBeOnTheScreen()
+      );
+      expect((await repositories.documents.get('doc-1'))?.archivedAt).toBeNull();
+    });
+
+    it('says first that open deadlines stay live, and archives once confirmed', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      const open = (await repositories.deadlines.list({ documentId: 'doc-1' })).length;
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(screen.getByRole('heading', { name: 'Archive the document?' })).toBeOnTheScreen();
+      expect(
+        screen.getByText(new RegExp(`^The document has ${open} open deadlines?\\. `))
+      ).toBeOnTheScreen();
+      expect((await repositories.documents.get('doc-1'))?.archivedAt).toBeNull();
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(
+        await screen.findByRole('heading', { name: 'This document is archived' })
+      ).toBeOnTheScreen();
+      expect(
+        await repositories.deadlines.list({ documentId: 'doc-1', statuses: ['open'] })
+      ).toHaveLength(open);
+    });
+
+    it('offers «Restore from archive» in the sheet of an archived document', async () => {
+      await seedAnalyzed(ANALYSIS_FIXTURES.invoice);
+      await repositories.documents.setArchived('doc-1', true);
+      await renderDocumentWithHeader();
+      const user = await openActions();
+
+      expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeOnTheScreen();
+      await user.press(screen.getAllByRole('button', { name: 'Restore from archive' }).at(-1)!);
+
+      await waitFor(async () =>
+        expect((await repositories.documents.get('doc-1'))?.archivedAt).toBeNull()
+      );
+    });
+
+    it('offers no archive before the analysis', async () => {
+      await seedDocument();
+      await renderDocumentWithHeader();
+      await openActions();
+
+      expect(screen.getByRole('button', { name: 'Rename' })).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeOnTheScreen();
+    });
+  });
+
   describe('a new analysis of an analyzed document (ANL-8)', () => {
     it('shows the previous result while the new one is on its way', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.invoice);

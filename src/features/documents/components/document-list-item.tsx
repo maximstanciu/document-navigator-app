@@ -24,6 +24,12 @@ const PLAIN_DOCUMENT: SymbolViewProps['name'] = {
   web: 'description',
 };
 
+const ARCHIVE: SymbolViewProps['name'] = {
+  ios: 'archivebox',
+  android: 'inventory_2',
+  web: 'inventory_2',
+};
+
 /** The tile on the left of a row, by the type of the document. Decoration: the type is in words. */
 const TYPE_ICONS: Record<DocumentType, SymbolViewProps['name']> = {
   letter: { ios: 'envelope', android: 'mail', web: 'mail' },
@@ -63,18 +69,25 @@ type DocumentListItemProps = {
   today: string;
   /** The name of the case it is filed in (CASE-3); left out on the case's own screen. */
   caseName?: string;
+  /**
+   * «Archived», or «Archived since 12 Nov» on the Archive screen, with the archive icon: the
+   * document is in the archive (HOME-6).
+   */
+  archiveNote?: string;
 };
 
 /**
  * A document in the list (HOME-2): title, type and sender, the nearest deadline on a pill to the
  * right, when it was added, its pages, the analysis status until it is analyzed, the flag of its
- * country (DET-11), and its case (CASE-3). A screen reader hears the deadline's full date.
+ * country (DET-11), its case (CASE-3) and whether it is archived (HOME-6). A screen reader hears
+ * the deadline's full date.
  */
 export function DocumentListItem({
   document,
   nearestDeadline,
   today,
   caseName,
+  archiveNote,
 }: DocumentListItemProps) {
   const theme = useTheme();
   const { t, i18n } = useTranslation();
@@ -106,7 +119,9 @@ export function DocumentListItem({
     <Link href={{ pathname: '/documents/[id]', params: { id: document.id } }} asChild>
       <Pressable
         role="link"
-        aria-label={[title, from, dueLine, metaLabel, inCase].filter(Boolean).join(', ')}>
+        aria-label={[title, from, dueLine, metaLabel, inCase, archiveNote]
+          .filter(Boolean)
+          .join(', ')}>
         {({ pressed }) => (
           <ThemedView
             type={pressed ? 'backgroundSelected' : 'backgroundElement'}
@@ -139,6 +154,14 @@ export function DocumentListItem({
                   />
                   <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
                     {caseName}
+                  </ThemedText>
+                </View>
+              )}
+              {archiveNote && (
+                <View style={styles.case}>
+                  <SymbolView name={ARCHIVE} size={16} tintColor={theme.textSecondary} />
+                  <ThemedText type="small" themeColor="textSecondary" numberOfLines={1}>
+                    {archiveNote}
                   </ThemedText>
                 </View>
               )}

@@ -313,4 +313,33 @@ describe('CaseScreen (CASE-3…CASE-5)', () => {
       expect(screen.queryByRole('button', { name: 'Choose from documents' })).not.toBeOnTheScreen();
     });
   });
+
+  describe('archived documents (HOME-6)', () => {
+    it('keeps an archived document in its case, marked', async () => {
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await addDocument('gas', 'Счёт за газ', 'flat');
+      await repositories.documents.setArchived('rent', true);
+
+      await renderCase();
+
+      expect(
+        await screen.findByRole('heading', { name: '2 documents in this case' })
+      ).toBeOnTheScreen();
+      expect(
+        screen.getByRole('link', { name: /^Договор аренды, .*, Archived$/ })
+      ).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: /^Счёт за газ, / })).not.toHaveAccessibleName(
+        /Archived/
+      );
+    });
+
+    it('does not offer archived documents to choose from', async () => {
+      await addDocument('letter', 'Письмо из банка');
+      await repositories.documents.setArchived('letter', true);
+      await renderCase();
+
+      expect(await screen.findByText('No documents in this case yet')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Choose from documents' })).not.toBeOnTheScreen();
+    });
+  });
 });

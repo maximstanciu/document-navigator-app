@@ -5,6 +5,7 @@ import { useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ScrollView, StyleSheet, type ScrollViewInstance } from 'react-native';
 
+import { ArchivedNotice } from '@/components/archived-notice';
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
 import { NameForm } from '@/components/ui/name-form';
@@ -22,7 +23,12 @@ import { DocumentResult } from '../components/document-result';
 import { OriginalBlock } from '../components/original-block';
 import { RelatedDocuments } from '../components/related-documents';
 import { displayTitle, formatDocumentType, formatOrigin } from '../format';
-import { documentQueries, useDeleteDocument, useRenameDocument } from '../queries';
+import {
+  documentQueries,
+  useDeleteDocument,
+  useRenameDocument,
+  useSetDocumentArchived,
+} from '../queries';
 import type { DocumentDetail } from '../types';
 
 /** «Invoice · Stadtwerke · 3 Oct 2026» (DET-1); before the analysis, when it was added. */
@@ -45,9 +51,10 @@ const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 /**
  * A document (SPEC §4.4): the title, where its analysis stands, the analysis itself in the order of
  * the four questions (DET-1…DET-10), the original and the disclaimer. «⋯» in the header renames,
- * analyzes again, for another country too, or deletes it (DET-9); under the title, the flags of the
- * document's language and country and the legal memo used (DET-11), the case it is filed in
- * (CASE-2) and the documents that carry its numbers (LINK-3).
+ * analyzes again, for another country too, archives or deletes it (DET-9, HOME-6); under the
+ * title, the flags of the document's language and country and the legal memo used (DET-11),
+ * whether it is archived (HOME-6), the case it is filed in (CASE-2) and the documents that carry
+ * its numbers (LINK-3).
  */
 export function DocumentDetailScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -56,10 +63,14 @@ export function DocumentDetailScreen({ id }: { id: string }) {
   // The same query as the «Original» block: no second read.
   const pages = useQuery(documentQueries.pages(id));
   const [actionsOpen, setActionsOpen] = useState(false);
+  // Archiving asks first when some deadlines are open. The result reads the same query; this one
+  // waits for the sheet, so a failed read stays the result's to show and retry.
+  const deadlines = useQuery({ ...documentQueries.deadlines(id), enabled: actionsOpen });
   const [renaming, setRenaming] = useState(false);
   const scroll = useRef<ScrollViewInstance>(null);
   const rename = useRenameDocument();
   const remove = useDeleteDocument();
+  const archive = useSetDocumentArchived();
   const analyze = useAnalyzeDocument();
 
   if (isPending) return <LoadingState label={t('documents.loadingOne')} />;
@@ -90,6 +101,19 @@ export function DocumentDetailScreen({ id }: { id: string }) {
     // The progress shows at the top.
     scroll.current?.scrollTo({ y: 0, animated: true });
   };
+  const archived = data.archivedAt !== null;
+  const openDeadlines = (deadlines.data ?? []).filter(
+    (deadline) => deadline.status === 'open'
+  ).length;
+  const setArchived = (value: boolean) => archive.mutate({ id, archived: value });
+  let failure: string | null = null;
+  if (rename.isError) failure = t('documents.rename.failed');
+  else if (remove.isError) failure = t('documents.actions.deleteFailed');
+  else if (archive.isError) {
+    failure = archive.variables.archived
+      ? t('documents.actions.archiveFailed')
+      : t('documents.archive.restoreFailed');
+  }
   const startRenaming = () => {
     rename.reset();
     setRenaming(true);
@@ -118,8 +142,13 @@ export function DocumentDetailScreen({ id }: { id: string }) {
         onClose={() => setActionsOpen(false)}
         title={title}
         canReanalyze={data.status === 'ready' && hasAllPages}
+        canArchive={data.analysis !== null}
+        archived={archived}
+        openDeadlines={openDeadlines}
         onRename={startRenaming}
         onReanalyze={reanalyze}
+        onArchive={() => setArchived(true)}
+        onRestore={() => setArchived(false)}
         onDelete={() => remove.mutate(id, { onSuccess: leave })}
       />
       {renaming ? (
@@ -138,9 +167,9 @@ export function DocumentDetailScreen({ id }: { id: string }) {
           {title}
         </ThemedText>
       )}
-      {(rename.isError || remove.isError) && (
+      {failure && (
         <ThemedText type="small" role="alert">
-          {rename.isError ? t('documents.rename.failed') : t('documents.actions.deleteFailed')}
+          {failure}
         </ThemedText>
       )}
       {meta !== '' && (
@@ -152,6 +181,14 @@ export function DocumentDetailScreen({ id }: { id: string }) {
         <ThemedText type="small" themeColor="textSecondary" aria-label={origin.label}>
           {origin.line}
         </ThemedText>
+      )}
+      {archived && (
+        <ArchivedNotice
+          title={t('documents.archive.archived')}
+          hint={t('documents.archive.archivedHint')}
+          busy={archive.isPending}
+          onRestore={() => setArchived(false)}
+        />
       )}
       <DocumentCase documentId={data.id} caseId={data.caseId} />
       {data.analysis && (

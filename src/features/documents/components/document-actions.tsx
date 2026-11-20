@@ -14,7 +14,7 @@ export function DocumentActionsButton({ onPress }: { onPress: () => void }) {
   return <HeaderMenuButton label={t('documents.actions.open')} onPress={onPress} />;
 }
 
-type Confirmation = 'reanalyze' | 'country' | 'delete';
+type Confirmation = 'reanalyze' | 'country' | 'archive' | 'delete';
 
 type DocumentActionsSheetProps = {
   visible: boolean;
@@ -26,25 +26,40 @@ type DocumentActionsSheetProps = {
    * its own button.
    */
   canReanalyze: boolean;
+  /** Only a document with an analysis goes to the archive (HOME-6). */
+  canArchive: boolean;
+  /** The document is in the archive (HOME-6): «Restore from archive» instead of «Archive». */
+  archived: boolean;
+  /** How many open deadlines it has: archiving asks first when there are any. */
+  openDeadlines: number;
   onRename: () => void;
   /** With the country picked in «Analyze for another country» (ANL-14), else as settings say. */
   onReanalyze: (country?: DocumentCountryChoice) => void;
+  onArchive: () => void;
+  onRestore: () => void;
   onDelete: () => void;
 };
 
 /**
- * The document's actions (DET-9): «Rename», «Analyze again», «Analyze for another country» and
- * «Delete», as a sheet from the bottom. Analyzing again and deleting ask first, in the same sheet
- * (ANL-8, STO-6): a system alert shown while a modal closes is unreliable on iOS. Another country
- * is picked first, then asked about like analyzing again (ANL-14).
+ * The document's actions (DET-9): «Rename», «Analyze again», «Analyze for another country»,
+ * «Archive» or «Restore from archive» (HOME-6) and «Delete», as a sheet from the bottom. Analyzing
+ * again and deleting ask first, in the same sheet (ANL-8, STO-6): a system alert shown while a
+ * modal closes is unreliable on iOS. Another country is picked first, then asked about like
+ * analyzing again (ANL-14). Archiving asks only when the document has open deadlines, to say they
+ * stay live.
  */
 export function DocumentActionsSheet({
   visible,
   onClose,
   title,
   canReanalyze,
+  canArchive,
+  archived,
+  openDeadlines,
   onRename,
   onReanalyze,
+  onArchive,
+  onRestore,
   onDelete,
 }: DocumentActionsSheetProps) {
   const { t } = useTranslation();
@@ -103,6 +118,21 @@ export function DocumentActionsSheet({
         <Button label={t('common.cancel')} variant="secondary" onPress={close} />
       </>
     );
+  } else if (confirmation === 'archive') {
+    content = (
+      <>
+        <ThemedText type="smallBold" role="heading">
+          {t('documents.actions.archiveTitle')}
+        </ThemedText>
+        <ThemedText type="small">{t('documents.actions.archiveMessage')}</ThemedText>
+        <ThemedText type="small">
+          {t('documents.actions.archiveDeadlines', { count: openDeadlines })}
+        </ThemedText>
+        <ThemedText type="small">{t('documents.actions.archiveHint')}</ThemedText>
+        <Button label={t('documents.actions.archive')} onPress={run(onArchive)} />
+        <Button label={t('common.cancel')} variant="secondary" onPress={close} />
+      </>
+    );
   } else if (confirmation === 'delete') {
     content = (
       <>
@@ -138,6 +168,17 @@ export function DocumentActionsSheet({
               onPress={() => setConfirmation('country')}
             />
           </>
+        )}
+        {archived ? (
+          <Button label={t('archive.restore')} variant="secondary" onPress={run(onRestore)} />
+        ) : (
+          canArchive && (
+            <Button
+              label={t('documents.actions.archive')}
+              variant="secondary"
+              onPress={openDeadlines > 0 ? () => setConfirmation('archive') : run(onArchive)}
+            />
+          )
         )}
         <Button
           label={t('documents.actions.delete')}

@@ -15,6 +15,7 @@ import { caseQueries, useMoveToCase } from '@/features/cases/queries';
 import { useTheme } from '@/hooks/use-theme';
 import { formatTimestampDate } from '@/lib/i18n/format';
 
+import { isArchived } from '../archive';
 import { displayTitle } from '../format';
 import { documentQueries } from '../queries';
 import type { DocumentSummary } from '../types';
@@ -63,7 +64,8 @@ function DocumentChoice({
 /**
  * «Choose from documents» (CASE-4), a modal: the documents outside the case, newest first, to tick
  * and file in it at once. One from another case moves here: a document is in one case at most.
- * Documents of archived cases aren't offered: they stay put until their case is restored (CASE-6).
+ * Archived documents and those of archived cases aren't offered: they stay put until restored
+ * (HOME-6, CASE-6).
  */
 export function AddToCaseScreen({ caseId }: { caseId: string }) {
   const theme = useTheme();
@@ -98,8 +100,9 @@ export function AddToCaseScreen({ caseId }: { caseId: string }) {
     );
   }
 
+  // Archived documents, and those of archived cases, aren't offered (CASE-4, HOME-6, CASE-6).
   const candidates = documents.data.filter(
-    (document) => document.caseId !== caseId && !document.caseArchived
+    (document) => document.caseId !== caseId && !isArchived(document)
   );
   // A document deleted meanwhile drops out of the choice.
   const chosen = candidates.filter((document) => selected.has(document.id)).map(({ id }) => id);
