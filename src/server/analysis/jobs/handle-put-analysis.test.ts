@@ -93,9 +93,23 @@ describe('handlePutAnalysis 202', () => {
     const third = await put(uploadRequest({ jobId: crypto.randomUUID() }));
 
     expect(first.status).toBe(202);
-    expect(await stateOf(first)).toEqual({ status: 'processing', etaSeconds: null });
-    expect(await stateOf(second)).toEqual({ status: 'queued', ahead: 1, etaSeconds: null });
-    expect(await stateOf(third)).toEqual({ status: 'queued', ahead: 2, etaSeconds: null });
+    expect(await stateOf(first)).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
+    expect(await stateOf(second)).toEqual({
+      status: 'queued',
+      ahead: 1,
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
+    expect(await stateOf(third)).toEqual({
+      status: 'queued',
+      ahead: 2,
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
     expect(calls).toHaveLength(1);
   });
 
@@ -176,7 +190,11 @@ describe('handlePutAnalysis 202', () => {
     const response = await put(repeat);
 
     expect(response.status).toBe(202);
-    expect(await stateOf(response)).toEqual({ status: 'processing', etaSeconds: null });
+    expect(await stateOf(response)).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
     expect(repeat.bodyUsed).toBe(false);
     expect(calls).toHaveLength(1);
 

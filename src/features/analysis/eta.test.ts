@@ -1,4 +1,4 @@
-import { etaOf } from './eta';
+import { etaOf, progressOf } from './eta';
 
 const NOW = Date.parse('2026-11-15T12:00:00Z');
 const in_ = (seconds: number) => etaOf({ endsAt: NOW + seconds * 1000, checkedAt: NOW }, NOW);
@@ -29,11 +29,38 @@ describe('etaOf', () => {
   });
 
   it('counts from the check when the clock was read before it', () => {
-    // The panel's clock ticks every 15 s; the server said «past the estimate» since.
+    // The panel's clock ticks every 5 s; the server said «past the estimate» since.
     expect(etaOf({ endsAt: NOW, checkedAt: NOW }, NOW - 10_000)).toBe('overdue');
     expect(etaOf({ endsAt: NOW + 7 * 60_000, checkedAt: NOW }, NOW - 14_000)).toEqual({
       unit: 'minutes',
       count: 7,
     });
+  });
+});
+
+describe('progressOf', () => {
+  /** Accepted 2 minutes before the check, 8 minutes left at it: 10 minutes in all. */
+  const job = { startedAt: NOW - 2 * 60_000, endsAt: NOW + 8 * 60_000, checkedAt: NOW };
+
+  it('fills as the minutes left count down', () => {
+    expect(progressOf(job, NOW)).toBeCloseTo(0.2);
+    expect(progressOf(job, NOW + 3 * 60_000)).toBeCloseTo(0.5);
+    expect(progressOf(job, NOW + 8 * 60_000 - 6_000)).toBeCloseTo(0.99);
+  });
+
+  it('starts empty for a job just accepted', () => {
+    expect(progressOf({ startedAt: NOW, endsAt: NOW + 60_000, checkedAt: NOW }, NOW)).toBe(0);
+  });
+
+  it('counts from the check when the clock was read before it', () => {
+    expect(progressOf(job, NOW - 14_000)).toBeCloseTo(0.2);
+  });
+
+  it('is unknown without an estimate, without the start, and past the estimate', () => {
+    expect(progressOf({ ...job, endsAt: null }, NOW)).toBeNull();
+    // A server older than SPEC v0.55 doesn't say when it accepted the job.
+    expect(progressOf({ ...job, startedAt: null }, NOW)).toBeNull();
+    expect(progressOf(job, NOW + 8 * 60_000)).toBeNull();
+    expect(progressOf({ ...job, endsAt: NOW }, NOW)).toBeNull();
   });
 });

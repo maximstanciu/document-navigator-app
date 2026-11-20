@@ -35,14 +35,23 @@ function queue(before: AnalysisJob[], durations = new JobDurations(seedPageMs(24
 
 describe('jobState', () => {
   it('tells a running job what is left of its estimate', () => {
-    expect(jobState(job(1, MINUTE), queue([]))).toEqual({ status: 'processing', etaSeconds: 180 });
-    expect(jobState(job(3, 0), queue([]))).toEqual({ status: 'processing', etaSeconds: 480 });
+    expect(jobState(job(1, MINUTE), queue([]))).toEqual({
+      status: 'processing',
+      etaSeconds: 180,
+      elapsedSeconds: 60,
+    });
+    expect(jobState(job(3, 0), queue([]))).toEqual({
+      status: 'processing',
+      etaSeconds: 480,
+      elapsedSeconds: 60,
+    });
   });
 
   it('says 0 once a job runs longer than estimated', () => {
     expect(jobState(job(1, 10 * MINUTE), queue([]))).toEqual({
       status: 'processing',
       etaSeconds: 0,
+      elapsedSeconds: 60,
     });
   });
 
@@ -55,6 +64,7 @@ describe('jobState', () => {
       status: 'queued',
       ahead: 2,
       etaSeconds: 15 * 60,
+      elapsedSeconds: 60,
     });
   });
 
@@ -70,16 +80,28 @@ describe('jobState', () => {
     expect(jobState(job(1), queue(before))).toMatchObject({ ahead: 4, etaSeconds: 9 * 60 });
   });
 
+  it('tells how long the job has been on the server, the wait in the queue included', () => {
+    const waited = { ...job(1, MINUTE), queuedAt: NOW - 5 * MINUTE - 900 };
+    expect(jobState(waited, queue([]))).toEqual({
+      status: 'processing',
+      etaSeconds: 180,
+      elapsedSeconds: 5 * 60,
+    });
+    expect(jobState({ ...job(1), queuedAt: NOW }, queue([]))).toMatchObject({ elapsedSeconds: 0 });
+  });
+
   it('has no estimate while the server has nothing to go by', () => {
     const unknown = new JobDurations();
     expect(jobState(job(1, MINUTE), queue([], unknown))).toEqual({
       status: 'processing',
       etaSeconds: null,
+      elapsedSeconds: 60,
     });
     expect(jobState(job(1), queue([job(1, 0)], unknown))).toEqual({
       status: 'queued',
       ahead: 1,
       etaSeconds: null,
+      elapsedSeconds: 60,
     });
   });
 

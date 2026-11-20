@@ -477,7 +477,13 @@ describe('checkAnalysisJobs: the polling (SPEC §7.2 «Опрос»)', () => {
 
     await expect(checkAnalysisJobs()).resolves.toEqual({
       progress: {
-        'doc-1': { status: 'queued', ahead: 2, endsAt: null, checkedAt: expect.any(Number) },
+        'doc-1': {
+          status: 'queued',
+          ahead: 2,
+          endsAt: null,
+          startedAt: null,
+          checkedAt: expect.any(Number),
+        },
       },
       changed: false,
     });
@@ -497,11 +503,19 @@ describe('checkAnalysisJobs: the polling (SPEC §7.2 «Опрос»)', () => {
     await uploaded();
     const checkedAt = Date.parse('2026-11-15T12:00:00Z');
     jest.spyOn(Date, 'now').mockReturnValue(checkedAt);
-    server.GET = () => json(200, { status: 'queued', ahead: 1, etaSeconds: 900 });
+    server.GET = () =>
+      json(200, { status: 'queued', ahead: 1, etaSeconds: 900, elapsedSeconds: 60 });
 
     await expect(checkAnalysisJobs()).resolves.toMatchObject({
       progress: {
-        'doc-1': { status: 'queued', ahead: 1, endsAt: checkedAt + 900_000, checkedAt },
+        'doc-1': {
+          status: 'queued',
+          ahead: 1,
+          endsAt: checkedAt + 900_000,
+          // When the server accepted the job, for the share of the estimate passed.
+          startedAt: checkedAt - 60_000,
+          checkedAt,
+        },
       },
     });
     server.GET = () => json(200, { status: 'processing', etaSeconds: 0 });

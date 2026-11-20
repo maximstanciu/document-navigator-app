@@ -370,18 +370,29 @@ export async function turnOnAnalysisPush(): Promise<NotificationPermission> {
 
 /**
  * When the server expects a job to end, as estimated at a check (ANL-3), in epoch ms: `endsAt`,
- * `null` without an estimate, and `checkedAt`, the check. Kept as moments, they stay right while
- * the server can't be asked.
+ * `null` without an estimate; `startedAt`, when the server accepted the job, for the share of the
+ * estimate that has passed (`null` from a server older than SPEC v0.55); and `checkedAt`, the
+ * check. Kept as moments, they stay right while the server can't be asked.
  */
-export type JobEstimate = { endsAt: number | null; checkedAt: number };
+export type JobEstimate = { endsAt: number | null; startedAt: number | null; checkedAt: number };
 
 /** Where a job that hasn't ended stands, for the status panel (ANL-3). */
 export type JobProgress =
   ({ status: 'queued'; ahead: number } & JobEstimate) | ({ status: 'processing' } & JobEstimate);
 
-function estimate(etaSeconds: number | null): JobEstimate {
+function estimate({
+  etaSeconds,
+  elapsedSeconds,
+}: {
+  etaSeconds: number | null;
+  elapsedSeconds: number | null;
+}): JobEstimate {
   const checkedAt = Date.now();
-  return { endsAt: etaSeconds === null ? null : checkedAt + etaSeconds * 1000, checkedAt };
+  return {
+    endsAt: etaSeconds === null ? null : checkedAt + etaSeconds * 1000,
+    startedAt: elapsedSeconds === null ? null : checkedAt - elapsedSeconds * 1000,
+    checkedAt,
+  };
 }
 
 /**
@@ -406,9 +417,9 @@ async function applyJobState(
   const { documents } = getRepositories();
   switch (state.status) {
     case 'queued':
-      return { status: 'queued', ahead: state.ahead, ...estimate(state.etaSeconds) };
+      return { status: 'queued', ahead: state.ahead, ...estimate(state) };
     case 'processing':
-      return { status: 'processing', ...estimate(state.etaSeconds) };
+      return { status: 'processing', ...estimate(state) };
     case 'done':
       try {
         await documents.saveAnalysis(job.id, {

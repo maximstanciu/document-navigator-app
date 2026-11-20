@@ -85,6 +85,9 @@ async function renderDocument() {
   );
 }
 
+/** The panel's bar: out of the accessibility tree, since the words next to it say the same. */
+const progressBar = () => screen.getByRole('progressbar', { includeHiddenElements: true });
+
 /** The app goes to the background and comes back (SPEC §7.2 «Опрос»). */
 async function returnToForeground() {
   await act(async () => {
@@ -186,12 +189,15 @@ describe('AnalysisStatusPanel: the push about the end of the job (ANL-12)', () =
 
 describe('AnalysisStatusPanel: when the analysis should end (ANL-3)', () => {
   it('shows the server’s estimate under the place in the queue', async () => {
-    server.GET = () => json(200, { status: 'queued', ahead: 1, etaSeconds: 25 * 60 });
+    server.GET = () =>
+      json(200, { status: 'queued', ahead: 1, etaSeconds: 25 * 60, elapsedSeconds: 5 * 60 });
     await seedDocument('analyzing');
     await renderDocument();
 
     expect(await screen.findByText('Ready in about 25 minutes')).toBeOnTheScreen();
     expect(screen.getByText('In the queue: 1 document ahead of yours')).toBeOnTheScreen();
+    // 5 minutes of 30 have passed: the bar follows the time left.
+    expect(progressBar()).toHaveAccessibilityValue({ now: 17 });
     // The estimate says how long; «a few minutes» would only blur it.
     expect(
       screen.getByText('You can close the app: the result will be here when you open it again.')
@@ -209,11 +215,13 @@ describe('AnalysisStatusPanel: when the analysis should end (ANL-3)', () => {
 
   it('says so when the analysis runs past its estimate', async () => {
     fakeNotifications.permission = 'granted';
-    server.GET = () => json(200, { status: 'processing', etaSeconds: 0 });
+    server.GET = () => json(200, { status: 'processing', etaSeconds: 0, elapsedSeconds: 600 });
     await seedDocument('analyzing');
     await renderDocument();
 
     expect(await screen.findByText('This is taking longer than usual')).toBeOnTheScreen();
+    // The time left isn't known any more: the bar only shows the work goes on.
+    expect(progressBar()).not.toHaveProp('aria-valuenow');
     expect(
       screen.getByText(
         "You can close the app: you'll get a notification when the document is analyzed."
@@ -228,6 +236,7 @@ describe('AnalysisStatusPanel: when the analysis should end (ANL-3)', () => {
 
     expect(await screen.findByText(/This takes a few minutes/)).toBeOnTheScreen();
     expect(screen.queryByText(/Ready in about/)).not.toBeOnTheScreen();
+    expect(progressBar()).not.toHaveProp('aria-valuenow');
   });
 });
 

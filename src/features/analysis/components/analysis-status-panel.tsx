@@ -17,7 +17,7 @@ import { PDF_MIME_TYPE } from '@/shared/analysis/contract';
 import { MAX_DOCUMENT_BYTES, MAX_IMAGE_PAGES, MAX_PDF_PAGES } from '@/shared/limits';
 
 import { isRetryable, type AnalysisError, type AnalysisErrorCode } from '../errors';
-import { etaOf, type Eta } from '../eta';
+import { etaOf, progressOf, type Eta } from '../eta';
 import {
   useAnalyzeDocument,
   useCancelAnalysis,
@@ -50,8 +50,11 @@ function failureMessage(
   return t(`analysis.error.${code}`);
 }
 
-/** How often the time left is counted again: often enough for a count in minutes. */
-const ETA_TICK_MS = 15_000;
+/**
+ * How often the time left and the bar are counted again: often enough for the bar to move in small
+ * steps on a 4-minute analysis.
+ */
+const ETA_TICK_MS = 5_000;
 
 /** «Ready in about 7 minutes», or that it takes longer than usual (ANL-3). */
 function etaMessage(eta: NonNullable<Eta>, t: TFunction): string {
@@ -123,6 +126,7 @@ function AnalysisProgress({
   const now = useNow(ETA_TICK_MS);
 
   const eta = uploading || !progress ? null : etaOf(progress, now.getTime());
+  const done = uploading || !progress ? null : progressOf(progress, now.getTime());
   const queuedBehind = progress?.status === 'queued' && progress.ahead > 0 ? progress.ahead : 0;
   const status = uploading
     ? t('analysis.uploading')
@@ -135,8 +139,11 @@ function AnalysisProgress({
       <View style={styles.progress}>
         <ThemedText type="smallBold">{status}</ThemedText>
         {eta && <ThemedText type="small">{etaMessage(eta, t)}</ThemedText>}
-        {/* The status above says it in words; the bar only shows that the work goes on. */}
-        <ProgressBar aria-hidden />
+        {/*
+          The words above say it, so the bar stays out of the accessibility tree. It fills as the
+          time left counts down; without an estimate, or past it, it only shows the work goes on.
+        */}
+        <ProgressBar aria-hidden value={done} />
       </View>
       <ThemedText type="small" themeColor="textSecondary">
         {uploading

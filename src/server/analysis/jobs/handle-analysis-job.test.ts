@@ -96,11 +96,16 @@ describe('an analysis job', () => {
     await put({ files: Array.from({ length: 4 }, () => jpeg()) });
     await put({ jobId: JOB_B });
 
-    expect(await stateOf(await get())).toEqual({ status: 'processing', etaSeconds: null });
+    expect(await stateOf(await get())).toEqual({
+      status: 'processing',
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
     expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
       status: 'queued',
       ahead: 1,
       etaSeconds: null,
+      elapsedSeconds: 0,
     });
 
     calls[0].answer();
@@ -115,6 +120,7 @@ describe('an analysis job', () => {
     expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
       status: 'processing',
       etaSeconds: null,
+      elapsedSeconds: 0,
     });
     expect(calls).toHaveLength(2);
   });
@@ -143,7 +149,11 @@ describe('an analysis job', () => {
 
       calls[0].answer(fromPortugal(), 0.01);
       await settle();
-      expect(await stateOf(await get())).toEqual({ status: 'processing', etaSeconds: null });
+      expect(await stateOf(await get())).toEqual({
+        status: 'processing',
+        etaSeconds: null,
+        elapsedSeconds: 0,
+      });
       expect(calls).toHaveLength(2);
       expect(calls[1].input.country).toBe('PT');
       expect(calls[1].input.files).toHaveLength(4);
@@ -235,6 +245,7 @@ describe('an analysis job', () => {
       status: 'queued',
       ahead: 2,
       etaSeconds: null,
+      elapsedSeconds: 0,
     });
   });
 
@@ -247,7 +258,12 @@ describe('an analysis job', () => {
     const accepted = await put({ jobId: third });
     // Nothing to go by yet.
     expect(accepted.status).toBe(202);
-    expect(await accepted.json()).toEqual({ status: 'queued', ahead: 2, etaSeconds: null });
+    expect(await accepted.json()).toEqual({
+      status: 'queued',
+      ahead: 2,
+      etaSeconds: null,
+      elapsedSeconds: 0,
+    });
 
     // Four pages in 10 minutes: 2 a page, with the fixed part counted as one more page.
     deps.advance(10 * 60_000);
@@ -257,16 +273,21 @@ describe('an analysis job', () => {
     expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
       status: 'processing',
       etaSeconds: 4 * 60,
+      elapsedSeconds: 10 * 60,
     });
     expect(await stateOf(await get({ jobId: third }))).toEqual({
       status: 'queued',
       ahead: 1,
       etaSeconds: 8 * 60,
+      elapsedSeconds: 10 * 60,
     });
 
     deps.advance(60_000);
     expect(await stateOf(await get({ jobId: JOB_B }))).toMatchObject({ etaSeconds: 3 * 60 });
-    expect(await stateOf(await get({ jobId: third }))).toMatchObject({ etaSeconds: 7 * 60 });
+    expect(await stateOf(await get({ jobId: third }))).toMatchObject({
+      etaSeconds: 7 * 60,
+      elapsedSeconds: 11 * 60,
+    });
   });
 
   it('learns nothing from a job that failed or was cancelled (ANL-3)', async () => {
@@ -287,6 +308,7 @@ describe('an analysis job', () => {
     expect(await stateOf(await get({ jobId: third }))).toEqual({
       status: 'processing',
       etaSeconds: null,
+      elapsedSeconds: 20 * 60,
     });
   });
 
@@ -551,6 +573,7 @@ describe('DELETE /api/v1/analyses/{jobId}', () => {
     expect(await stateOf(await get({ jobId: JOB_B }))).toEqual({
       status: 'processing',
       etaSeconds: null,
+      elapsedSeconds: 0,
     });
     expect(ofType('job.removed')[0]).toMatchObject({ reason: 'cancelled', state: 'processing' });
     expect(ofType('analysis.end')[0]).toMatchObject({
@@ -832,6 +855,7 @@ describe('result retention', () => {
       status: 'queued',
       ahead: 1,
       etaSeconds: null,
+      elapsedSeconds: (3 * TEST_RESULT_TTL_MS) / 1000,
     });
   });
 });

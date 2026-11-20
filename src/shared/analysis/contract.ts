@@ -92,6 +92,13 @@ export const JOB_FAILURE_CODES = ['analysis_failed', 'unavailable'] as const;
 const etaSecondsSchema = z.number().int().min(0).nullable().default(null);
 
 /**
+ * Seconds since the server accepted the job, the wait in the queue included: with `etaSeconds`,
+ * how much of the estimated time has passed, for the progress bar (ANL-3). A server older than
+ * SPEC v0.55 doesn't send it.
+ */
+const elapsedSecondsSchema = z.number().int().min(0).nullable().default(null);
+
+/**
  * State of a job, the `200` of GET and the `202` of PUT (SPEC §7.2). `ahead` counts the jobs that
  * will be analyzed before this one, the running ones included.
  */
@@ -100,8 +107,13 @@ export const analysisJobStateSchema = z.discriminatedUnion('status', [
     status: z.literal('queued'),
     ahead: z.number().int().min(0),
     etaSeconds: etaSecondsSchema,
+    elapsedSeconds: elapsedSecondsSchema,
   }),
-  z.object({ status: z.literal('processing'), etaSeconds: etaSecondsSchema }),
+  z.object({
+    status: z.literal('processing'),
+    etaSeconds: etaSecondsSchema,
+    elapsedSeconds: elapsedSecondsSchema,
+  }),
   analyzeResponseSchema.extend({ status: z.literal('done') }),
   z.object({
     status: z.literal('failed'),

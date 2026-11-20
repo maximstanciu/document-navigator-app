@@ -26,11 +26,17 @@ export function jobState(job: AnalysisJob, queue: JobQueue): AnalysisJobState {
       error: { code: result.code, message: FAILURE_MESSAGES[result.code] },
     };
   }
+  const elapsedSeconds = Math.max(0, Math.floor((queue.now() - job.queuedAt) / 1000));
   if (job.status === 'processing') {
-    return { status: 'processing', etaSeconds: etaSeconds(job, [], queue) };
+    return { status: 'processing', etaSeconds: etaSeconds(job, [], queue), elapsedSeconds };
   }
   const before = queue.jobs.before(job);
-  return { status: 'queued', ahead: before.length, etaSeconds: etaSeconds(job, before, queue) };
+  return {
+    status: 'queued',
+    ahead: before.length,
+    etaSeconds: etaSeconds(job, before, queue),
+    elapsedSeconds,
+  };
 }
 
 /**
