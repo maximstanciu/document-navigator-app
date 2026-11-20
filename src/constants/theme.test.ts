@@ -41,6 +41,8 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   ['onInverseWarning', 'inverse'],
   ['onInverseAction', 'inverseAction'],
   ['inverseAction', 'inverse'],
+  // «New case» among the case chips on the Documents tab.
+  ['onAccent', 'accent'],
   // The floating tab bar: its labels and icons, and the round «Add a document» on it.
   ['text', 'tabBar'],
   ['textSecondary', 'tabBar'],

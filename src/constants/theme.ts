@@ -1,7 +1,8 @@
 /**
  * The app's colors in light and dark mode, its type families, spacing and radii. The look: ink on a
- * cool grey ground with white cards, and one lime accent. In the light theme the lime never sits on
- * a light surface: it shows only on ink (the accent of `tint` fills and of the inverse card).
+ * cool grey ground with white cards, and one lime accent. In the light theme the lime sits on a light
+ * surface only as a filled action with ink on it (`accent`, «New case» among the cases); otherwise it
+ * shows only on ink (the accent of `tint` fills and of the inverse card).
  */
 
 import '@/global.css';
@@ -37,6 +38,9 @@ export const Colors = {
     // A button on the inverse card.
     inverseAction: Lime,
     onInverseAction: Ink,
+    // An action that stands out among chips («New case» among the cases): lime with ink, both themes.
+    accent: Lime,
+    onAccent: Ink,
     // Risk levels and the fraud warning (DET-5, DET-10). Always paired with text and an icon:
     // color alone never carries the meaning (§8.4). Contrast is checked in theme.test.ts.
     riskHigh: '#B42318',
@@ -69,6 +73,8 @@ export const Colors = {
     onInverseWarning: '#9A1B10',
     inverseAction: Ink,
     onInverseAction: Lime,
+    accent: Lime,
+    onAccent: Ink,
     riskHigh: '#FDA29B',
     riskHighBackground: '#55160C',
     riskMedium: '#FEC84B',

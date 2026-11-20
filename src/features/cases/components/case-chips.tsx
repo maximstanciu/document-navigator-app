@@ -27,10 +27,12 @@ type ChipProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
   detail?: string;
   accessibleLabel: string;
+  /** Filled lime with ink on it: the action among the places («New case»). */
+  accent?: boolean;
 };
 
 /** A case's chip is rendered inside `Link asChild`, which passes the press handler down. */
-function Chip({ role, icon, label, detail, accessibleLabel, ...rest }: ChipProps) {
+function Chip({ role, icon, label, detail, accessibleLabel, accent, ...rest }: ChipProps) {
   const theme = useTheme();
 
   return (
@@ -40,11 +42,15 @@ function Chip({ role, icon, label, detail, accessibleLabel, ...rest }: ChipProps
       {...rest}
       style={({ pressed }) => [
         styles.chip,
-        { backgroundColor: theme.backgroundElement },
+        { backgroundColor: accent ? theme.accent : theme.backgroundElement },
         pressed && styles.pressed,
       ]}>
-      <SymbolView name={icon} size={18} tintColor={theme.tint} />
-      <ThemedText type="smallBold" numberOfLines={1} style={styles.label}>
+      <SymbolView name={icon} size={18} tintColor={accent ? theme.onAccent : theme.tint} />
+      <ThemedText
+        type="smallBold"
+        themeColor={accent ? 'onAccent' : undefined}
+        numberOfLines={1}
+        style={styles.label}>
         {label}
       </ThemedText>
       {detail && (
@@ -106,9 +112,10 @@ export function CaseChips({ cases, counts, archivedCases, archivedDocuments }: C
             </Link>
           );
         })}
-        {/* Opens a modal, like «Add»: an action rather than a place. */}
+        {/* Opens a modal, like «Add»: an action rather than a place, so it stands out in lime. */}
         <Chip
           role="button"
+          accent
           icon={NEW_FOLDER}
           label={t('cases.newCase')}
           accessibleLabel={t('cases.newCase')}
