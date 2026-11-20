@@ -1,21 +1,24 @@
 import { useQuery } from '@tanstack/react-query';
 import { Image } from 'expo-image';
+import { Link } from 'expo-router';
 import { SymbolView } from 'expo-symbols';
 import { useTranslation } from 'react-i18next';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { Section } from '@/components/section';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import { Spacing } from '@/constants/theme';
-import { PdfFileCard } from '@/features/capture/components/pdf-file-card';
+import { PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+import { displayTitle } from '../format';
 import { documentQueries } from '../queries';
 import type { DocumentDetail, DocumentPage } from '../types';
 import { InlineError } from './inline-error';
+import { PdfOriginal } from './pdf-original';
 
-function PageTile({ page }: { page: DocumentPage }) {
+/** A page thumbnail; pressed, it opens the pages full screen at this one (DET-7). */
+function PageTile({ documentId, page }: { documentId: string; page: DocumentPage }) {
   const theme = useTheme();
   const { t } = useTranslation();
   const number = page.index + 1;
@@ -37,22 +40,28 @@ function PageTile({ page }: { page: DocumentPage }) {
           />
         </ThemedView>
       ) : (
-        <Image
-          source={{ uri: page.uri }}
-          accessible
-          alt={t('documents.original.page', { number })}
-          contentFit="cover"
-          style={styles.tile}
-        />
+        <Link
+          href={{
+            pathname: '/documents/[id]/pages',
+            params: { id: documentId, page: String(number) },
+          }}
+          asChild>
+          <Pressable
+            role="link"
+            aria-label={t('documents.original.page', { number })}
+            style={({ pressed }) => pressed && styles.pressed}>
+            <Image source={{ uri: page.uri }} contentFit="cover" style={styles.tile} />
+          </Pressable>
+        </Link>
       )}
     </View>
   );
 }
 
 /**
- * «Original» (DET-7): the page thumbnails, or the PDF as a file card (D-4). Pages whose files are
- * gone show as such, and with none left the block says the original isn't available; the rest of
- * the screen works without it (STO-8). The full-screen viewer and «Open in…» arrive in task 4.3.
+ * «Original» (DET-7): the page thumbnails, which open the pages full screen, or the PDF as a file
+ * card with «Open» and «Share» (D-4). Pages whose files are gone show as such, and with none left
+ * the block says the original isn't available; the rest of the screen works without it (STO-8).
  */
 export function OriginalBlock({ document }: { document: DocumentDetail }) {
   const theme = useTheme();
@@ -70,13 +79,18 @@ export function OriginalBlock({ document }: { document: DocumentDetail }) {
         {t('documents.original.unavailable')}
       </ThemedText>
     );
-  } else if (document.mimeType === 'application/pdf') {
-    content = <PdfFileCard name={null} size={document.fileSize} />;
+  } else if (document.mimeType === 'application/pdf' && pages[0].uri !== null) {
+    const file = {
+      uri: pages[0].uri,
+      mimeType: document.mimeType,
+      title: displayTitle(document.title, t),
+    };
+    content = <PdfOriginal file={file} size={document.fileSize} />;
   } else {
     content = (
       <View style={styles.grid}>
         {pages.map((page) => (
-          <PageTile key={page.id} page={page} />
+          <PageTile key={page.id} documentId={document.id} page={page} />
         ))}
       </View>
     );
@@ -103,5 +117,8 @@ const styles = StyleSheet.create({
   missing: {
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  pressed: {
+    opacity: PressedOpacity,
   },
 });

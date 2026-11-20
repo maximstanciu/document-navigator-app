@@ -3,6 +3,7 @@ import { Stack } from 'expo-router';
 import { renderRouter } from 'expo-router/testing-library';
 
 import DocumentRoute from '@/app/documents/[id]';
+import DocumentPagesRoute from '@/app/documents/[id]/pages';
 import { analysisRecords } from '@/features/analysis/analysis-records';
 import * as analysisApi from '@/features/analysis/api';
 import { syncReminders } from '@/features/reminders/sync-reminders';
@@ -18,9 +19,14 @@ import { installTestRepositories } from '@/test/sqlite';
 
 import * as api from '../api';
 import { copyToClipboard } from '../clipboard';
+import { openOriginalFile, shareOriginalFile } from '../original-file';
 
 jest.mock('expo-file-system', () => jest.requireActual('@/test/fake-file-system'));
 jest.mock('../clipboard', () => ({ copyToClipboard: jest.fn(async () => {}) }));
+jest.mock('../original-file', () => ({
+  openOriginalFile: jest.fn(async () => {}),
+  shareOriginalFile: jest.fn(async () => {}),
+}));
 // The native date pickers can't run in Jest; the web field stands in for them.
 jest.mock('@/components/ui/date-time-picker', () =>
   jest.requireActual('@/components/ui/date-time-picker.web')
@@ -518,6 +524,42 @@ describe('DocumentDetailScreen', () => {
   });
 
   describe('original (DET-7, STO-8)', () => {
+    it('opens the pages full screen at the pressed one', async () => {
+      await seedDocument({ pages: 2 });
+      await renderRouter(
+        {
+          _layout: () => <Stack />,
+          'documents/[id]': DocumentRoute,
+          'documents/[id]/pages': DocumentPagesRoute,
+        },
+        { initialUrl: '/documents/doc-1', wrapper: createTestProviders() }
+      );
+      const user = userEvent.setup();
+
+      await user.press(await screen.findByRole('link', { name: 'Page 2' }));
+
+      expect(await screen.findByText('Page 2 of 2')).toBeOnTheScreen();
+    });
+
+    it('opens a PDF in the system viewer or shares it, and says when that fails (D-4)', async () => {
+      await seedDocument({ pdf: true });
+      jest.mocked(shareOriginalFile).mockRejectedValueOnce(new Error('Sharing in progress'));
+      await renderDocument();
+      const user = userEvent.setup();
+      const file = {
+        uri: `${fakeFileSystem.documentRoot}/documents/doc-1/p1.pdf`,
+        mimeType: 'application/pdf',
+        title: 'Untitled document',
+      };
+
+      await user.press(await screen.findByRole('button', { name: 'Open the PDF in another app' }));
+      expect(openOriginalFile).toHaveBeenCalledWith(file);
+
+      await user.press(screen.getByRole('button', { name: 'Save or send the PDF' }));
+      expect(shareOriginalFile).toHaveBeenCalledWith(file, 'Share');
+      expect(await screen.findByText("Couldn't open the file. Try again.")).toBeOnTheScreen();
+    });
+
     it('marks a page whose file is gone and keeps the rest', async () => {
       await seedDocument({ pages: 2 });
       fakeFileSystem.reset();

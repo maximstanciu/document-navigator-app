@@ -214,6 +214,18 @@ export const en = {
         "The original isn't available: its files are no longer on this device. The analysis and deadlines still work.",
       page: 'Page {{number}}',
       pageMissing: 'Page {{number}} is not available',
+      open: 'Open',
+      openPdf: 'Open the PDF in another app',
+      share: 'Share',
+      sharePdf: 'Save or send the PDF',
+      openFailed: "Couldn't open the file. Try again.",
+    },
+    viewer: {
+      position: 'Page {{number}} of {{total}}',
+      previous: 'Previous page',
+      next: 'Next page',
+      openPage: 'Open page {{number}} in another app',
+      sharePage: 'Save or send page {{number}}',
     },
     related: {
       title: 'Related documents',

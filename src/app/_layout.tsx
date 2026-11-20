@@ -18,6 +18,7 @@ export default function RootLayout() {
       <Stack screenOptions={{ headerBackButtonDisplayMode: 'minimal' }}>
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="documents/[id]" options={{ title: '' }} />
+        <Stack.Screen name="documents/[id]/pages" options={{ title: '' }} />
         <Stack.Screen name="cases/[id]" options={{ title: '' }} />
         <Stack.Screen name="cases/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="cases/[id]/add" options={{ presentation: 'modal' }} />
