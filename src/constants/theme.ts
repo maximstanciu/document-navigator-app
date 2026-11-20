@@ -18,6 +18,8 @@ export const Colors = {
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#E3E5EA',
     textSecondary: '#555B66',
+    // Fine print (the «not legal advice» disclaimer): the lightest grey that still passes AA.
+    textMuted: '#6B707A',
     // Fills (primary buttons, chosen chips, checkboxes) and tappable text: ink, with lime on it.
     tint: Ink,
     onTint: Lime,
@@ -54,6 +56,7 @@ export const Colors = {
     backgroundElement: '#15171C',
     backgroundSelected: '#252830',
     textSecondary: '#A4A9B3',
+    textMuted: '#7C818B',
     tint: Lime,
     onTint: Ink,
     danger: '#FF6369',

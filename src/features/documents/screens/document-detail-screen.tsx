@@ -163,7 +163,7 @@ export function DocumentDetailScreen({ id }: { id: string }) {
       )}
       <OriginalBlock document={data} />
       {data.analysis && (
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="small" themeColor="textMuted">
           {t('documents.disclaimer')}
         </ThemedText>
       )}

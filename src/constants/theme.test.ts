@@ -25,6 +25,8 @@ const PAIRS: [ThemeColor, ThemeColor][] = [
   ['text', 'backgroundElement'],
   ['textSecondary', 'background'],
   ['textSecondary', 'backgroundElement'],
+  ['textMuted', 'background'],
+  ['textMuted', 'backgroundElement'],
   ['tint', 'background'],
   ['tint', 'backgroundElement'],
   ['onTint', 'tint'],
