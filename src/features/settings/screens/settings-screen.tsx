@@ -63,7 +63,7 @@ export function SettingsScreen() {
           <DeleteAllData />
         </Section>
         <Section gap={Spacing.three} title={t('settings.sections.about')}>
-          <ThemedText type="small" themeColor="textSecondary">
+          <ThemedText type="small" themeColor="textMuted">
             {t('documents.disclaimer')}
           </ThemedText>
           <InfoRow

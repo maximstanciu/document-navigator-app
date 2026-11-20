@@ -18,7 +18,8 @@ export const Colors = {
     backgroundElement: '#FFFFFF',
     backgroundSelected: '#E3E5EA',
     textSecondary: '#555B66',
-    // Fine print (the «not legal advice» disclaimer): the lightest grey that still passes AA.
+    // Fine print (the «not legal advice» disclaimer on the document screen and in settings): the
+    // lightest grey that still passes AA.
     textMuted: '#6B707A',
     // Fills (primary buttons, chosen chips, checkboxes) and tappable text: ink, with lime on it.
     tint: Ink,
