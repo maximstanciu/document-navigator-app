@@ -87,7 +87,12 @@ type DocumentSummaryRow = Pick<
   | 'analyzed_at'
   | 'attention_dismissed_at'
   | 'case_id'
-> & { has_fraud_signals: number; has_high_risk: number; country: string | null };
+> & {
+  has_fraud_signals: number;
+  has_high_risk: number;
+  country: string | null;
+  case_archived: number;
+};
 
 /**
  * Active documents matching `where`, newest first, as summaries: SQLite works out the three facts
@@ -100,7 +105,9 @@ function selectSummaries(where = '') {
       COALESCE(json_array_length(analysis_json, '$.fraudSignals'), 0) > 0 AS has_fraud_signals,
       EXISTS (SELECT 1 FROM json_each(analysis_json, '$.risks')
         WHERE json_extract(value, '$.severity') = 'high') AS has_high_risk,
-      json_extract(analysis_json, '$.documentCountry') AS country
+      json_extract(analysis_json, '$.documentCountry') AS country,
+      EXISTS (SELECT 1 FROM cases
+        WHERE cases.id = case_id AND cases.archived_at IS NOT NULL) AS case_archived
     FROM (SELECT *, CASE WHEN json_valid(analysis) THEN analysis END AS analysis_json
       FROM documents WHERE deleted_at IS NULL ${where})
     ORDER BY created_at DESC, id`;
@@ -133,6 +140,7 @@ function toSummaryRecord(row: DocumentSummaryRow): DocumentSummaryRecord {
     hasFraudSignals: row.has_fraud_signals === 1,
     hasHighRisk: row.has_high_risk === 1,
     country: row.country,
+    caseArchived: row.case_archived === 1,
   };
 }
 
@@ -241,7 +249,7 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
     /**
      * Creates a document together with its pages in order, in one transaction: a draft never exists
      * without its pages (CAP-5). The page files must already be saved. A document added from a case
-     * is filed in it (CASE-4), unless the case was deleted meanwhile.
+     * is filed in it (CASE-4), unless the case was deleted or archived meanwhile (CASE-6).
      */
     async create(input: NewDocument, pages: readonly NewPage[] = []): Promise<DocumentRecord> {
       const timestamp = now().toISOString();
@@ -249,8 +257,9 @@ export function createDocumentsRepository(db: SqlDatabase, now: Clock) {
         await tx.runAsync(
           `INSERT INTO documents (id, title, status, case_id, source, mime_type, page_count,
             file_size, search_text, created_at, updated_at)
-           VALUES (?, ?, ?, (SELECT id FROM cases WHERE id = ? AND deleted_at IS NULL), ?, ?, ?, ?,
-             ?, ?, ?)`,
+           VALUES (?, ?, ?,
+             (SELECT id FROM cases WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL),
+             ?, ?, ?, ?, ?, ?, ?)`,
           [
             input.id,
             input.title,

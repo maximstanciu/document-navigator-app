@@ -34,10 +34,11 @@ export function deadlinesByDocument(
 /**
  * Fraud signs or a high risk stay in the block for `ATTENTION_DAYS` after the analysis, until
  * «Got it». «Got it» counts for the analysis it was pressed after: a new analysis shows its own
- * warnings again.
+ * warnings again. Archiving the document's case counts as «Got it» while it is archived (CASE-6).
  */
 function hasFreshWarning(document: DocumentSummary, now: Date): boolean {
   if (!(document.hasFraudSignals || document.hasHighRisk) || !document.analyzedAt) return false;
+  if (document.caseArchived) return false;
   if (document.attentionDismissedAt && document.attentionDismissedAt >= document.analyzedAt) {
     return false;
   }
@@ -58,6 +59,8 @@ function compareDue(a: DeadlineSummary, b: DeadlineSummary) {
  * next `ATTENTION_DAYS` days (the device's calendar days), and documents with fraud signs or a high
  * risk for `ATTENTION_DAYS` after their analysis or until «Got it». Documents with deadlines come
  * first, the most urgent at the top; then warnings only, fraud before risk, newest analysis first.
+ * A document of an archived case still comes in for its deadlines: the archive hides no deadline
+ * (CASE-6).
  *
  * `openDeadlines` are the open deadlines of all documents, soonest first.
  */

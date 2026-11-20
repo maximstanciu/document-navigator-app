@@ -3,7 +3,15 @@ import { queryOptions, useMutation, useQueryClient } from '@tanstack/react-query
 import { dbKeys, localQueryDefaults } from '@/lib/db/query-keys';
 import { invalidateKeys } from '@/lib/query-client';
 
-import { createCase, deleteCase, getCase, listCases, moveToCase, renameCase } from './api';
+import {
+  createCase,
+  deleteCase,
+  getCase,
+  listCases,
+  moveToCase,
+  renameCase,
+  setCaseArchived,
+} from './api';
 
 /**
  * Local queries. How many documents a case has comes from the documents list the screens already
@@ -49,6 +57,16 @@ export function useCreateCase() {
 /** «Rename» on the case screen (CASE-5). */
 export function useRenameCase() {
   return useCasesMutation(({ id, name }: { id: string; name: string }) => renameCase(id, name));
+}
+
+/**
+ * «Archive» / «Restore from archive» (CASE-6). The documents' summaries carry whether their case is
+ * archived, so they refresh too.
+ */
+export function useSetCaseArchived() {
+  return useCasesMutation(({ id, archived }: { id: string; archived: boolean }) =>
+    setCaseArchived(id, archived)
+  );
 }
 
 /** «Delete case» (CASE-5): its documents stay. */

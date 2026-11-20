@@ -122,4 +122,18 @@ describe('DocumentCase (CASE-2)', () => {
     expect(await repositories.cases.get('case-new')).toMatchObject({ name: 'Ремонт' });
     expect((await repositories.documents.get('doc-1'))?.caseId).toBe('case-new');
   });
+
+  it('names an archived case of the document and offers no other archived case (CASE-6)', async () => {
+    await repositories.documents.moveToCase(['doc-1'], 'flat');
+    await repositories.cases.create({ id: 'old', name: 'Налоги 2025' });
+    await repositories.cases.setArchived('old', true);
+    await repositories.cases.setArchived('flat', true);
+    await renderDocument();
+
+    await openPicker('Case: Квартира · archived. Change');
+
+    expect(screen.getByRole('radio', { name: 'Квартира · archived' })).toBeChecked();
+    expect(screen.getByRole('radio', { name: 'Машина' })).toBeOnTheScreen();
+    expect(screen.queryByRole('radio', { name: /Налоги 2025/ })).not.toBeOnTheScreen();
+  });
 });

@@ -18,8 +18,11 @@ export type DeadlineSummary = Pick<
   'id' | 'documentId' | 'description' | 'dueDate' | 'dueTime'
 >;
 
-/** Everything the document screen shows about the document itself (DET-1…DET-10). */
-export type DocumentDetail = DocumentSummary &
+/**
+ * Everything the document screen shows about the document itself (DET-1…DET-10). Whether its case
+ * is archived it reads from the case itself (CASE-2, CASE-6).
+ */
+export type DocumentDetail = Omit<DocumentSummary, 'caseArchived'> &
   Pick<
     DocumentRecord,
     'documentDate' | 'mimeType' | 'errorCode' | 'fileSize' | 'analysis' | 'legalMemoCountry'

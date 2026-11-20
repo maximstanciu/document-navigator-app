@@ -59,6 +59,9 @@ export const en = {
       noMatchMessage: 'Choose another document type or “All”.',
     },
     allDocuments: 'All documents',
+    allArchivedTitle: 'All documents are archived',
+    allArchivedMessage:
+      'They are in archived cases. Open “Archive” under “Cases”, or find a document with search.',
     origin: {
       memo: {
         PT: 'with the guide to Portuguese law',
@@ -268,6 +271,31 @@ export const en = {
       deleteMessage:
         'Only the case is deleted. Its documents stay in the app, under “All documents”.',
       deleteFailed: "Couldn't delete the case. Try again.",
+      archive: 'Archive',
+      archiveTitle: 'Archive the case?',
+      archiveDocuments: 'Its documents leave “All documents”; search still finds them.',
+      archiveDeadlines_one:
+        'The case has {{count}} open deadline. It stays on the Deadlines tab, and reminders keep coming.',
+      archiveDeadlines_other:
+        'The case has {{count}} open deadlines. They stay on the Deadlines tab, and reminders keep coming.',
+      archiveHint: 'If a deadline no longer matters, mark it “Done” or “Not relevant”.',
+      archiveFailed: "Couldn't archive the case. Try again.",
+    },
+    archive: {
+      title: 'Archive',
+      screenTitle: 'Archived cases',
+      chipLabel_one: 'Archive, {{count}} case',
+      chipLabel_other: 'Archive, {{count}} cases',
+      loading: 'Loading the archive',
+      emptyTitle: 'No archived cases',
+      emptyMessage: 'Put a finished case here: “⋯” on the case screen, then “Archive”.',
+      since: 'Archived {{date}}',
+      archivedName: '{{name}} · archived',
+      archived: 'This case is archived',
+      archivedHint:
+        "Its documents aren't under “All documents”, but search finds them. Deadlines and reminders work as before.",
+      restore: 'Restore from archive',
+      restoreFailed: "Couldn't restore the case. Try again.",
     },
     document: {
       add: 'Add to a case',

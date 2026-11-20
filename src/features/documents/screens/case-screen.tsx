@@ -1,16 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
 import { router, Stack } from 'expo-router';
+import { SymbolView } from 'expo-symbols';
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { FlatList, StyleSheet, View } from 'react-native';
 
 import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state';
 import { ThemedText } from '@/components/themed-text';
+import { ThemedView } from '@/components/themed-view';
 import { Button } from '@/components/ui/button';
 import { NameForm } from '@/components/ui/name-form';
-import { ContentColumn, Spacing } from '@/constants/theme';
+import { ContentColumn, Radius, Spacing } from '@/constants/theme';
 import { CaseActionsButton, CaseActionsSheet } from '@/features/cases/components/case-actions';
-import { caseQueries, useDeleteCase, useRenameCase } from '@/features/cases/queries';
+import {
+  caseQueries,
+  useDeleteCase,
+  useRenameCase,
+  useSetCaseArchived,
+} from '@/features/cases/queries';
 import { MAX_CASE_NAME_LENGTH } from '@/features/cases/types';
 import { deadlineQueries } from '@/features/deadlines/queries';
 import { useNow } from '@/hooks/use-now';
@@ -25,10 +32,41 @@ import { documentQueries } from '../queries';
 // Opened by a direct URL (web preview), the screen has nothing to go back to.
 const leave = () => (router.canGoBack() ? router.back() : router.replace('/'));
 
+/** «This case is archived» with «Restore from archive», under the case's name (CASE-6). */
+function ArchivedNotice({ busy, onRestore }: { busy: boolean; onRestore: () => void }) {
+  const theme = useTheme();
+  const { t } = useTranslation();
+
+  return (
+    <ThemedView type="backgroundElement" style={styles.notice}>
+      <View style={styles.noticeTitle}>
+        <SymbolView
+          name={{ ios: 'archivebox', android: 'inventory_2', web: 'inventory_2' }}
+          size={20}
+          tintColor={theme.text}
+        />
+        <ThemedText type="smallBold" role="heading" style={styles.noticeText}>
+          {t('cases.archive.archived')}
+        </ThemedText>
+      </View>
+      <ThemedText type="small" themeColor="textSecondary">
+        {t('cases.archive.archivedHint')}
+      </ThemedText>
+      <Button
+        label={t('cases.archive.restore')}
+        variant="secondary"
+        disabled={busy}
+        onPress={onRestore}
+      />
+    </ThemedView>
+  );
+}
+
 /**
- * A case (CASE-3…CASE-5): what in its documents needs attention by the rule of HOME-1, then its
+ * A case (CASE-3…CASE-6): what in its documents needs attention by the rule of HOME-1, then its
  * documents newest first. «Add document» captures a new one into the case, «Choose from documents»
- * files ones already in the app; «⋯» in the header renames or deletes the case.
+ * files ones already in the app; «⋯» in the header renames, archives or deletes the case. An
+ * archived case says so and takes no documents until it is restored.
  */
 export function CaseScreen({ id }: { id: string }) {
   const theme = useTheme();
@@ -39,6 +77,7 @@ export function CaseScreen({ id }: { id: string }) {
   const deadlines = useQuery(deadlineQueries.open());
   const rename = useRenameCase();
   const remove = useDeleteCase();
+  const archive = useSetCaseArchived();
   const [actionsOpen, setActionsOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
 
@@ -69,11 +108,28 @@ export function CaseScreen({ id }: { id: string }) {
   }
 
   const { name } = found.data;
+  const archived = found.data.archivedAt !== null;
   const today = localCalendarDate(now);
   const inCase = documents.data.filter((document) => document.caseId === id);
-  const hasOthers = inCase.length < documents.data.length;
+  // Documents of archived cases aren't offered to another case (CASE-4, CASE-6).
+  const hasOthers = documents.data.some(
+    (document) => document.caseId !== id && !document.caseArchived
+  );
   const nearest = deadlinesByDocument(deadlines.data);
   const attention = selectAttention(inCase, deadlines.data, now);
+  const inCaseIds = new Set(inCase.map((document) => document.id));
+  const openDeadlines = deadlines.data.filter((deadline) =>
+    inCaseIds.has(deadline.documentId)
+  ).length;
+  const setArchived = (value: boolean) => archive.mutate({ id, archived: value });
+  let failure: string | null = null;
+  if (rename.isError) failure = t('cases.actions.renameFailed');
+  else if (remove.isError) failure = t('cases.actions.deleteFailed');
+  else if (archive.isError) {
+    failure = archive.variables.archived
+      ? t('cases.actions.archiveFailed')
+      : t('cases.archive.restoreFailed');
+  }
 
   return (
     <>
@@ -87,10 +143,14 @@ export function CaseScreen({ id }: { id: string }) {
         visible={actionsOpen}
         onClose={() => setActionsOpen(false)}
         name={name}
+        archived={archived}
+        openDeadlines={openDeadlines}
         onRename={() => {
           rename.reset();
           setRenaming(true);
         }}
+        onArchive={() => setArchived(true)}
+        onRestore={() => setArchived(false)}
         onDelete={() => remove.mutate(id, { onSuccess: leave })}
       />
       <FlatList
@@ -123,24 +183,28 @@ export function CaseScreen({ id }: { id: string }) {
                 {name}
               </ThemedText>
             )}
-            {(rename.isError || remove.isError) && (
+            {failure && (
               <ThemedText type="small" role="alert">
-                {rename.isError ? t('cases.actions.renameFailed') : t('cases.actions.deleteFailed')}
+                {failure}
               </ThemedText>
             )}
-            <View style={styles.buttons}>
-              <Button
-                label={t('cases.addDocument')}
-                onPress={() => router.push({ pathname: '/capture', params: { caseId: id } })}
-              />
-              {hasOthers && (
+            {archived ? (
+              <ArchivedNotice busy={archive.isPending} onRestore={() => setArchived(false)} />
+            ) : (
+              <View style={styles.buttons}>
                 <Button
-                  label={t('cases.addExisting')}
-                  variant="secondary"
-                  onPress={() => router.push({ pathname: '/cases/[id]/add', params: { id } })}
+                  label={t('cases.addDocument')}
+                  onPress={() => router.push({ pathname: '/capture', params: { caseId: id } })}
                 />
-              )}
-            </View>
+                {hasOthers && (
+                  <Button
+                    label={t('cases.addExisting')}
+                    variant="secondary"
+                    onPress={() => router.push({ pathname: '/cases/[id]/add', params: { id } })}
+                  />
+                )}
+              </View>
+            )}
             <AttentionBlock items={attention} today={today} />
             {inCase.length > 0 && (
               <ThemedText type="smallBold" role="heading">
@@ -173,5 +237,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: Spacing.two,
+  },
+  notice: {
+    gap: Spacing.two,
+    padding: Spacing.three,
+    borderRadius: Radius.card,
+  },
+  noticeTitle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
+  },
+  noticeText: {
+    flexShrink: 1,
   },
 });

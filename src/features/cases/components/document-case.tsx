@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { MinTouchTarget, PressedOpacity, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
+import { activeCases } from '../api';
 import { caseQueries, useMoveToCase } from '../queries';
 
 function CaseOption({
@@ -77,6 +78,10 @@ export function DocumentCase({ documentId, caseId }: DocumentCaseProps) {
   // Until the cases are read, its case has no name to show.
   if (caseId !== null && cases.isPending) return null;
   const current = cases.data?.find((item) => item.id === caseId);
+  // «Apartment · archived»: an archived case stays the document's until it is moved (CASE-6).
+  const currentName =
+    current &&
+    (current.archivedAt ? t('cases.archive.archivedName', { name: current.name }) : current.name);
 
   const close = () => {
     move.reset();
@@ -116,10 +121,11 @@ export function DocumentCase({ documentId, caseId }: DocumentCaseProps) {
           disabled={move.isPending}
           onPress={() => choose(null)}
         />
-        {cases.data.map((item) => (
+        {/* An archived case takes no documents: only the document's own is listed (CASE-6). */}
+        {[...(current?.archivedAt ? [current] : []), ...activeCases(cases.data)].map((item) => (
           <CaseOption
             key={item.id}
-            label={item.name}
+            label={item.archivedAt ? (currentName ?? item.name) : item.name}
             selected={item.id === caseId}
             disabled={move.isPending}
             onPress={() => choose(item.id)}
@@ -129,15 +135,15 @@ export function DocumentCase({ documentId, caseId }: DocumentCaseProps) {
     );
   }
 
-  const label = current
-    ? t('cases.document.inCase', { name: current.name })
+  const label = currentName
+    ? t('cases.document.inCase', { name: currentName })
     : t('cases.document.add');
 
   return (
     <>
       <Pressable
         role="button"
-        aria-label={current ? t('cases.document.change', { name: current.name }) : label}
+        aria-label={currentName ? t('cases.document.change', { name: currentName }) : label}
         onPress={() => setOpen(true)}
         style={({ pressed }) => [styles.trigger, pressed && styles.pressed]}>
         <SymbolView

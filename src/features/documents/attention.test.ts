@@ -31,6 +31,7 @@ function document(id: string, overrides: Partial<DocumentSummary> = {}): Documen
     hasFraudSignals: false,
     hasHighRisk: false,
     country: null,
+    caseArchived: false,
     ...overrides,
   };
 }
@@ -204,5 +205,20 @@ describe('deadlinesByDocument', () => {
     expect(grouped.get('a')?.map((d) => d.id)).toEqual(['a1', 'a2']);
     expect(grouped.get('b')?.map((d) => d.id)).toEqual(['b1']);
     expect(grouped.get('c')).toBeUndefined();
+  });
+});
+
+describe('selectAttention in an archived case (CASE-6)', () => {
+  it('drops the warnings of a document in an archived case but keeps its deadlines', () => {
+    const items = selectAttention(
+      [
+        document('fraud', { hasFraudSignals: true, caseArchived: true }),
+        document('due', { caseArchived: true }),
+      ],
+      [deadline('d1', 'due', '2026-10-20')],
+      NOW
+    );
+
+    expect(items.map((item) => item.document.id)).toEqual(['due']);
   });
 });

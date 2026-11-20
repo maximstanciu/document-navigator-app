@@ -46,6 +46,7 @@ describe('cases repository (CASE-1…CASE-5)', () => {
       createdAt: '2026-10-17T09:00:00.000Z',
       updatedAt: '2026-10-17T09:00:00.000Z',
       deletedAt: null,
+      archivedAt: null,
     });
     expect((await repos.cases.list()).map(({ id }) => id)).toEqual(['car', 'flat']);
     expect(await repos.cases.get('flat')).toEqual(flat);
@@ -194,5 +195,86 @@ describe('documents in cases (CASE-2, CASE-4)', () => {
     await repos.documents.remove('doc-1');
 
     expect((await caseOf('doc-1')).case_id).toBeNull();
+  });
+});
+
+describe('case archive (CASE-6)', () => {
+  it('archives a case and restores it, its documents staying filed in it', async () => {
+    await repos.cases.create({ id: 'flat', name: 'Квартира' });
+    await addDocument('rent', 'flat');
+    clock.advance(1000);
+
+    await expect(repos.cases.setArchived('flat', true)).resolves.toBe(true);
+
+    expect(await repos.cases.get('flat')).toMatchObject({
+      archivedAt: '2026-10-17T09:00:01.000Z',
+      updatedAt: '2026-10-17T09:00:01.000Z',
+    });
+    // Still listed: screens that name a document's case need it.
+    expect(await repos.cases.list()).toEqual([
+      expect.objectContaining({ id: 'flat', archivedAt: '2026-10-17T09:00:01.000Z' }),
+    ]);
+    expect((await caseOf('rent')).case_id).toBe('flat');
+
+    clock.advance(1000);
+    await expect(repos.cases.setArchived('flat', false)).resolves.toBe(true);
+    expect(await repos.cases.get('flat')).toMatchObject({ archivedAt: null });
+    expect((await caseOf('rent')).case_id).toBe('flat');
+  });
+
+  it('keeps the instant a case was first archived', async () => {
+    await repos.cases.create({ id: 'flat', name: 'Квартира' });
+    await repos.cases.setArchived('flat', true);
+    clock.advance(DAY);
+
+    await repos.cases.setArchived('flat', true);
+
+    expect(await repos.cases.get('flat')).toMatchObject({
+      archivedAt: '2026-10-17T09:00:00.000Z',
+    });
+  });
+
+  it('refuses to archive or restore a deleted case', async () => {
+    await repos.cases.create({ id: 'flat', name: 'Квартира' });
+    await repos.cases.remove('flat');
+
+    await expect(repos.cases.setArchived('flat', true)).resolves.toBe(false);
+    await expect(repos.cases.setArchived('flat', false)).resolves.toBe(false);
+    await expect(repos.cases.setArchived('missing', true)).resolves.toBe(false);
+  });
+
+  it('files no documents in an archived case, and lets them out of it', async () => {
+    await repos.cases.create({ id: 'flat', name: 'Квартира' });
+    await addDocument('rent', 'flat');
+    await addDocument('loose');
+    await repos.cases.setArchived('flat', true);
+
+    await expect(repos.documents.moveToCase(['loose'], 'flat')).resolves.toBe(false);
+    expect((await caseOf('loose')).case_id).toBeNull();
+
+    // A document captured from the case meanwhile is saved out of any case (CASE-4).
+    await addDocument('scanned', 'flat');
+    expect((await caseOf('scanned')).case_id).toBeNull();
+
+    await expect(repos.documents.moveToCase(['rent'], null)).resolves.toBe(true);
+    expect((await caseOf('rent')).case_id).toBeNull();
+  });
+
+  it('marks the summaries of the documents in an archived case', async () => {
+    await repos.cases.create({ id: 'flat', name: 'Квартира' });
+    await repos.cases.create({ id: 'car', name: 'Машина' });
+    await addDocument('rent', 'flat');
+    await addDocument('insurance', 'car');
+    await addDocument('loose');
+    await repos.cases.setArchived('flat', true);
+
+    const archived = (await repos.documents.listSummaries()).map(({ id, caseArchived }) => [
+      id,
+      caseArchived,
+    ]);
+    expect(Object.fromEntries(archived)).toEqual({ rent: true, insurance: false, loose: false });
+    expect(await repos.documents.searchSummaries('документ rent')).toEqual([
+      expect.objectContaining({ id: 'rent', caseArchived: true }),
+    ]);
   });
 });

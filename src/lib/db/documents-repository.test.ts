@@ -229,6 +229,7 @@ describe('documents repository', () => {
           hasFraudSignals: true,
           hasHighRisk: true,
           country: 'DE',
+          caseArchived: false,
         },
         {
           id: 'draft',
@@ -244,6 +245,7 @@ describe('documents repository', () => {
           hasFraudSignals: false,
           hasHighRisk: false,
           country: null,
+          caseArchived: false,
         },
       ]);
     });

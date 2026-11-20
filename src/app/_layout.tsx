@@ -20,6 +20,7 @@ export default function RootLayout() {
         <Stack.Screen name="documents/[id]" options={{ title: '' }} />
         <Stack.Screen name="documents/[id]/pages" options={{ title: '' }} />
         <Stack.Screen name="cases/[id]" options={{ title: '' }} />
+        <Stack.Screen name="cases/archive" options={{ title: '' }} />
         <Stack.Screen name="cases/new" options={{ presentation: 'modal' }} />
         <Stack.Screen name="cases/[id]/add" options={{ presentation: 'modal' }} />
         <Stack.Screen name="capture" options={{ presentation: 'modal', headerShown: false }} />

@@ -8,9 +8,10 @@ type CaseRow = {
   created_at: string;
   updated_at: string;
   deleted_at: string | null;
+  archived_at: string | null;
 };
 
-const COLUMNS = 'id, name, created_at, updated_at, deleted_at';
+const COLUMNS = 'id, name, created_at, updated_at, deleted_at, archived_at';
 
 function toRecord(row: CaseRow): CaseRecord {
   return {
@@ -19,6 +20,7 @@ function toRecord(row: CaseRow): CaseRecord {
     createdAt: row.created_at,
     updatedAt: row.updated_at,
     deletedAt: row.deleted_at,
+    archivedAt: row.archived_at,
   };
 }
 
@@ -27,7 +29,8 @@ export type NewCase = Pick<CaseRecord, 'id' | 'name'>;
 /**
  * Files the active documents `documentIds` in the case `caseId`, or takes them out of any case with
  * `null` (CASE-2, CASE-4). Documents already there keep their `updated_at`. Returns `false`, and
- * files nothing, when the case is gone: a tombstone must not collect documents.
+ * files nothing, when the case is gone (a tombstone must not collect documents) or archived: an
+ * archived case takes no documents until it is restored (CASE-6).
  */
 export async function fileDocuments(
   tx: SqlExecutor,
@@ -37,7 +40,7 @@ export async function fileDocuments(
 ): Promise<boolean> {
   if (caseId !== null) {
     const exists = await tx.getFirstAsync<{ id: string }>(
-      'SELECT id FROM cases WHERE id = ? AND deleted_at IS NULL',
+      'SELECT id FROM cases WHERE id = ? AND deleted_at IS NULL AND archived_at IS NULL',
       [caseId]
     );
     if (!exists) return false;
@@ -61,7 +64,10 @@ export function createCasesRepository(db: SqlDatabase, now: Clock) {
       return row ? toRecord(row) : null;
     },
 
-    /** Active cases, newest first (CASE-3). */
+    /**
+     * Cases that aren't deleted, archived ones too (CASE-6, see `archivedAt`), newest first
+     * (CASE-3).
+     */
     async list(): Promise<CaseRecord[]> {
       const rows = await db.getAllAsync<CaseRow>(
         `SELECT ${COLUMNS} FROM cases WHERE deleted_at IS NULL ORDER BY created_at DESC, id`
@@ -92,6 +98,23 @@ export function createCasesRepository(db: SqlDatabase, now: Clock) {
       const result = await db.runAsync(
         'UPDATE cases SET name = ?, updated_at = ? WHERE id = ? AND deleted_at IS NULL',
         [name, now().toISOString(), id]
+      );
+      return result.changes > 0;
+    },
+
+    /**
+     * Puts a case in the archive or takes it out (CASE-6). Its documents stay filed in it; an
+     * archived case keeps the instant it was archived. `false` if the case is gone.
+     */
+    async setArchived(id: string, archived: boolean): Promise<boolean> {
+      const timestamp = now().toISOString();
+      const result = await db.runAsync(
+        archived
+          ? `UPDATE cases SET archived_at = COALESCE(archived_at, ?), updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`
+          : `UPDATE cases SET archived_at = NULL, updated_at = ?
+             WHERE id = ? AND deleted_at IS NULL`,
+        archived ? [timestamp, timestamp, id] : [timestamp, id]
       );
       return result.changes > 0;
     },

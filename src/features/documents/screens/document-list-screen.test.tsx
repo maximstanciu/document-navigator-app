@@ -5,6 +5,7 @@ import { renderRouter } from 'expo-router/testing-library';
 import CaptureRoute from '@/app/capture';
 import CaptureLayout from '@/app/capture/_layout';
 import CaseRoute from '@/app/cases/[id]';
+import ArchivedCasesRoute from '@/app/cases/archive';
 import DocumentRoute from '@/app/documents/[id]';
 import { Spacing } from '@/constants/theme';
 import { analysisRecords } from '@/features/analysis/analysis-records';
@@ -501,6 +502,118 @@ describe('DocumentListScreen', () => {
 
       expect(screen).toHavePathname('/capture');
       expect(await screen.findByRole('button', { name: 'Scan' })).toBeOnTheScreen();
+    });
+  });
+
+  describe('archived cases (CASE-6)', () => {
+    beforeEach(async () => {
+      await repositories.cases.create({ id: 'flat', name: 'Квартира' });
+      clock.advance(60_000);
+      await repositories.cases.create({ id: 'car', name: 'Машина' });
+    });
+
+    it('leaves the documents of an archived case out of the list and its chip out of «Cases»', async () => {
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await addDocument('gas', 'Счёт за газ', 'car');
+      await repositories.cases.setArchived('flat', true);
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('link', { name: /^Счёт за газ/ })).toBeOnTheScreen();
+      expect(screen.queryByRole('link', { name: /^Договор аренды/ })).not.toBeOnTheScreen();
+      expect(screen.queryByRole('link', { name: /^Квартира, / })).not.toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Машина, 1 document' })).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Archive, 1 case' })).toBeOnTheScreen();
+    });
+
+    it('has no «Archive» chip while the archive is empty', async () => {
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('link', { name: 'Квартира, 1 document' })).toBeOnTheScreen();
+      expect(screen.queryByRole('link', { name: /^Archive/ })).not.toBeOnTheScreen();
+    });
+
+    it('finds a document of an archived case and says the case is archived', async () => {
+      const user = userEvent.setup();
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await repositories.cases.setArchived('flat', true);
+      await renderWithProviders(<DocumentListScreen />);
+
+      await user.type(await screen.findByRole('searchbox'), 'аренды');
+
+      expect(
+        await screen.findByRole('link', {
+          name: /^Договор аренды, .*, Case: Квартира · archived$/,
+        })
+      ).toBeOnTheScreen();
+    });
+
+    it('says when every document is in an archived case', async () => {
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await repositories.cases.setArchived('flat', true);
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByText('All documents are archived')).toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: 'Archive, 1 case' })).toBeOnTheScreen();
+    });
+
+    it('keeps a deadline of an archived case in «Needs attention», but not its warnings', async () => {
+      await addAnalyzed('invoice', dueIn(ANALYSIS_FIXTURES.invoice, 3));
+      await addAnalyzed('fraud', dueIn(ANALYSIS_FIXTURES.fraudulentInvoice, 60));
+      await repositories.documents.moveToCase(['invoice', 'fraud'], 'flat');
+      await repositories.cases.setArchived('flat', true);
+
+      await renderWithProviders(<DocumentListScreen />);
+
+      expect(await screen.findByRole('heading', { name: 'Needs attention' })).toBeOnTheScreen();
+      expect(screen.getAllByRole('link', { name: new RegExp(`^${INVOICE}`) })).toHaveLength(1);
+      expect(screen.queryByRole('link', { name: new RegExp(`^${FRAUD}`) })).not.toBeOnTheScreen();
+      expect(listRows()).toHaveLength(0);
+    });
+
+    it('opens the archive from its chip, and a case from there', async () => {
+      const user = userEvent.setup();
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await addDocument('gas', 'Счёт за газ', 'car');
+      await repositories.cases.setArchived('car', true);
+      clock.advance(60_000);
+      await repositories.cases.setArchived('flat', true);
+      await renderRouter(
+        {
+          _layout: () => <Stack />,
+          index: DocumentListScreen,
+          'cases/archive': ArchivedCasesRoute,
+          'cases/[id]': CaseRoute,
+        },
+        { initialUrl: '/', wrapper: createTestProviders() }
+      );
+
+      await user.press(await screen.findByRole('link', { name: 'Archive, 2 cases' }));
+
+      expect(screen).toHavePathname('/cases/archive');
+      // The most recently archived first.
+      const rows = await screen.findAllByRole('link', { name: /, 1 document · Archived / });
+      expect(rows.map((row) => row.props.accessibilityLabel.split(',')[0])).toEqual([
+        'Квартира',
+        'Машина',
+      ]);
+
+      await user.press(rows[0]);
+
+      expect(screen).toHavePathname('/cases/flat');
+      expect(
+        await screen.findByRole('heading', { name: 'This case is archived' })
+      ).toBeOnTheScreen();
+    });
+
+    it('says when the archive is empty', async () => {
+      await renderRouter(
+        { _layout: () => <Stack />, 'cases/archive': ArchivedCasesRoute },
+        { initialUrl: '/cases/archive', wrapper: createTestProviders() }
+      );
+
+      expect(await screen.findByText('No archived cases')).toBeOnTheScreen();
     });
   });
 });

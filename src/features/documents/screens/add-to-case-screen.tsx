@@ -63,6 +63,7 @@ function DocumentChoice({
 /**
  * «Choose from documents» (CASE-4), a modal: the documents outside the case, newest first, to tick
  * and file in it at once. One from another case moves here: a document is in one case at most.
+ * Documents of archived cases aren't offered: they stay put until their case is restored (CASE-6).
  */
 export function AddToCaseScreen({ caseId }: { caseId: string }) {
   const theme = useTheme();
@@ -97,7 +98,9 @@ export function AddToCaseScreen({ caseId }: { caseId: string }) {
     );
   }
 
-  const candidates = documents.data.filter((document) => document.caseId !== caseId);
+  const candidates = documents.data.filter(
+    (document) => document.caseId !== caseId && !document.caseArchived
+  );
   // A document deleted meanwhile drops out of the choice.
   const chosen = candidates.filter((document) => selected.has(document.id)).map(({ id }) => id);
   const toggle = (id: string) =>

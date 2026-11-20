@@ -20,7 +20,8 @@ type RelatedCaseButtonProps = {
  * The button that puts two related documents in one case (LINK-4). The related document's case
  * takes this document, from another case too; if only this document has a case, the related one
  * goes there; if neither has, «New case» opens with both. Nothing for documents already in one
- * case. A case deleted meanwhile takes no document (CASE-2): the move fails.
+ * case. A case deleted meanwhile takes no document (CASE-2): the move fails. An archived case takes
+ * none either, so there is no button towards one (CASE-6).
  */
 export function RelatedCaseButton({
   documentId,
@@ -54,7 +55,7 @@ export function RelatedCaseButton({
   const targetId = related.caseId ?? caseId;
   // Without its name (the cases are still being read, or the case has just gone) there is no button.
   const target = cases.data?.find((item) => item.id === targetId);
-  if (!target) return null;
+  if (!target || target.archivedAt !== null) return null;
 
   const label = t(moveHere ? 'cases.related.moveHere' : 'cases.related.addRelated', {
     name: target.name,

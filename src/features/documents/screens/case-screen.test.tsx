@@ -210,4 +210,95 @@ describe('CaseScreen (CASE-3…CASE-5)', () => {
       expect(await repositories.cases.get('flat')).not.toBeNull();
     });
   });
+
+  describe('archive (CASE-6)', () => {
+    async function openActions() {
+      const user = userEvent.setup();
+      await user.press(await screen.findByRole('button', { name: 'Case actions' }));
+      return user;
+    }
+
+    it('archives a case without open deadlines at once, and restores it', async () => {
+      await addDocument('rent', 'Договор аренды', 'flat');
+      await addDocument('loose', 'Письмо из банка');
+      await renderCase();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(
+        await screen.findByRole('heading', { name: 'This case is archived' })
+      ).toBeOnTheScreen();
+      expect(screen.getByText(/search finds them/)).toBeOnTheScreen();
+      // An archived case takes no documents.
+      expect(screen.queryByRole('button', { name: 'Add document' })).not.toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Choose from documents' })).not.toBeOnTheScreen();
+      expect(screen.getByRole('link', { name: /^Договор аренды/ })).toBeOnTheScreen();
+      expect((await repositories.cases.get('flat'))?.archivedAt).not.toBeNull();
+
+      await user.press(screen.getByRole('button', { name: 'Restore from archive' }));
+
+      expect(await screen.findByRole('button', { name: 'Add document' })).toBeOnTheScreen();
+      expect(
+        screen.queryByRole('heading', { name: 'This case is archived' })
+      ).not.toBeOnTheScreen();
+      expect((await repositories.cases.get('flat'))?.archivedAt).toBeNull();
+    });
+
+    it('says first that open deadlines stay live, and archives once confirmed', async () => {
+      await addAnalyzed('invoice', ANALYSIS_FIXTURES.invoice, 5, 'flat');
+      await renderCase();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(screen.getByRole('heading', { name: 'Archive the case?' })).toBeOnTheScreen();
+      expect(
+        screen.getByText(/open deadlines?\. (It stays|They stay) on the Deadlines tab/)
+      ).toBeOnTheScreen();
+      expect((await repositories.cases.get('flat'))?.archivedAt).toBeNull();
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+
+      expect(
+        await screen.findByRole('heading', { name: 'This case is archived' })
+      ).toBeOnTheScreen();
+      expect((await repositories.cases.get('flat'))?.archivedAt).not.toBeNull();
+      // Its deadline still needs attention.
+      expect(screen.getByRole('heading', { name: 'Needs attention' })).toBeOnTheScreen();
+    });
+
+    it('keeps the case out of the archive when cancelled', async () => {
+      await addAnalyzed('invoice', ANALYSIS_FIXTURES.invoice, 5, 'flat');
+      await renderCase();
+      const user = await openActions();
+
+      await user.press(screen.getByRole('button', { name: 'Archive' }));
+      await user.press(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(screen.queryByRole('heading', { name: 'Archive the case?' })).not.toBeOnTheScreen();
+      expect((await repositories.cases.get('flat'))?.archivedAt).toBeNull();
+    });
+
+    it('offers «Restore from archive» in the sheet of an archived case', async () => {
+      await repositories.cases.setArchived('flat', true);
+      await renderCase();
+      const user = await openActions();
+
+      expect(screen.queryByRole('button', { name: 'Archive' })).not.toBeOnTheScreen();
+      await user.press(screen.getAllByRole('button', { name: 'Restore from archive' }).at(-1)!);
+
+      await waitFor(async () =>
+        expect((await repositories.cases.get('flat'))?.archivedAt).toBeNull()
+      );
+    });
+
+    it('does not offer documents of archived cases to choose from', async () => {
+      await addDocument('insurance', 'Страховка', 'car');
+      await repositories.cases.setArchived('car', true);
+      await renderCase();
+
+      expect(await screen.findByText('No documents in this case yet')).toBeOnTheScreen();
+      expect(screen.queryByRole('button', { name: 'Choose from documents' })).not.toBeOnTheScreen();
+    });
+  });
 });

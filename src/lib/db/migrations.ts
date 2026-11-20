@@ -160,6 +160,11 @@ export const MIGRATIONS: readonly Migration[] = [
       `CREATE INDEX document_link_dismissals_b ON document_link_dismissals (document_id_b)`,
     ],
   },
+  {
+    // CASE-6: the instant a case went to the archive; `NULL` for a case that isn't archived.
+    version: 8,
+    statements: [`ALTER TABLE cases ADD COLUMN archived_at TEXT`],
+  },
 ];
 
 export const LATEST_SCHEMA_VERSION = MIGRATIONS[MIGRATIONS.length - 1].version;

@@ -12,7 +12,7 @@ import type { DocumentDetail, DocumentPage, DocumentSummary, RelatedDocument } f
  */
 
 /** For a document read whole; the list works the same facts out in SQL (`listSummaries()`). */
-function toSummary(document: DocumentRecord): DocumentSummary {
+function toSummary(document: DocumentRecord): Omit<DocumentSummary, 'caseArchived'> {
   return {
     id: document.id,
     title: document.title,

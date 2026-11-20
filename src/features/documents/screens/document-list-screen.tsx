@@ -7,6 +7,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/screen-state'
 import { TabScreen } from '@/components/tab-screen';
 import { ThemedText } from '@/components/themed-text';
 import { Spacing } from '@/constants/theme';
+import { activeCases } from '@/features/cases/api';
 import { CaseChips } from '@/features/cases/components/case-chips';
 import { caseQueries } from '@/features/cases/queries';
 import { deadlineQueries } from '@/features/deadlines/queries';
@@ -37,7 +38,8 @@ function countByCase(documents: readonly DocumentSummary[]): Map<string, number>
 /**
  * The documents tab (SPEC §4.5): «Needs attention» (HOME-1), the cases (CASE-3), then all documents
  * newest first (HOME-2), with search (HOME-3) and a filter by type (HOME-4); before the first
- * document, an invitation to scan one (HOME-5).
+ * document, an invitation to scan one (HOME-5). Documents of archived cases are left out of the
+ * list and the filter, and come back in search, marked (CASE-6).
  */
 export function DocumentListScreen() {
   const theme = useTheme();
@@ -77,14 +79,29 @@ export function DocumentListScreen() {
   }
 
   const today = localCalendarDate(now);
-  const types = availableTypeFilters(documents.data);
+  const listed = documents.data.filter((document) => !document.caseArchived);
+  const types = availableTypeFilters(listed);
   // A filter left over from a type that is no longer there filters nothing.
   const activeFilter = typeFilter !== null && types.includes(typeFilter) ? typeFilter : null;
   const nearest = deadlinesByDocument(deadlines.data);
-  const shown = filterByType(searching ? (results.data ?? []) : documents.data, activeFilter);
+  const shown = filterByType(searching ? (results.data ?? []) : listed, activeFilter);
+  // All documents: one of an archived case still needs attention for its deadlines (CASE-6).
   const attention = searching ? [] : selectAttention(documents.data, deadlines.data, now);
-  const caseNames = new Map(cases.data.map((item) => [item.id, item.name]));
-  const caseChips = <CaseChips cases={cases.data} counts={countByCase(documents.data)} />;
+  // A document found in an archived case says so on its card: «Apartment · archived».
+  const caseNames = new Map(
+    cases.data.map((item) => [
+      item.id,
+      item.archivedAt ? t('cases.archive.archivedName', { name: item.name }) : item.name,
+    ])
+  );
+  const active = activeCases(cases.data);
+  const caseChips = (
+    <CaseChips
+      cases={active}
+      counts={countByCase(documents.data)}
+      archivedCount={cases.data.length - active.length}
+    />
+  );
 
   if (documents.data.length === 0) {
     return (
@@ -112,6 +129,13 @@ export function DocumentListScreen() {
       <EmptyState
         title={t('documents.search.noResultsTitle')}
         message={t('documents.search.noResultsMessage')}
+      />
+    );
+  } else if (listed.length === 0) {
+    empty = (
+      <EmptyState
+        title={t('documents.allArchivedTitle')}
+        message={t('documents.allArchivedMessage')}
       />
     );
   } else {

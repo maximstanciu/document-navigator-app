@@ -28,6 +28,7 @@ describe('type filter (HOME-4)', () => {
         hasFraudSignals: false,
         hasHighRisk: false,
         country: null,
+        caseArchived: false,
       })
     );
 

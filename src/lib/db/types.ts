@@ -67,6 +67,8 @@ export type DocumentSummaryRecord = Pick<
   hasHighRisk: boolean;
   /** The country the document comes from, ISO 3166-1 alpha-2, if the analysis found it (ANL-14). */
   country: string | null;
+  /** Its case is in the archive (CASE-6): the list leaves it out, search marks it. */
+  caseArchived: boolean;
 };
 
 /**
@@ -88,6 +90,8 @@ export type CaseRecord = {
   createdAt: string;
   updatedAt: string;
   deletedAt: string | null;
+  /** In the archive since then (CASE-6), `null` — not archived. */
+  archivedAt: string | null;
 };
 
 export type PageRecord = {

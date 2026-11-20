@@ -11,7 +11,12 @@ import { MAX_CASE_NAME_LENGTH, type CaseSummary } from './types';
  */
 
 function toSummary(record: CaseRecord): CaseSummary {
-  return { id: record.id, name: record.name, createdAt: record.createdAt };
+  return {
+    id: record.id,
+    name: record.name,
+    createdAt: record.createdAt,
+    archivedAt: record.archivedAt,
+  };
 }
 
 /** A blank name is refused, a long one cut to `MAX_CASE_NAME_LENGTH` (CASE-1). */
@@ -21,7 +26,10 @@ function cleanName(name: string): string {
   return trimmed;
 }
 
-/** Active cases, newest first (CASE-3). */
+/**
+ * Cases newest first (CASE-3), archived ones too: screens that offer cases leave those out with
+ * `activeCases()`, screens that name a document's case need them all (CASE-6).
+ */
 export async function listCases(): Promise<CaseSummary[]> {
   const cases = await getRepositories().cases.list();
   return cases.map(toSummary);
@@ -49,6 +57,15 @@ export async function renameCase(id: string, name: string): Promise<void> {
   if (!renamed) throw new Error('The case is gone');
 }
 
+/**
+ * «Archive» and «Restore from archive» (CASE-6). The documents stay in the case, their deadlines and
+ * reminders keep working.
+ */
+export async function setCaseArchived(id: string, archived: boolean): Promise<void> {
+  const changed = await getRepositories().cases.setArchived(id, archived);
+  if (!changed) throw new Error('The case is gone');
+}
+
 /** «Delete case» (CASE-5): the documents stay, out of any case. */
 export async function deleteCase(id: string): Promise<void> {
   await getRepositories().cases.remove(id);
@@ -64,4 +81,16 @@ export async function moveToCase(
 ): Promise<void> {
   const moved = await getRepositories().documents.moveToCase(documentIds, caseId);
   if (!moved) throw new Error('The case is gone');
+}
+
+/** The cases that aren't archived: the ones that take documents (CASE-2, CASE-3, CASE-6). */
+export function activeCases(cases: readonly CaseSummary[]): CaseSummary[] {
+  return cases.filter((item) => item.archivedAt === null);
+}
+
+/** Archived cases, the most recently archived first (CASE-6). */
+export function archivedCases(cases: readonly CaseSummary[]): CaseSummary[] {
+  return cases
+    .filter((item) => item.archivedAt !== null)
+    .sort((a, b) => ((a.archivedAt ?? '') < (b.archivedAt ?? '') ? 1 : -1));
 }
