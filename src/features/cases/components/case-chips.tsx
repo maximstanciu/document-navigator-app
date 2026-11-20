@@ -27,7 +27,7 @@ type ChipProps = Omit<PressableProps, 'children' | 'style'> & {
   label: string;
   detail?: string;
   accessibleLabel: string;
-  /** Filled lime with ink on it: the action among the places («New case»). */
+  /** Filled lime with ink on it, to stand out from the cases («New case», «Archive»). */
   accent?: boolean;
 };
 
@@ -54,7 +54,7 @@ function Chip({ role, icon, label, detail, accessibleLabel, accent, ...rest }: C
         {label}
       </ThemedText>
       {detail && (
-        <ThemedText type="small" themeColor="textSecondary">
+        <ThemedText type="small" themeColor={accent ? 'onAccent' : 'textSecondary'}>
           {detail}
         </ThemedText>
       )}
@@ -112,7 +112,7 @@ export function CaseChips({ cases, counts, archivedCases, archivedDocuments }: C
             </Link>
           );
         })}
-        {/* Opens a modal, like «Add»: an action rather than a place, so it stands out in lime. */}
+        {/* Opens a modal, like «Add»: an action rather than a place. */}
         <Chip
           role="button"
           accent
@@ -125,6 +125,7 @@ export function CaseChips({ cases, counts, archivedCases, archivedDocuments }: C
           <Link href="/archive" asChild>
             <Chip
               role="link"
+              accent
               icon={ARCHIVE}
               label={t('archive.title')}
               detail={String(archived)}
