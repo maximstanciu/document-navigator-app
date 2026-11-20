@@ -96,6 +96,23 @@ export function useAnalysisJobsPolling() {
   useQuery(analysisJobsQuery());
 }
 
+/**
+ * Checks the jobs now, joining a check already running, and resolves once what the server had is
+ * stored and read again — or after `timeoutMs`, whichever comes first. Never rejects. For a tap on
+ * the push about a finished analysis (ANL-12): its document then opens with the result rather than
+ * «Analyzing…», and a slow or missing network holds the opening back by `timeoutMs` at most.
+ */
+export function checkAnalysisJobsNow(queryClient: QueryClient, timeoutMs: number): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(resolve, timeoutMs);
+    const settle = () => {
+      clearTimeout(timer);
+      resolve();
+    };
+    queryClient.fetchQuery(analysisJobsQuery()).then(settle, settle);
+  });
+}
+
 /** Where the job of this document stands, while it waits on the server (ANL-3). */
 export function useJobProgress(documentId: string): JobProgress | null {
   const { data } = useQuery({
