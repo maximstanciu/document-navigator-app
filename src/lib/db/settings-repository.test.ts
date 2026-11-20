@@ -85,6 +85,20 @@ describe('settings repository', () => {
     ).rejects.toThrow(/overdueReminder/);
   });
 
+  it('stores the app lock, off by default (SET-8)', async () => {
+    expect(DEFAULT_SETTINGS.appLock).toBe(false);
+
+    await settings.update({ appLock: true });
+
+    expect((await settings.get()).appLock).toBe(true);
+    expect(
+      await db.getFirstAsync<{ value: string }>("SELECT value FROM settings WHERE key = 'app_lock'")
+    ).toEqual({ value: 'true' });
+    await expect(
+      settings.update({ appLock: 'yes' } as unknown as Parameters<typeof settings.update>[0])
+    ).rejects.toThrow(/appLock/);
+  });
+
   it('refuses a country without a memo', async () => {
     await expect(
       settings.update({ documentCountry: 'FR' } as unknown as Parameters<typeof settings.update>[0])

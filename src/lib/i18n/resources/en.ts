@@ -23,6 +23,14 @@ export const en = {
   app: {
     databaseError: 'Could not open the app data',
   },
+  appLock: {
+    title: 'App locked',
+    message: "Confirm it's you to open your documents.",
+    unlock: 'Unlock',
+    prompt: 'Unlock DocNavigator',
+    lockout: 'Too many attempts. Unlock the phone with its code, then try again.',
+    failed: "Couldn't confirm it's you. Try again.",
+  },
   tabs: {
     documents: 'Documents',
     deadlines: 'Deadlines',
@@ -553,6 +561,7 @@ export const en = {
       language: 'Language',
       reminders: 'Reminders',
       analysis: 'Analysis',
+      security: 'Security',
       data: 'Data',
       about: 'About',
     },
@@ -602,6 +611,25 @@ export const en = {
       details: 'Details in notifications',
       detailsHint:
         'Show what to do in the notification, for example “Pay €84.20”. Notifications can be seen on the lock screen.',
+    },
+    appLock: {
+      label: {
+        faceId: 'Require Face ID',
+        touchId: 'Require Touch ID',
+        fingerprint: 'Require fingerprint',
+        face: 'Require face unlock',
+        biometrics: 'Require biometrics',
+        passcode: 'Require screen lock',
+        generic: 'App lock',
+      },
+      hint: "Asked when the app starts and after more than a minute in the background. The phone's screen lock code works too.",
+      hintPasscode:
+        "The phone's screen lock code is asked when the app starts and after more than a minute in the background.",
+      unavailable: "Set up a screen lock in the phone's settings first.",
+      unavailableOn:
+        "The phone has no screen lock, so the app opens without the check. Set one up in the phone's settings.",
+      promptOn: 'Turn on app lock',
+      promptOff: 'Turn off app lock',
     },
     deleteAll: {
       button: 'Delete all data',

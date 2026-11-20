@@ -1,5 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
+import { confirmOwner } from '@/features/app-lock/confirm-owner';
+import type { AuthPrompt, AuthResult } from '@/features/app-lock/local-auth';
 import { syncRemindersInBackground } from '@/features/reminders/sync-reminders';
 import { dbKeys } from '@/lib/db/query-keys';
 import { getRepositories } from '@/lib/db/repositories';
@@ -34,6 +36,33 @@ export function useSettings() {
   const update = useUpdateSettings();
   const settings = data && { ...data, ...(update.isPending ? update.variables : undefined) };
   return { settings, update };
+}
+
+/**
+ * Turns the app lock on or off (SET-8) once the owner confirms it in the system prompt, so that
+ * neither a lock that can't be opened gets turned on nor someone holding the open app turns it off.
+ * `prompt: null` skips the check: turning it off on a phone without a screen lock, where there is
+ * nothing to check against. Resolves to the prompt's result; only `success` changes the setting.
+ */
+export function useSetAppLock() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({
+      enabled,
+      prompt,
+    }: {
+      enabled: boolean;
+      prompt: AuthPrompt | null;
+    }): Promise<AuthResult> => {
+      const result = prompt ? await confirmOwner(prompt) : 'success';
+      if (result === 'success') await getRepositories().settings.update({ appLock: enabled });
+      return result;
+    },
+    onSuccess: (result) =>
+      result === 'success'
+        ? queryClient.invalidateQueries({ queryKey: dbKeys.settings.all() })
+        : undefined,
+  });
 }
 
 /**

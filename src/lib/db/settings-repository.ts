@@ -16,6 +16,7 @@ const KEYS: { [K in keyof Settings]: string } = {
   notificationDetails: 'notification_details',
   overdueReminder: 'overdue_reminder',
   onboardingCompleted: 'onboarding_completed',
+  appLock: 'app_lock',
   consent: 'consent',
 };
 
@@ -35,6 +36,7 @@ function isValid<K extends keyof Settings>(key: K, value: unknown): value is Set
     case 'notificationDetails':
     case 'overdueReminder':
     case 'onboardingCompleted':
+    case 'appLock':
       return typeof value === 'boolean';
     case 'consent':
       return (

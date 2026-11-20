@@ -1,17 +1,17 @@
 import { useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { StyleSheet, Switch, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/themed-text';
 import { Button } from '@/components/ui/button';
 import { TimePicker } from '@/components/ui/date-time-picker';
 import { Spacing } from '@/constants/theme';
 import { PREPARATION_OFFSET_DAYS } from '@/features/reminders/plan-reminders';
-import { useTheme } from '@/hooks/use-theme';
 import { formatClockTime } from '@/lib/i18n/format';
 
 import { useSettings } from '../queries';
 import { ChoiceRow } from './choice-row';
+import { SwitchRow } from './switch-row';
 
 /** Days before a deadline the app offers to remind on; the default is 7, 1 and 0 (REM-2). */
 const OFFSET_OPTIONS = [14, 7, 3, 1, 0];
@@ -126,48 +126,6 @@ export function ReminderSettings() {
           {t('settings.saveFailed')}
         </ThemedText>
       )}
-    </View>
-  );
-}
-
-/** A setting turned on and off, with what it does under it. */
-function SwitchRow({
-  label,
-  hint,
-  value,
-  disabled,
-  onValueChange,
-}: {
-  label: string;
-  hint: string;
-  value: boolean;
-  disabled: boolean;
-  onValueChange: (value: boolean) => void;
-}) {
-  const theme = useTheme();
-  return (
-    <View style={styles.group}>
-      <View style={styles.row}>
-        <ThemedText type="smallBold" style={styles.text}>
-          {label}
-        </ThemedText>
-        <Switch
-          // Not `aria-label`: Switch hands its props to the native view as they are, and only View
-          // turns `aria-*` into what Android reads out (task 5.6: TalkBack found no name).
-          accessibilityLabel={label}
-          value={value}
-          disabled={disabled}
-          // The track off is as visible as on, in both themes (the web default nearly vanishes);
-          // the thumb is the theme's, not the platform's accent, except on iOS, which keeps its own.
-          trackColor={{ false: theme.textSecondary, true: theme.tint }}
-          ios_backgroundColor={theme.textSecondary}
-          thumbColor={process.env.EXPO_OS === 'ios' ? undefined : theme.onTint}
-          onValueChange={onValueChange}
-        />
-      </View>
-      <ThemedText type="small" themeColor="textSecondary">
-        {hint}
-      </ThemedText>
     </View>
   );
 }

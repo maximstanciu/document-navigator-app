@@ -3,6 +3,7 @@
     "NSCameraUsageDescription": "DocNavigator uses the camera to scan your documents.",
     "NSPhotoLibraryUsageDescription": "DocNavigator opens the photos you choose to add them as pages of a document.",
     "NSCalendarsUsageDescription": "DocNavigator adds the deadlines you choose to your calendar.",
-    "NSCalendarsWriteOnlyAccessUsageDescription": "DocNavigator adds the deadlines you choose to your calendar."
+    "NSCalendarsWriteOnlyAccessUsageDescription": "DocNavigator adds the deadlines you choose to your calendar.",
+    "NSFaceIDUsageDescription": "DocNavigator uses Face ID so that only you can open the app."
   }
 }

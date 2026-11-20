@@ -43,7 +43,7 @@ src/
     documents/[id].tsx # thin route: reads params, renders a feature screen
     api/v1/*+api.ts    # thin API routes: parse request, call a handler in src/server
   features/<feature>/  # one folder per domain area: capture, documents, analysis, deadlines,
-                       #   reminders, onboarding, settings (see the plan's target structure)
+                       #   reminders, onboarding, settings, app-lock (see the plan's target structure)
     types.ts api.ts queries.ts
     components/ screens/
   components/          # shared UI: ui/ for primitives (Button, Checkbox, date/time pickers),

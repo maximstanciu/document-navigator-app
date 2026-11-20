@@ -1,4 +1,5 @@
 import { resetFakeCalendar } from './fake-calendar';
+import { resetFakeLocalAuth } from './fake-local-auth';
 import { resetFakeNotifications } from './fake-notifications';
 
 // Native libraries that ship no Jest mock. Tests of features replace our adapter instead
@@ -29,3 +30,8 @@ beforeEach(() => resetFakeNotifications());
 // through `fakeCalendar` from `@/test/fake-calendar`.
 jest.mock('@/features/deadlines/calendar', () => jest.requireActual('@/test/fake-calendar'));
 beforeEach(() => resetFakeCalendar());
+
+// And without a screen lock, so that the app lock is never on and its setting is hidden, as on web.
+// App lock tests set one up through `fakeLocalAuth` from `@/test/fake-local-auth`.
+jest.mock('@/features/app-lock/local-auth', () => jest.requireActual('@/test/fake-local-auth'));
+beforeEach(() => resetFakeLocalAuth());

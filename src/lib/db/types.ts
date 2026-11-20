@@ -171,6 +171,11 @@ export type Settings = {
   /** One more reminder the day after a deadline still open (SET-7, REM-13). */
   overdueReminder: boolean;
   onboardingCompleted: boolean;
+  /**
+   * Ask for biometrics or the phone's screen lock to open the app (SET-8): at launch and after a
+   * minute in the background.
+   */
+  appLock: boolean;
   /** Analysis consent with the version of the consent text the user accepted (ONB-2). */
   consent: { version: string; acceptedAt: string } | null;
 };
@@ -184,5 +189,6 @@ export const DEFAULT_SETTINGS: Settings = {
   notificationDetails: false,
   overdueReminder: true,
   onboardingCompleted: false,
+  appLock: false,
   consent: null,
 };

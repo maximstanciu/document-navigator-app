@@ -14,6 +14,7 @@ import { RemainingAnalyses } from '@/features/analysis/components/remaining-anal
 import { settingsQuery } from '@/lib/db/settings-query';
 import { env } from '@/lib/env';
 
+import { AppLockSetting } from '../components/app-lock-setting';
 import { DeleteAllData } from '../components/delete-all-data';
 import { DocumentCountryPicker } from '../components/document-country-picker';
 import { ExplanationLanguagePicker, LanguagePicker } from '../components/language-picker';
@@ -31,8 +32,8 @@ function InfoRow({ label, value }: { label: string; value: string }) {
 }
 
 /**
- * Settings (SET-1…SET-5): languages, default reminders, what is left of today's analyses, «Delete
- * all data», and the disclaimer with the version. The privacy policy link comes with the policy
+ * Settings (SET-1…SET-8): languages, default reminders, what is left of today's analyses, the app
+ * lock, «Delete all data», and the disclaimer with the version. The privacy policy link comes with the policy
  * itself (task 6.4).
  */
 export function SettingsScreen() {
@@ -59,6 +60,7 @@ export function SettingsScreen() {
           <DocumentCountryPicker />
           <RemainingAnalyses />
         </Section>
+        <AppLockSetting />
         <Section gap={Spacing.three} title={t('settings.sections.data')}>
           <DeleteAllData />
         </Section>

@@ -7,6 +7,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { Colors, Fonts } from '@/constants/theme';
 import { AnalysisJobsSync } from '@/features/analysis/components/analysis-jobs-sync';
+import { AppLock } from '@/features/app-lock/components/app-lock';
 import { DeadlineNotificationActions } from '@/features/deadlines/components/deadline-notification-actions';
 import { NotificationOpener } from '@/features/reminders/components/notification-opener';
 import { ReminderSync } from '@/features/reminders/components/reminder-sync';
@@ -56,10 +57,13 @@ export function AppProviders({ children }: PropsWithChildren) {
             <LanguageSync />
             <ReminderSync />
             <AnalysisJobsSync />
-            {children}
-            {/* After the navigator, so its effect runs once the root stack is mounted (REM-6). */}
-            <NotificationOpener />
-            <DeadlineNotificationActions />
+            {/* Everything that shows or opens a screen waits for the owner (SET-8). */}
+            <AppLock>
+              {children}
+              {/* After the navigator, so its effect runs once the root stack is mounted (REM-6). */}
+              <NotificationOpener />
+              <DeadlineNotificationActions />
+            </AppLock>
           </DatabaseGate>
         </ThemeProvider>
       </QueryClientProvider>

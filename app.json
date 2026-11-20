@@ -145,6 +145,12 @@
       "expo-sqlite",
       "expo-secure-store",
       [
+        "expo-local-authentication",
+        {
+          "faceIDPermission": "DocNavigator uses Face ID so that only you can open the app."
+        }
+      ],
+      [
         "expo-calendar",
         {
           "calendarPermission": "DocNavigator adds the deadlines you choose to your calendar.",

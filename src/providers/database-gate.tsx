@@ -5,20 +5,23 @@ import { useTranslation } from 'react-i18next';
 
 import { ErrorState } from '@/components/screen-state';
 import { openAppDatabase } from '@/lib/db/open-database';
+import { settingsQuery } from '@/lib/db/settings-query';
 import { applyStoredLanguage } from '@/lib/i18n/i18n';
 
 /**
- * Renders the app only after the database is open and migrated (STO-5) and the stored interface
- * language is applied (SET-1). The splash screen stays up meanwhile (`preventAutoHideAsync` in the
+ * Renders the app only after the database is open and migrated (STO-5), the stored interface
+ * language is applied (SET-1) and the settings are read, so the app lock (SET-8) knows at once
+ * whether to show the lock. The splash screen stays up meanwhile (`preventAutoHideAsync` in the
  * root layout); a failure shows an error with retry.
  */
 export function DatabaseGate({ children }: PropsWithChildren) {
   const { t } = useTranslation();
   const { status, error, refetch } = useQuery({
     queryKey: ['app', 'database'],
-    queryFn: async () => {
+    queryFn: async ({ client }) => {
       await openAppDatabase();
       await applyStoredLanguage();
+      await client.prefetchQuery(settingsQuery());
       return true;
     },
     staleTime: Infinity,
