@@ -279,6 +279,18 @@ describe('CaseScreen (CASE-3…CASE-5)', () => {
       expect((await repositories.cases.get('flat'))?.archivedAt).toBeNull();
     });
 
+    it('does not invite adding documents to an empty archived case', async () => {
+      await repositories.cases.setArchived('flat', true);
+      await renderCase();
+
+      expect(await screen.findByText('No documents in this case')).toBeOnTheScreen();
+      expect(
+        screen.getByText('To add documents, restore the case from the archive first.')
+      ).toBeOnTheScreen();
+      expect(screen.queryByText('No documents in this case yet')).not.toBeOnTheScreen();
+      expect(screen.queryByText(/Add a new document/)).not.toBeOnTheScreen();
+    });
+
     it('offers «Restore from archive» in the sheet of an archived case', async () => {
       await repositories.cases.setArchived('flat', true);
       await renderCase();

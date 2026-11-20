@@ -214,7 +214,15 @@ export function CaseScreen({ id }: { id: string }) {
           </View>
         }
         ListEmptyComponent={
-          <EmptyState title={t('cases.emptyTitle')} message={t('cases.emptyMessage')} />
+          // An archived case takes no documents (CASE-6), so it doesn't invite adding them.
+          archived ? (
+            <EmptyState
+              title={t('cases.archive.emptyCaseTitle')}
+              message={t('cases.archive.emptyCaseMessage')}
+            />
+          ) : (
+            <EmptyState title={t('cases.emptyTitle')} message={t('cases.emptyMessage')} />
+          )
         }
         keyboardShouldPersistTaps="handled"
         contentContainerStyle={styles.content}

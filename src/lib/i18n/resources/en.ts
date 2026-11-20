@@ -296,6 +296,8 @@ export const en = {
         "Its documents aren't under “All documents”, but search finds them. Deadlines and reminders work as before.",
       restore: 'Restore from archive',
       restoreFailed: "Couldn't restore the case. Try again.",
+      emptyCaseTitle: 'No documents in this case',
+      emptyCaseMessage: 'To add documents, restore the case from the archive first.',
     },
     document: {
       add: 'Add to a case',
