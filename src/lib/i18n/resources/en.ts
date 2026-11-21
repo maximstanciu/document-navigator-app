@@ -180,7 +180,8 @@ export const en = {
       keyFacts: 'Key facts',
       original: 'Original',
     },
-    noActions: "The document doesn't ask you to do anything.",
+    noActions:
+      "We didn't find anything you need to do. The analysis can miss things, so check the original.",
     disclaimer:
       'This is not legal advice. Check important dates and amounts against the original document.',
     loadFailed: "Couldn't load this part of the document.",

@@ -197,6 +197,19 @@ describe('DocumentDetailScreen', () => {
       expect(screen.queryByRole('heading', { name: 'Deadlines' })).not.toBeOnTheScreen();
     });
 
+    it('says no actions were found, not that there are none, and points to the original (DET-3)', async () => {
+      await seedAnalyzed({ ...ANALYSIS_FIXTURES.invoice, actions: [], deadlines: [] });
+
+      await renderDocument();
+
+      expect(await screen.findByRole('heading', { name: 'What to do' })).toBeOnTheScreen();
+      expect(
+        await screen.findByText(
+          "We didn't find anything you need to do. The analysis can miss things, so check the original."
+        )
+      ).toBeOnTheScreen();
+    });
+
     it('groups several actions under their deadline and lists the rest under «Deadlines»', async () => {
       await seedAnalyzed(ANALYSIS_FIXTURES.officialNotice);
 
